@@ -1,0 +1,182 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Edit3,
+  FileText,
+  PenTool,
+  Plus,
+} from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
+import { StatusBadge } from '../../components/common/StatusBadge';
+import { apiClient } from '../../api/client';
+import type { Article, PaginatedResult } from '../../types';
+
+export const UserDashboardPage: React.FC = () => {
+  const { user } = useAuthStore();
+
+  const { data: articlesData, isLoading } = useQuery({
+    queryKey: ['authorArticles', user?.id],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
+        params: { limit: 50 },
+      });
+      return data;
+    },
+    enabled: Boolean(user?.id),
+  });
+
+  const articles = articlesData?.items || [];
+
+  // Compute live KPI metrics
+  const totalCount = articles.length;
+  const publishedCount = articles.filter((a) => a.status === 'published').length;
+  const reviewCount = articles.filter((a) => a.status === 'pending_review').length;
+  const draftCount = articles.filter((a) => a.status === 'draft').length;
+
+  const recentDrafts = articles
+    .filter((a) => a.status === 'draft' || a.status === 'pending_review')
+    .slice(0, 4);
+
+  return (
+    <div className="space-y-10 font-sans text-ink-primary">
+      {/* Desk Masthead Header */}
+      <div className="border-b border-border-subtle pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="text-xs font-mono uppercase tracking-wider text-ink-secondary mb-1">
+            THE GAZETTE / YOUR DESK
+          </div>
+          <h1 className="text-3xl font-editorial font-bold text-ink-primary">
+            Welcome back, {user?.name}
+          </h1>
+          <p className="text-xs text-ink-secondary mt-1 font-mono">
+            {publishedCount} published · {reviewCount} awaiting review · {draftCount} draft
+          </p>
+        </div>
+
+        <Link
+          to="/editor"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-sm self-start sm:self-auto"
+        >
+          <PenTool size={14} />
+          <span>Write New Story</span>
+        </Link>
+      </div>
+
+      {/* Typographic Metrics Bar (Rules over Box Cards) */}
+      <div className="py-6 border-b border-border-subtle grid grid-cols-2 md:grid-cols-4 gap-6 text-left font-sans">
+        <div className="space-y-1 border-r border-border-subtle/60 pr-4 last:border-r-0">
+          <div className="text-3xl font-editorial font-bold text-ink-primary">
+            {isLoading ? '...' : publishedCount}
+          </div>
+          <div className="text-xs font-mono uppercase tracking-wider text-emerald-700 font-semibold flex items-center gap-1">
+            <CheckCircle2 size={12} />
+            <span>Published</span>
+          </div>
+          <div className="text-[11px] text-ink-secondary">Live on publication front page</div>
+        </div>
+
+        <div className="space-y-1 border-r border-border-subtle/60 pr-4 last:border-r-0">
+          <div className="text-3xl font-editorial font-bold text-ink-primary">
+            {isLoading ? '...' : reviewCount}
+          </div>
+          <div className="text-xs font-mono uppercase tracking-wider text-amber-700 font-semibold flex items-center gap-1">
+            <Clock size={12} />
+            <span>In Review</span>
+          </div>
+          <div className="text-[11px] text-ink-secondary">Awaiting senior editor review</div>
+        </div>
+
+        <div className="space-y-1 border-r border-border-subtle/60 pr-4 last:border-r-0">
+          <div className="text-3xl font-editorial font-bold text-ink-primary">
+            {isLoading ? '...' : draftCount}
+          </div>
+          <div className="text-xs font-mono uppercase tracking-wider text-ink-secondary font-semibold flex items-center gap-1">
+            <Edit3 size={12} />
+            <span>Active Drafts</span>
+          </div>
+          <div className="text-[11px] text-ink-secondary">Works in progress</div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-3xl font-editorial font-bold text-ink-primary">
+            {isLoading ? '...' : totalCount}
+          </div>
+          <div className="text-xs font-mono uppercase tracking-wider text-ink-secondary font-semibold flex items-center gap-1">
+            <FileText size={12} />
+            <span>Total Manuscripts</span>
+          </div>
+          <div className="text-[11px] text-ink-secondary">Across story lifecycle</div>
+        </div>
+      </div>
+
+      {/* Works in Progress Stream */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+          <h2 className="text-lg font-editorial font-bold text-ink-primary">
+            Active Works in Progress
+          </h2>
+          <Link
+            to="/stories"
+            className="text-xs font-semibold text-accent-crimson hover:underline flex items-center gap-1"
+          >
+            <span>View All Manuscripts →</span>
+          </Link>
+        </div>
+
+        <div className="divide-y divide-border-subtle">
+          {recentDrafts.length > 0 ? (
+            recentDrafts.map((draft) => (
+              <article
+                key={draft.id}
+                className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+              >
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-[11px] font-mono">
+                    <StatusBadge status={draft.status} />
+                    <span className="text-ink-secondary">v{draft.version}</span>
+                    <span className="text-ink-secondary">· {draft.wordCount || 0} words</span>
+                  </div>
+
+                  <Link
+                    to={`/editor/${draft.id}`}
+                    className="text-base font-editorial font-bold text-ink-primary group-hover:text-accent-crimson transition-colors block truncate"
+                  >
+                    {draft.title.replace(/\s\d{10,}/g, '')}
+                  </Link>
+
+                  <p className="text-xs text-ink-secondary line-clamp-1">
+                    {draft.description || 'No excerpt provided.'}
+                  </p>
+                </div>
+
+                <Link
+                  to={`/editor/${draft.id}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-ink-primary rounded-lg text-xs font-medium transition-colors shrink-0 font-mono"
+                >
+                  <Edit3 size={13} />
+                  <span>Resume Writing</span>
+                </Link>
+              </article>
+            ))
+          ) : (
+            <div className="py-12 text-center space-y-3">
+              <p className="text-sm font-bold text-ink-primary">No active drafts yet.</p>
+              <p className="text-xs text-ink-secondary">Start a new story when you're ready.</p>
+              <Link
+                to="/editor"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors"
+              >
+                <Plus size={14} />
+                <span>Write a story</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

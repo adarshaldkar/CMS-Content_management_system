@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms_dev_password
+      POSTGRES_DB: cms_platform
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cms -d cms_platform']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: cms-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: cms
+      MONGO_INITDB_ROOT_PASSWORD: cms_dev_password
+      MONGO_INITDB_DATABASE: cms_platform
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  mongo_data:

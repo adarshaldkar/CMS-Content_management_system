@@ -1,0 +1,113 @@
+import type { PaginationQuery } from './common.model';
+
+export enum ContentStatus {
+  DRAFT = 'draft',
+  PENDING_REVIEW = 'pending_review',
+  APPROVED = 'approved',
+  SCHEDULED = 'scheduled',
+  PUBLISHED = 'published',
+  REJECTED = 'rejected',
+  ARCHIVED = 'archived',
+}
+
+export interface Article {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  content: string;
+  authorId: string;
+  categoryId: string | null;
+  tagIds: string[];
+  coverImage: string | null;
+  status: ContentStatus;
+  version: number;
+  wordCount: number;
+  readingTimeMinutes: number;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  reviewNote: string | null;
+  scheduledAt: Date | null;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface ArticleRevision {
+  id: string;
+  articleId: string;
+  version: number;
+  title: string;
+  description: string;
+  content: string;
+  authorId: string;
+  changeSummary: string | null;
+  createdAt: Date;
+}
+
+export interface CreateRevisionDto {
+  articleId: string;
+  version: number;
+  title: string;
+  description: string;
+  content: string;
+  authorId: string;
+  changeSummary?: string | null;
+}
+
+export interface WorkflowTransitionDto {
+  targetStatus: ContentStatus;
+  reviewNote?: string | null;
+  scheduledAt?: string | null;
+  changeSummary?: string | null;
+  expectedVersion?: number;
+}
+
+export interface CreateArticleDto {
+  title: string;
+  slug: string;
+  description: string;
+  content: string;
+  authorId: string;
+  categoryId?: string | null;
+  tagIds?: string[];
+  coverImage?: string | null;
+  status?: ContentStatus;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  scheduledAt?: Date | null;
+  reviewNote?: string | null;
+  wordCount?: number;
+  readingTimeMinutes?: number;
+}
+
+export interface UpdateArticleDto {
+  title?: string;
+  slug?: string;
+  description?: string;
+  content?: string;
+  categoryId?: string | null;
+  tagIds?: string[];
+  coverImage?: string | null;
+  status?: ContentStatus;
+  version?: number;
+  expectedVersion?: number;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  scheduledAt?: Date | null;
+  publishedAt?: Date | null;
+  reviewNote?: string | null;
+  wordCount?: number;
+  readingTimeMinutes?: number;
+  changeSummary?: string | null;
+}
+
+export interface ArticleQueryFilters extends PaginationQuery {
+  status?: ContentStatus;
+  authorId?: string;
+  categoryId?: string;
+  categorySlug?: string;
+  search?: string;
+  sort?: 'trending' | 'latest' | 'popular';
+}
