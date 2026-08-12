@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Calendar,
   CheckCircle2,
-  Clock,
-  Eye,
   FileCheck,
   FileText,
-  Filter,
   History,
-  MessageSquare,
   Sparkles,
   XCircle,
 } from 'lucide-react';
@@ -88,28 +83,26 @@ export const EditorialReviewPage: React.FC = () => {
   });
 
   const articles = articlesData?.items || [];
-  const latestRevision = revisions[0];
-  const previousRevision = revisions[1];
 
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-accent-crimson font-semibold mb-1">
-            <FileCheck size={15} />
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-accent-crimson font-semibold mb-1">
+            <FileCheck size={13} />
             <span>Editorial Governance</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-editorial font-bold text-ink-primary">
+          <h1 className="text-2xl sm:text-3xl font-editorial font-semibold text-ink-primary">
             Manuscript Review Queue
           </h1>
           <p className="text-xs text-ink-secondary mt-1">
-            Review author submissions, inspect revision diffs, and approve pieces for publication.
+            Review author submissions, inspect version snapshots, and approve pieces for publication.
           </p>
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto no-scrollbar">
+        <div className="flex items-center border-b border-border-subtle overflow-x-auto">
           {[
             { id: 'pending_review', label: 'Pending Review', count: articles.length },
             { id: 'changes_requested', label: 'Changes Requested' },
@@ -122,16 +115,16 @@ export const EditorialReviewPage: React.FC = () => {
                 setActiveTab(tab.id as any);
                 setSelectedArticle(null);
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'bg-white text-ink-primary shadow-sm'
-                  : 'text-ink-secondary hover:text-ink-primary'
+                  ? 'border-ink-primary text-ink-primary'
+                  : 'border-transparent text-ink-secondary hover:text-ink-primary'
               }`}
             >
               <span>{tab.label}</span>
-              {tab.id === 'pending_review' && (
-                <span className="px-1.5 py-0.5 bg-accent-crimson text-white rounded-full text-[10px] font-mono">
-                  {articles.length}
+              {tab.id === 'pending_review' && articles.length > 0 && (
+                <span className="font-mono text-[10px] text-accent-crimson font-bold">
+                  ({articles.length})
                 </span>
               )}
             </button>
@@ -139,44 +132,46 @@ export const EditorialReviewPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Review Area: List & Side-by-Side Diff */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* Main Review Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Manuscripts Queue List (5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
-          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-secondary font-semibold">
+        <div className="lg:col-span-5 space-y-3">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold">
             Submissions ({articles.length})
-          </h2>
+          </p>
 
           {isLoading ? (
             <div className="py-12 text-center">
               <LoadingSpinner label="Loading submissions..." />
             </div>
           ) : articles.length > 0 ? (
-            <div className="space-y-3">
+            <div className="divide-y divide-border-subtle bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
               {articles.map((article) => (
                 <div
                   key={article.id}
                   onClick={() => setSelectedArticle(article)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                  className={`p-4 transition-colors cursor-pointer space-y-1.5 ${
                     selectedArticle?.id === article.id
-                      ? 'bg-white border-accent-crimson shadow-md ring-1 ring-accent-crimson/20'
-                      : 'bg-white border-border-subtle hover:border-slate-300 shadow-sm'
+                      ? 'bg-slate-50 border-l-2 border-accent-crimson'
+                      : 'hover:bg-slate-50/60 border-l-2 border-transparent'
                   }`}
                 >
-                  <div className="flex items-center justify-between text-[11px] font-mono">
+                  <div className="flex items-center justify-between text-[10px] font-mono">
                     <span className="text-accent-crimson font-semibold uppercase tracking-wider">
-                      {article.categorySlug || 'Technology'}
+                      {article.categorySlug || 'Dispatch'}
                     </span>
                     <span className="text-ink-secondary">v{article.version}</span>
                   </div>
 
-                  <h3 className="text-sm font-editorial font-bold text-ink-primary leading-snug line-clamp-2">
+                  <h3 className="text-sm font-editorial font-semibold text-ink-primary leading-snug line-clamp-2">
                     {article.title}
                   </h3>
 
-                  <p className="text-xs text-ink-secondary line-clamp-2">{article.description}</p>
+                  {article.description && (
+                    <p className="text-xs text-ink-secondary line-clamp-2">{article.description}</p>
+                  )}
 
-                  <div className="flex items-center justify-between text-[11px] font-mono text-ink-secondary pt-2 border-t border-border-subtle/50">
+                  <div className="flex items-center justify-between text-[10px] font-mono text-ink-secondary pt-2">
                     <span>{article.readingTimeMinutes || 3} min read</span>
                     <span>{new Date(article.updatedAt).toLocaleDateString()}</span>
                   </div>
@@ -184,22 +179,22 @@ export const EditorialReviewPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="p-10 text-center bg-white border border-border-subtle rounded-xl">
-              <CheckCircle2 size={24} className="mx-auto text-emerald-600 mb-2" />
+            <div className="p-10 text-center bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
+              <CheckCircle2 size={20} className="mx-auto text-emerald-600 mb-2" />
               <p className="text-xs font-semibold text-ink-primary">Queue is clear</p>
-              <p className="text-xs text-ink-secondary mt-1">No manuscripts in this status.</p>
+              <p className="text-xs text-ink-secondary mt-1 font-editorial italic">No manuscripts in this status.</p>
             </div>
           )}
         </div>
 
-        {/* Inspection & Diff Viewer (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Inspection & Manuscript Detail (7 cols) */}
+        <div className="lg:col-span-7 space-y-4">
           {selectedArticle ? (
-            <div className="bg-white border border-border-subtle rounded-2xl p-6 shadow-sm space-y-6">
+            <div className="bg-white border border-border-subtle p-6 space-y-6" style={{ borderRadius: 2 }}>
               {/* Inspection Header */}
-              <div className="space-y-3 border-b border-border-subtle pb-5">
+              <div className="space-y-2 border-b border-border-subtle pb-4">
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-[11px] font-mono font-semibold uppercase tracking-wider">
+                  <span className="font-mono text-[10px] uppercase font-semibold text-accent-crimson tracking-wider">
                     {selectedArticle.status.replace('_', ' ')}
                   </span>
                   <span className="text-xs font-mono text-ink-secondary">
@@ -207,17 +202,19 @@ export const EditorialReviewPage: React.FC = () => {
                   </span>
                 </div>
 
-                <h2 className="text-2xl font-editorial font-bold text-ink-primary leading-tight">
+                <h2 className="text-2xl font-editorial font-semibold text-ink-primary leading-tight">
                   {selectedArticle.title}
                 </h2>
 
-                <p className="text-sm text-ink-secondary italic font-editorial">
-                  {selectedArticle.description}
-                </p>
+                {selectedArticle.description && (
+                  <p className="text-sm text-ink-secondary italic font-editorial">
+                    {selectedArticle.description}
+                  </p>
+                )}
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-4 rounded-xl border border-border-subtle">
+              <div className="flex flex-wrap items-center gap-2 bg-canvas-paper p-3 border border-border-subtle" style={{ borderRadius: 2 }}>
                 <button
                   onClick={() =>
                     transitionMutation.mutate({
@@ -226,10 +223,11 @@ export const EditorialReviewPage: React.FC = () => {
                     })
                   }
                   disabled={transitionMutation.isPending}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold tracking-wide transition-colors"
+                  style={{ borderRadius: 2 }}
                 >
-                  <CheckCircle2 size={14} />
-                  <span>Approve Manuscript</span>
+                  <CheckCircle2 size={13} />
+                  <span>Approve</span>
                 </button>
 
                 <button
@@ -240,51 +238,55 @@ export const EditorialReviewPage: React.FC = () => {
                     })
                   }
                   disabled={transitionMutation.isPending}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-accent-crimson hover:bg-accent-crimson-hover text-white rounded-lg text-xs font-semibold tracking-wide transition-colors"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors"
+                  style={{ borderRadius: 2 }}
                 >
-                  <Sparkles size={14} />
+                  <Sparkles size={13} />
                   <span>Publish Directly</span>
                 </button>
 
                 <button
                   onClick={() => setShowRejectModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold tracking-wide transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold tracking-wide transition-colors"
+                  style={{ borderRadius: 2 }}
                 >
-                  <XCircle size={14} />
+                  <XCircle size={13} />
                   <span>Request Changes</span>
                 </button>
 
                 <button
                   onClick={() => setShowScheduleModal(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-border-subtle text-ink-secondary hover:text-ink-primary rounded-lg text-xs font-semibold tracking-wide transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border-subtle text-ink-secondary hover:text-ink-primary text-xs font-semibold tracking-wide transition-colors"
+                  style={{ borderRadius: 2 }}
                 >
-                  <Calendar size={14} />
-                  <span>Schedule Release</span>
+                  <Calendar size={13} />
+                  <span>Schedule</span>
                 </button>
               </div>
 
               {/* Revision Snapshot & Content Body */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs font-mono text-ink-secondary border-b border-border-subtle pb-2">
                   <span className="font-semibold text-ink-primary flex items-center gap-1.5">
-                    <History size={14} />
-                    <span>Revision Snapshot (v{selectedArticle.version})</span>
+                    <History size={13} />
+                    <span>Manuscript Content (v{selectedArticle.version})</span>
                   </span>
-                  <span>{revisions.length} total revision snapshots</span>
+                  <span>{revisions.length} revision snapshots</span>
                 </div>
 
                 <div
-                  className="prose prose-slate max-w-none text-sm leading-relaxed p-4 bg-slate-50/70 rounded-xl border border-border-subtle font-sans max-h-96 overflow-y-auto"
+                  className="prose prose-slate max-w-none text-sm leading-relaxed p-4 bg-canvas-paper border border-border-subtle font-sans max-h-96 overflow-y-auto"
+                  style={{ borderRadius: 2 }}
                   dangerouslySetInnerHTML={{ __html: selectedArticle.content }}
                 />
               </div>
             </div>
           ) : (
-            <div className="p-16 text-center bg-white border border-dashed border-border-subtle rounded-2xl">
-              <FileText size={32} className="mx-auto text-slate-300 mb-3" />
+            <div className="p-16 text-center bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
+              <FileText size={28} className="mx-auto text-ink-secondary/40 mb-3" />
               <p className="text-sm font-semibold text-ink-primary">Select a manuscript from the queue</p>
-              <p className="text-xs text-ink-secondary mt-1">
-                Inspect author changes, review revision diffs, and approve or request revisions.
+              <p className="text-xs text-ink-secondary mt-1 font-editorial italic">
+                Inspect author changes, review revision snapshots, and approve or request revisions.
               </p>
             </div>
           )}
@@ -293,10 +295,10 @@ export const EditorialReviewPage: React.FC = () => {
 
       {/* Reject / Request Changes Modal */}
       {showRejectModal && selectedArticle && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center gap-2 text-rose-600">
-              <AlertCircle size={18} />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans">
+          <div className="bg-white border border-border-subtle w-full max-w-md p-6 space-y-4 shadow-xl" style={{ borderRadius: 2 }}>
+            <div className="flex items-center gap-2 text-rose-700">
+              <AlertCircle size={16} />
               <h3 className="text-base font-bold text-ink-primary">Request Editorial Changes</h3>
             </div>
             <p className="text-xs text-ink-secondary leading-relaxed">
@@ -305,14 +307,15 @@ export const EditorialReviewPage: React.FC = () => {
             <textarea
               value={reviewNote}
               onChange={(e) => setReviewNote(e.target.value)}
-              placeholder="e.g. Please substantiate the claim in section 2 with verified benchmarks..."
+              placeholder="e.g. Please clarify citations in section 2 and provide benchmark numbers…"
               rows={4}
-              className="w-full p-3 text-xs bg-slate-50 border border-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+              className="w-full p-3 text-xs bg-canvas-paper border border-border-subtle focus:outline-none focus:border-ink-primary font-sans"
+              style={{ borderRadius: 2 }}
             />
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowRejectModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-ink-secondary hover:text-ink-primary"
+                className="px-3.5 py-1.5 text-xs font-semibold text-ink-secondary hover:text-ink-primary"
               >
                 Cancel
               </button>
@@ -325,7 +328,8 @@ export const EditorialReviewPage: React.FC = () => {
                   })
                 }
                 disabled={!reviewNote.trim() || transitionMutation.isPending}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors disabled:opacity-50"
+                className="px-4 py-1.5 bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold tracking-wide transition-colors disabled:opacity-50"
+                style={{ borderRadius: 2 }}
               >
                 Submit Feedback Note
               </button>
@@ -336,25 +340,26 @@ export const EditorialReviewPage: React.FC = () => {
 
       {/* Schedule Release Modal */}
       {showScheduleModal && selectedArticle && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans">
+          <div className="bg-white border border-border-subtle w-full max-w-md p-6 space-y-4 shadow-xl" style={{ borderRadius: 2 }}>
             <div className="flex items-center gap-2 text-ink-primary">
-              <Calendar size={18} className="text-accent-crimson" />
+              <Calendar size={16} className="text-accent-crimson" />
               <h3 className="text-base font-bold">Schedule Publication Release</h3>
             </div>
             <p className="text-xs text-ink-secondary leading-relaxed">
-              Select the date and time when this article will be automatically published to the public front page.
+              Select the date and time when this article will be automatically published.
             </p>
             <input
               type="datetime-local"
               value={scheduleDate}
               onChange={(e) => setScheduleDate(e.target.value)}
-              className="w-full p-3 text-xs bg-slate-50 border border-border-subtle rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-crimson/20"
+              className="w-full p-2.5 text-xs bg-canvas-paper border border-border-subtle focus:outline-none focus:border-ink-primary font-mono"
+              style={{ borderRadius: 2 }}
             />
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowScheduleModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-ink-secondary"
+                className="px-3.5 py-1.5 text-xs font-semibold text-ink-secondary hover:text-ink-primary"
               >
                 Cancel
               </button>
@@ -367,7 +372,8 @@ export const EditorialReviewPage: React.FC = () => {
                   })
                 }
                 disabled={!scheduleDate || transitionMutation.isPending}
-                className="px-4 py-2 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors disabled:opacity-50"
+                className="px-4 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors disabled:opacity-50"
+                style={{ borderRadius: 2 }}
               >
                 Confirm Schedule
               </button>

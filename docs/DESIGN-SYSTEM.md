@@ -1,24 +1,51 @@
-# THE GAZETTE — Editorial Visual Design System Rules
+# THE GAZETTE — Editorial Visual & Surface Composition System
 
-> **Master Directive:** Eliminate AI-generated template patterns (4-card KPI rows, rounded box cards for everything, promotional empty states). Build an authentic, human publication interface based on strong typography, horizontal rules (`──────`), intentional asymmetry, whitespace, and compact editorial metadata.
+> **Master Rule:** Cards are used ONLY when content genuinely requires containment (e.g. lightbox preview, media asset tile). Lists, editorial sections, horizontal hairline rules (`──────`), typography, whitespace, and asymmetrical composition MUST be preferred for informational content, selection interfaces, and workspaces.
 
 ---
 
-## 1. Core Visual Rules
+## 1. Surface Identity Architecture
 
-1. **Stop Using Box Cards Everywhere**:
-   - Use containers ONLY when semantic group containment is strictly required (e.g., lightbox preview, media asset tile).
-   - Replace KPI box cards (`[Card] [Card] [Card] [Card]`) with **typographic statistics separated by horizontal rules and subtle vertical dividers**.
-2. **Editorial Composition (Lines & Rules over Boxes)**:
-   - Use horizontal rules (`border-b border-border-subtle`, `divide-y`) and whitespace rather than wrapped `┌──────┐` rounded border containers.
-   - Let content dictate structure through font sizing (*Newsreader* serif headlines, *Plus Jakarta Sans* body, *JetBrains Mono* metadata).
-3. **Concise, Human Microcopy**:
-   - Never use promotional AI marketing copy inside product dashboards (e.g. *"Start your next story in our typography-first studio"*).
-   - Use direct, human microcopy: **"No drafts yet."** → **"Write a story"**.
-4. **Grouped Publication Desk Sidebar**:
-   - Group navigation items under clear editorial desks (`WRITE`, `YOUR DESK`, `READ`, `ACCOUNT`) rather than a flat SaaS list.
-5. **Clean Editorial Headlines**:
-   - Never display internal test timestamps or raw IDs in display headlines. Keep titles clean, authoritative, and human.
-6. **Restrained Color Usage**:
-   - Reserve strong accent colors (*Crimson*) for primary editorial leads and primary CTAs.
-   - Keep status tags restrained using subtle typography and neutral slate borders.
+The platform consists of **4 distinct visual surfaces**, each tailored to its exact purpose:
+
+```text
+                                PLATFORM SURFACES
+                                        │
+     ┌───────────────────┬──────────────┴──────────────┬───────────────────┐
+     │                   │                             │                   │
+     ▼                   ▼                             ▼                   ▼
+1. PUBLIC WEBSITE   2. ONBOARDING                  3. USER DESK        4. ADMIN SUITE
+• Asymmetric         • Left-aligned                • Publication desk  • Operational
+• Headline-driven    • Typographic lists           • Typographic stats • Tabular & dense
+• Image-lead hero    • Hairline rules              • Workspace streams • Compact metadata
+• Hairline rules     • Zero icon boxes / cards     • Hairline dividers • High data density
+```
+
+---
+
+## 2. Specific Page Surface Composition Rules
+
+### Surface A: Onboarding (`/onboarding`)
+- **Layout**: Left-aligned, un-centered editorial structure.
+- **Typography**: Clean serif header (`WHAT WOULD YOU LIKE TO READ?`), uppercase section dividers (`ENGINEERING`, `DESIGN & CULTURE`, `DISCOVERY`).
+- **Selection Control**: Clean typographic list items separated by 1px rules (`──────`). Selected topics use bold typography, subtle accent text, and a simple `✓` or `Selected` indicator — **no 2-column card boxes, no icon containers, no checkmark circles**.
+- **Explanatory text**: Removed unnecessary sub-descriptions under every item. Let the typography and subject name communicate clearly.
+
+### Surface B: User Dashboard & Desk (`/dashboard`, `/stories`)
+- **Metrics**: Large typographic stats separated by horizontal rules and clean vertical dividers:
+  ```text
+  3                 2                 1                 0
+  Published         In Review         Drafts            Scheduled
+  ─────────────────────────────────────────────────────────────
+  ```
+- **Story Stream**: Clean typographic list items divided by horizontal rules (`divide-y divide-border-subtle`).
+- **Microcopy**: Direct human phrasing (`"No active drafts."` → `[ Write a story ]`). No promotional AI marketing copy.
+
+### Surface C: Public Editorial Homepage (`/`)
+- **Layout**: Intentional editorial asymmetry (6-col hero lead story, 3-col secondary highlights, 3-col numbered trending `01`–`05`).
+- **Headlines**: Authoritative display serif headlines (*Newsreader* / *Playfair*) with tight leading (`leading-[1.1]`).
+- **Categories & Tags**: Clean uppercase typography (`TECHNOLOGY · 4 MIN READ`), no rounded pill bubble backgrounds.
+
+### Surface D: Admin Panel (`/admin/*`)
+- **Layout**: Dense, operational, and tabular.
+- **Design**: Clean data tables, status pills, filter bars, and compact metrics designed for high-density workflow tasks.

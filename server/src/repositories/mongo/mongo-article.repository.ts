@@ -71,9 +71,10 @@ export class MongoArticleRepository implements IArticleRepository {
     if (filters.authorId) query.authorId = filters.authorId;
     if (filters.categoryId) query.categoryId = filters.categoryId;
     if (filters.search) {
+      const safeSearch = filters.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { title: { $regex: filters.search, $options: 'i' } },
-        { description: { $regex: filters.search, $options: 'i' } },
+        { title: { $regex: safeSearch, $options: 'i' } },
+        { description: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 

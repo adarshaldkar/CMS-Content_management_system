@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FolderPlus,
-  Hash,
-  Layers,
   Pencil,
   Plus,
   Tag,
@@ -66,7 +64,7 @@ export const TaxonomyManagerPage: React.FC = () => {
   // 3. Delete Category Mutation
   const deleteCategoryMutation = useMutation({
     mutationFn: async (id: string) => {
-      if (!confirm('Are you sure you want to delete this taxonomy category?')) return;
+      if (!confirm('Are you sure you want to delete this category?')) return;
       await apiClient.delete(`/categories/${id}`);
     },
     onSuccess: () => {
@@ -74,159 +72,171 @@ export const TaxonomyManagerPage: React.FC = () => {
     },
   });
 
+  const handleOpenCreate = () => {
+    setEditingCategory(null);
+    setName('');
+    setSlug('');
+    setDescription('');
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (cat: Category) => {
+    setEditingCategory(cat);
+    setName(cat.name);
+    setSlug(cat.slug);
+    setDescription(cat.description || '');
+    setShowModal(true);
+  };
+
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-accent-crimson font-semibold mb-1">
-            <Layers size={15} />
-            <span>Taxonomy & Organization</span>
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-accent-crimson font-semibold mb-1">
+            <Tag size={13} />
+            <span>Taxonomy Architecture</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-editorial font-bold text-ink-primary">
-            Categories & Editorial Tags
+          <h1 className="text-2xl sm:text-3xl font-editorial font-semibold text-ink-primary">
+            Categories & Editorial Topics
           </h1>
           <p className="text-xs text-ink-secondary mt-1">
-            Define editorial sections, slug paths, and topic tags used across the publication.
+            Structure the publication sections, curate discoverable topic tags, and organize editorial feeds.
           </p>
         </div>
 
         <button
-          onClick={() => {
-            setEditingCategory(null);
-            setName('');
-            setSlug('');
-            setDescription('');
-            setShowModal(true);
-          }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-sm self-start sm:self-auto"
+          onClick={handleOpenCreate}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors font-mono"
+          style={{ borderRadius: 2 }}
         >
-          <Plus size={14} />
+          <Plus size={13} />
           <span>New Category</span>
         </button>
       </div>
 
-      {/* Categories Grid */}
+      {/* Categories Table */}
       {isLoading ? (
         <div className="py-20 text-center">
-          <LoadingSpinner label="Loading taxonomy..." />
+          <LoadingSpinner label="Loading taxonomy trees..." />
         </div>
       ) : categories.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((category) => (
-            <div
-              key={category.id}
-              className="bg-white border border-border-subtle rounded-xl p-5 shadow-sm space-y-3 flex flex-col justify-between"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-accent-crimson font-bold">
-                    Section
-                  </span>
-                  <span className="text-[11px] font-mono text-ink-secondary">
-                    slug: /{category.slug}
-                  </span>
-                </div>
-
-                <h3 className="text-base font-editorial font-bold text-ink-primary">
-                  {category.name}
-                </h3>
-
-                <p className="text-xs text-ink-secondary line-clamp-2 leading-relaxed">
-                  {category.description || 'Editorial articles and dispatches.'}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-subtle/60">
-                <button
-                  onClick={() => {
-                    setEditingCategory(category);
-                    setName(category.name);
-                    setSlug(category.slug);
-                    setDescription(category.description || '');
-                    setShowModal(true);
-                  }}
-                  className="p-1.5 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded"
-                >
-                  <Pencil size={13} />
-                </button>
-                <button
-                  onClick={() => deleteCategoryMutation.mutate(category.id)}
-                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white border border-border-subtle overflow-hidden" style={{ borderRadius: 2 }}>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-canvas-paper border-b border-border-subtle font-mono uppercase text-[10px] text-ink-secondary">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Category</th>
+                <th className="px-5 py-3 font-semibold">Slug Identifier</th>
+                <th className="px-5 py-3 font-semibold">Description</th>
+                <th className="px-5 py-3 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {categories.map((cat) => (
+                <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="px-5 py-3.5 font-bold font-editorial text-ink-primary text-sm">
+                    {cat.name}
+                  </td>
+                  <td className="px-5 py-3.5 font-mono text-[11px] text-accent-crimson">
+                    /{cat.slug}
+                  </td>
+                  <td className="px-5 py-3.5 text-ink-secondary text-xs max-w-[340px] truncate">
+                    {cat.description || '—'}
+                  </td>
+                  <td className="px-5 py-3.5 text-right space-x-2">
+                    <button
+                      onClick={() => handleOpenEdit(cat)}
+                      className="p-1 text-ink-secondary hover:text-ink-primary transition-colors"
+                      title="Edit Category"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={() => deleteCategoryMutation.mutate(cat.id)}
+                      className="p-1 text-rose-600 hover:text-rose-800 transition-colors"
+                      title="Delete Category"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
-        <div className="p-12 text-center bg-white border border-border-subtle rounded-2xl">
-          <FolderPlus size={28} className="mx-auto text-ink-secondary mb-2" />
-          <p className="text-xs font-semibold text-ink-primary">No categories created yet</p>
-          <p className="text-xs text-ink-secondary mt-1">Create categories to structure your publication.</p>
+        <div className="p-12 text-center bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
+          <p className="text-xs text-ink-secondary font-editorial italic">No categories created yet.</p>
         </div>
       )}
 
-      {/* Category Create/Edit Modal */}
+      {/* Category Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-bold text-ink-primary">
-              {editingCategory ? 'Edit Category' : 'Create New Category'}
-            </h3>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans">
+          <div className="bg-white border border-border-subtle max-w-md w-full p-6 space-y-4 shadow-xl" style={{ borderRadius: 2 }}>
+            <div className="flex items-center gap-2 text-ink-primary">
+              <FolderPlus size={16} className="text-accent-crimson" />
+              <h3 className="text-base font-bold">
+                {editingCategory ? 'Edit Category' : 'Create New Category'}
+              </h3>
+            </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-ink-primary mb-1">Category Name</label>
+                <label className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary font-semibold block mb-1">
+                  Name
+                </label>
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    if (!editingCategory) {
-                      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-                    }
-                  }}
-                  placeholder="e.g. Artificial Intelligence"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-crimson/20"
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Cybersecurity & Cryptography"
+                  className="w-full p-2 text-xs bg-canvas-paper border border-border-subtle focus:outline-none focus:border-ink-primary font-sans"
+                  style={{ borderRadius: 2 }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-ink-primary mb-1">URL Slug</label>
+                <label className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary font-semibold block mb-1">
+                  Slug
+                </label>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="e.g. artificial-intelligence"
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-crimson/20 font-mono"
+                  placeholder="e.g. cybersecurity"
+                  className="w-full p-2 text-xs bg-canvas-paper border border-border-subtle focus:outline-none focus:border-ink-primary font-mono"
+                  style={{ borderRadius: 2 }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-ink-primary mb-1">Description</label>
+                <label className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary font-semibold block mb-1">
+                  Description
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Short description of this section..."
+                  placeholder="Brief summary of what falls under this editorial topic…"
                   rows={3}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-border-subtle rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-crimson/20"
+                  className="w-full p-2 text-xs bg-canvas-paper border border-border-subtle focus:outline-none focus:border-ink-primary font-sans"
+                  style={{ borderRadius: 2 }}
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border-subtle">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-ink-secondary"
+                className="px-3.5 py-1.5 text-xs font-semibold text-ink-secondary hover:text-ink-primary"
               >
                 Cancel
               </button>
               <button
                 onClick={() => saveCategoryMutation.mutate()}
                 disabled={!name.trim() || saveCategoryMutation.isPending}
-                className="px-4 py-2 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors"
+                className="px-4 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors font-mono disabled:opacity-50"
+                style={{ borderRadius: 2 }}
               >
                 Save Category
               </button>

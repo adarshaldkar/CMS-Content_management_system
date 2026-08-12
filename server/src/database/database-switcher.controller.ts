@@ -22,7 +22,7 @@ export class DatabaseSwitcherController {
 
   @Post('switch')
   @ApiOperation({ summary: 'Atomically switch active database with mutex' })
-  @RequirePermissions(Permission.USER_UPDATE_ROLE)
+  @RequirePermissions(Permission.DATABASE_SWITCH)
   async switchDb(
     @Body() body: { targetDatabase: 'postgres' | 'mongodb' },
     @CurrentUser() user: AuthUser,

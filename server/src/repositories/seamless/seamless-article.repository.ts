@@ -9,22 +9,39 @@ import type {
 } from '../../domain/models';
 import type { IArticleRepository } from '../interfaces/article.repository.interface';
 
-/**
- * SeamlessArticleRepository
- *
- * Wraps the primary (active) article repository and secondary (peer) article repository.
- * When an article is looked up by slug or ID and not found in the active database,
- * it checks the peer database and transparently replicates the article into the active database.
- */
 export class SeamlessArticleRepository implements IArticleRepository {
   private readonly logger = new Logger(SeamlessArticleRepository.name);
 
   constructor(
-    private readonly activeRepo: IArticleRepository,
-    private readonly peerRepo: IArticleRepository,
-    private readonly activeDbName: string,
-    private readonly peerDbName: string,
+    private readonly primaryRepo: IArticleRepository,
+    private readonly secondaryRepo: IArticleRepository,
+    public readonly primaryName: string,
+    public readonly secondaryName: string,
   ) {}
+
+  public get activeDbName(): string {
+    return this.primaryName;
+  }
+
+  public get peerDbName(): string {
+    return this.secondaryName;
+  }
+
+  private get activeRepo(): IArticleRepository {
+    const active = process.env.ACTIVE_DATABASE || this.primaryName;
+    if (active === 'mongodb') {
+      return this.primaryName === 'mongodb' ? this.primaryRepo : this.secondaryRepo;
+    }
+    return this.primaryName === 'postgres' ? this.primaryRepo : this.secondaryRepo;
+  }
+
+  private get peerRepo(): IArticleRepository {
+    const active = process.env.ACTIVE_DATABASE || this.primaryName;
+    if (active === 'mongodb') {
+      return this.primaryName === 'mongodb' ? this.secondaryRepo : this.primaryRepo;
+    }
+    return this.primaryName === 'postgres' ? this.secondaryRepo : this.primaryRepo;
+  }
 
   async findById(id: string): Promise<Article | null> {
     const article = await this.activeRepo.findById(id);
@@ -34,7 +51,7 @@ export class SeamlessArticleRepository implements IArticleRepository {
       const peerArticle = await this.peerRepo.findById(id);
       if (peerArticle) {
         this.logger.log(
-          `[Seamless Sync] JIT replicating article "${peerArticle.title}" from ${this.peerDbName} to ${this.activeDbName} by ID`,
+          `[Seamless Sync] JIT replicating article "${peerArticle.title}" by ID`,
         );
         return await this.activeRepo.create({
           title: peerArticle.title,
@@ -69,7 +86,7 @@ export class SeamlessArticleRepository implements IArticleRepository {
       const peerArticle = await this.peerRepo.findBySlug(slug);
       if (peerArticle) {
         this.logger.log(
-          `[Seamless Sync] JIT replicating article "${peerArticle.title}" from ${this.peerDbName} to ${this.activeDbName} by Slug`,
+          `[Seamless Sync] JIT replicating article "${peerArticle.title}" by Slug`,
         );
         return await this.activeRepo.create({
           title: peerArticle.title,
@@ -97,7 +114,47 @@ export class SeamlessArticleRepository implements IArticleRepository {
   }
 
   async findMany(filters: ArticleQueryFilters): Promise<PaginatedResult<Article>> {
-    return this.activeRepo.findMany(filters);
+    const result = await this.activeRepo.findMany(filters);
+    if (result.items.length > 0 || result.total > 0) {
+      return result;
+    }
+
+    try {
+      const peerResult = await this.peerRepo.findMany(filters);
+      if (peerResult.items.length > 0) {
+        this.logger.log(
+          `[Seamless Sync] JIT replicating ${peerResult.items.length} articles from peer repository for query`,
+        );
+        for (const peerArticle of peerResult.items) {
+          try {
+            await this.activeRepo.create({
+              title: peerArticle.title,
+              slug: peerArticle.slug,
+              description: peerArticle.description,
+              content: peerArticle.content,
+              authorId: peerArticle.authorId,
+              categoryId: peerArticle.categoryId,
+              tagIds: peerArticle.tagIds,
+              coverImage: peerArticle.coverImage,
+              status: peerArticle.status,
+              seoTitle: peerArticle.seoTitle,
+              seoDescription: peerArticle.seoDescription,
+              scheduledAt: peerArticle.scheduledAt,
+              reviewNote: peerArticle.reviewNote,
+              wordCount: peerArticle.wordCount,
+              readingTimeMinutes: peerArticle.readingTimeMinutes,
+            });
+          } catch {
+            // Safe ignore duplicates
+          }
+        }
+        return peerResult;
+      }
+    } catch (err: any) {
+      this.logger.warn(`[Seamless Sync] Peer findMany fallback failed: ${err.message}`);
+    }
+
+    return result;
   }
 
   async create(data: CreateArticleDto): Promise<Article> {

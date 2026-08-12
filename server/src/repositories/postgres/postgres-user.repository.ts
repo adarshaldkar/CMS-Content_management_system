@@ -145,7 +145,7 @@ export class PostgresUserRepository implements IUserRepository {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit) || 0,
+      totalPages: Math.ceil(total / limit) || 1,
     };
   }
 

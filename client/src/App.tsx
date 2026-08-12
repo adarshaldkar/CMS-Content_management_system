@@ -72,6 +72,8 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/editor" element={<ArticleEditorPage />} />
           <Route path="/editor/:id" element={<ArticleEditorPage />} />
+          <Route path="/write" element={<ArticleEditorPage />} />
+          <Route path="/write/:id" element={<ArticleEditorPage />} />
         </Route>
 
         {/* 5. User / Author Workspace (Protected) */}

@@ -45,6 +45,9 @@ import { PostgresMediaRepository } from './postgres/postgres-media.repository';
 import { MongoMediaRepository } from './mongo/mongo-media.repository';
 import { SeamlessUserRepository } from './seamless/seamless-user.repository';
 import { SeamlessArticleRepository } from './seamless/seamless-article.repository';
+import { SeamlessCategoryRepository } from './seamless/seamless-category.repository';
+import { SeamlessMediaRepository } from './seamless/seamless-media.repository';
+import { SeamlessRevisionRepository } from './seamless/seamless-revision.repository';
 
 export const articleRepositoryProvider: FactoryProvider<IArticleRepository> = {
   provide: ARTICLE_REPOSITORY,
@@ -75,10 +78,6 @@ export const userRepositoryProvider: FactoryProvider<IUserRepository> = {
       : new SeamlessUserRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb');
   },
 };
-
-import { SeamlessCategoryRepository } from './seamless/seamless-category.repository';
-import { SeamlessMediaRepository } from './seamless/seamless-media.repository';
-import { SeamlessRevisionRepository } from './seamless/seamless-revision.repository';
 
 export const categoryRepositoryProvider: FactoryProvider<ICategoryRepository> = {
   provide: CATEGORY_REPOSITORY,

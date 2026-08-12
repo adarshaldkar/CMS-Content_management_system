@@ -174,12 +174,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    // Look up password hash from postgres or mongo repository
-    // In our repository models, password is validated
-    const isValid = await verifyPassword(
-      (user as any).passwordHash || (user as any).password_hash || '',
-      dto.password,
-    );
+    // Password hash is normalized to `passwordHash` on every repository toDomain().
+    // (Postgres aliases column `password_hash` → passwordHash; Mongo schema stores passwordHash.)
+    const userWithHash = user as User & { password_hash?: string };
+    const storedHash: string = userWithHash.passwordHash || userWithHash.password_hash || '';
+    const isValid = await verifyPassword(storedHash, dto.password);
 
     if (!isValid) {
       await this.auditService.log({

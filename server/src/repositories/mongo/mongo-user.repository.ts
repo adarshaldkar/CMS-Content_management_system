@@ -11,6 +11,7 @@ import type {
 import { UserRole } from '../../domain/models';
 import { UserSchemaClass, type UserDocument } from './user.schema';
 import type { IUserRepository } from '../interfaces/user.repository.interface';
+import { escapeRegex } from '../../common/utils/regex-escape.util';
 
 @Injectable()
 export class MongoUserRepository implements IUserRepository {
@@ -60,9 +61,10 @@ export class MongoUserRepository implements IUserRepository {
     if (filters.role) query.role = filters.role;
     if (filters.isActive !== undefined) query.isActive = filters.isActive;
     if (filters.search) {
+      const safe = escapeRegex(filters.search);
       query.$or = [
-        { email: { $regex: filters.search, $options: 'i' } },
-        { name: { $regex: filters.search, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } },
+        { name: { $regex: safe, $options: 'i' } },
       ];
     }
 
@@ -81,7 +83,7 @@ export class MongoUserRepository implements IUserRepository {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit) || 0,
+      totalPages: Math.ceil(total / limit) || 1,
     };
   }
 

@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   CheckSquare,
   Database,
-  FileText,
   FolderTree,
   Globe,
   HardDrive,
@@ -18,7 +17,6 @@ import {
   Users,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
-import { StatusBadge } from '../common/StatusBadge';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../api/auth.api';
 import { fetchHealth } from '../../api/client';
@@ -45,7 +43,6 @@ export const AdminLayout: React.FC = () => {
   };
 
   const navItems = [
-    { label: 'Overview', to: '/admin', icon: LayoutDashboard, exact: true },
     { label: 'Review Queue', to: '/admin/review', icon: CheckSquare },
     { label: 'User Directory', to: '/admin/users', icon: Users },
     { label: 'Categories', to: '/admin/categories', icon: FolderTree },
@@ -59,31 +56,32 @@ export const AdminLayout: React.FC = () => {
   const isPostgres = activeDb.toLowerCase() === 'postgres';
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex font-sans">
-      {/* Admin Sidebar */}
-      <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col fixed inset-y-0 z-30">
+    <div className="min-h-screen bg-canvas-paper text-ink-primary flex font-sans">
+      {/* Editorial Admin Sidebar */}
+      <aside className="w-64 bg-white border-r border-border-subtle flex flex-col fixed inset-y-0 z-30">
         {/* Brand */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-          <BrandLogo variant="light" size="sm" />
+        <div className="p-5 border-b border-border-subtle flex items-center justify-between">
+          <BrandLogo size="sm" />
         </div>
 
-        {/* Database Health Status Indicator */}
-        <div className="p-4 border-b border-slate-800 bg-slate-900/60">
+        {/* Database Status Telemetry */}
+        <div className="px-5 py-3 border-b border-border-subtle bg-canvas-paper">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-400 flex items-center gap-1.5 font-mono text-[11px]">
-              <HardDrive size={13} />
+            <span className="text-ink-secondary flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider font-semibold">
+              <HardDrive size={12} />
               <span>ACTIVE DB:</span>
             </span>
             <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-semibold uppercase ${
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 border text-[11px] font-mono font-medium uppercase ${
                 isPostgres
-                  ? 'bg-blue-950 text-blue-300 border border-blue-800'
-                  : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                  ? 'bg-sky-50 text-sky-800 border-sky-200'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
               }`}
+              style={{ borderRadius: 2 }}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                  isPostgres ? 'bg-blue-400' : 'bg-emerald-400'
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isPostgres ? 'bg-sky-500' : 'bg-emerald-500'
                 }`}
               />
               {activeDb}
@@ -92,24 +90,23 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-slate-500">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          <div className="px-3 pb-2 text-[10px] font-mono uppercase tracking-[0.18em] text-accent-crimson font-semibold">
             Editorial Operations
           </div>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.exact}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                `flex items-center gap-2.5 px-3 py-2 text-xs transition-colors ${
                   isActive
-                    ? 'bg-slate-800 text-white font-semibold shadow-inner'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    ? 'bg-canvas-paper text-ink-primary font-semibold border-l-2 border-accent-crimson'
+                    : 'text-ink-secondary hover:text-ink-primary hover:bg-slate-50 border-l-2 border-transparent'
                 }`
               }
             >
-              <item.icon size={16} />
+              <item.icon size={15} />
               <span>{item.label}</span>
             </NavLink>
           ))}
@@ -117,20 +114,20 @@ export const AdminLayout: React.FC = () => {
           {/* Database Control for Super Admin */}
           {hasRole('super_admin') && (
             <>
-              <div className="pt-4 px-3 pb-2 text-[10px] font-mono uppercase tracking-wider text-slate-500">
+              <div className="pt-5 px-3 pb-2 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold">
                 System Infrastructure
               </div>
               <NavLink
                 to="/admin/database"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  `flex items-center gap-2.5 px-3 py-2 text-xs transition-colors ${
                     isActive
-                      ? 'bg-purple-900/60 text-purple-200 font-semibold border border-purple-700'
-                      : 'text-purple-400 hover:text-purple-300 hover:bg-purple-950/40'
+                      ? 'bg-canvas-paper text-ink-primary font-semibold border-l-2 border-accent-crimson'
+                      : 'text-ink-secondary hover:text-ink-primary hover:bg-slate-50 border-l-2 border-transparent'
                   }`
                 }
               >
-                <Database size={16} />
+                <Database size={15} />
                 <span>Database Switcher</span>
               </NavLink>
             </>
@@ -138,38 +135,43 @@ export const AdminLayout: React.FC = () => {
         </nav>
 
         {/* Admin Footer / User Profile */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/80">
+        <div className="p-4 border-t border-border-subtle bg-canvas-paper">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-purple-900 text-purple-200 border border-purple-700 flex items-center justify-center text-xs font-mono uppercase">
+            <div
+              className="w-8 h-8 bg-ink-primary text-white flex items-center justify-center text-xs font-mono font-bold uppercase shrink-0"
+              style={{ borderRadius: 2 }}
+            >
               {user?.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
                   alt={user.name}
-                  className="w-full h-full rounded-full object-cover"
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                user?.name.charAt(0) || 'A'
+                user?.name?.charAt(0) || 'A'
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-200 truncate">{user?.name}</p>
-              {user?.role && <StatusBadge status={user.role} size="sm" />}
+              <p className="text-xs font-semibold text-ink-primary truncate font-sans">{user?.name}</p>
+              <span className="font-mono text-[10px] uppercase text-accent-crimson tracking-wider font-semibold">
+                {user?.role}
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
             <Link
               to="/"
-              className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
+              className="flex items-center gap-1.5 text-[11px] text-ink-secondary hover:text-ink-primary transition-colors font-mono"
             >
-              <Globe size={13} />
+              <Globe size={12} />
               <span>Public Site</span>
             </Link>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 transition-colors"
+              className="flex items-center gap-1 text-[11px] text-rose-700 hover:text-rose-900 transition-colors font-mono font-medium"
             >
-              <LogOut size={13} />
+              <LogOut size={12} />
               <span>Sign Out</span>
             </button>
           </div>

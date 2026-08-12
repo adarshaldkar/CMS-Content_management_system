@@ -1,9 +1,4 @@
-export interface Comment {
-  id: string;
-  articleId: string;
-  authorId: string;
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt: Date | null;
-}
+// Comment types are now defined in social.model.ts — re-exported here for backward compatibility
+export { CommentStatus } from './social.model';
+export type { Comment, CreateCommentDto, UpdateCommentDto, CommentQueryFilters } from './social.model';
+

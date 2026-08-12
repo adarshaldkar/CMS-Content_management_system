@@ -1,85 +1,86 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  ArrowRight,
-  BrainCircuit,
-  Check,
-  Code2,
-  Compass,
-  Cpu,
-  Layers,
-  Palette,
-  Scale,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
-import { BrandLogo } from '../../components/common/BrandLogo';
+import { ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { apiClient } from '../../api/client';
 
-interface TopicOption {
+interface Topic {
   id: string;
   name: string;
-  category: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  description: string;
+  count: string;
 }
 
-const TOPICS: TopicOption[] = [
+interface TopicSection {
+  section: string;
+  topics: Topic[];
+}
+
+const TOPIC_SECTIONS: TopicSection[] = [
   {
-    id: 'technology',
-    name: 'Technology & Computing',
-    category: 'Engineering',
-    icon: Cpu,
-    description: 'Infrastructure, distributed systems, and operating principles.',
+    section: 'Engineering & Systems',
+    topics: [
+      { id: 'technology', name: 'Technology', count: '312K' },
+      { id: 'software-architecture', name: 'Software Architecture', count: '48K' },
+      { id: 'cybersecurity', name: 'Cybersecurity', count: '91K' },
+      { id: 'cloud-infrastructure', name: 'Cloud & Infrastructure', count: '76K' },
+      { id: 'devops', name: 'DevOps', count: '55K' },
+      { id: 'web-development', name: 'Web Development', count: '204K' },
+    ],
   },
   {
-    id: 'ai',
-    name: 'Artificial Intelligence',
-    category: 'Innovation',
-    icon: BrainCircuit,
-    description: 'Large language models, neural architectures, and safety alignment.',
+    section: 'Artificial Intelligence',
+    topics: [
+      { id: 'ai', name: 'Artificial Intelligence', count: '189K' },
+      { id: 'llms', name: 'Large Language Models', count: '67K' },
+      { id: 'machine-learning', name: 'Machine Learning', count: '143K' },
+      { id: 'data-science', name: 'Data Science', count: '98K' },
+    ],
   },
   {
-    id: 'cybersecurity',
-    name: 'Cybersecurity & Privacy',
-    category: 'Defense',
-    icon: ShieldCheck,
-    description: 'Threat models, cryptography, authentication, and vulnerability research.',
+    section: 'Programming',
+    topics: [
+      { id: 'python', name: 'Python', count: '221K' },
+      { id: 'javascript', name: 'JavaScript', count: '310K' },
+      { id: 'react', name: 'React', count: '88K' },
+      { id: 'system-design', name: 'System Design', count: '52K' },
+    ],
   },
   {
-    id: 'editorial-design',
-    name: 'Editorial Design & Typography',
-    category: 'Design',
-    icon: Palette,
-    description: 'Layout grids, print heritage, typography pairing, and visual balance.',
+    section: 'Editorial & Ideas',
+    topics: [
+      { id: 'editorial-design', name: 'Editorial Design', count: '22K' },
+      { id: 'typography', name: 'Typography', count: '18K' },
+      { id: 'media-culture', name: 'Journalism & Media', count: '41K' },
+      { id: 'policy', name: 'Policy & Governance', count: '33K' },
+    ],
+  },
+];
+
+// Preview articles shown in the right panel — editorial teaser
+const PREVIEW_ARTICLES = [
+  {
+    label: 'Cybersecurity',
+    title: 'How Passkeys Are Replacing Passwords',
+    author: 'R. Holloway',
+    time: '8 min',
   },
   {
-    id: 'software-architecture',
-    name: 'Software Architecture',
-    category: 'Engineering',
-    icon: Code2,
-    description: 'Domain-driven design, transactional patterns, and resilient APIs.',
+    label: 'AI',
+    title: 'The Architecture Behind Modern LLM Inference',
+    author: 'E. Vance',
+    time: '11 min',
   },
   {
-    id: 'media-culture',
-    name: 'Media, Journalism & Culture',
-    category: 'Publishing',
-    icon: Compass,
-    description: 'Investigative reporting, independent journalism, and digital media.',
+    label: 'System Design',
+    title: 'Zero-Downtime Database Migrations at Scale',
+    author: 'A. Krishnan',
+    time: '6 min',
   },
   {
-    id: 'science',
-    name: 'Science & Exploration',
-    category: 'Discovery',
-    icon: Layers,
-    description: 'Physics, computational biology, astronomy, and energy research.',
-  },
-  {
-    id: 'policy-governance',
-    name: 'Policy & Governance',
-    category: 'Society',
-    icon: Scale,
-    description: 'Open web standards, regulatory frameworks, and tech governance.',
+    label: 'Editorial',
+    title: 'Why Newsrooms Should Own Their Publishing Stack',
+    author: 'M. Osei',
+    time: '5 min',
   },
 ];
 
@@ -89,9 +90,10 @@ export const OnboardingPage: React.FC = () => {
     'ai',
     'cybersecurity',
   ]);
+  const [hoveredTopic, setHoveredTopic] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { user } = useAuthStore();
+  const { updateUser } = useAuthStore();
   const navigate = useNavigate();
 
   const toggleTopic = (id: string) => {
@@ -100,123 +102,263 @@ export const OnboardingPage: React.FC = () => {
     );
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedTopics.length < 3) return;
-
     setIsSaving(true);
-    // Store user topic preferences in localStorage for personalized reader feed
     try {
-      localStorage.setItem('user_preferred_topics', JSON.stringify(selectedTopics));
+      const updated = await apiClient.patch('/auth/me', {
+        preferredTopics: selectedTopics,
+      });
+      if (updated.data?.user) updateUser(updated.data.user);
     } catch {
-      // Ignore storage errors
-    }
-
-    setTimeout(() => {
+      // continue regardless
+    } finally {
       setIsSaving(false);
       navigate('/dashboard');
-    }, 400);
+    }
   };
 
   const isReady = selectedTopics.length >= 3;
 
-  return (
-    <div className="min-h-screen bg-canvas-paper flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-3xl mx-auto w-full">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <BrandLogo size="lg" showSubtitle />
-          <h1 className="mt-8 text-3xl font-editorial font-bold text-ink-primary tracking-tight">
-            Personalize your publication feed
-          </h1>
-          <p className="mt-2 text-sm text-ink-secondary max-w-lg mx-auto">
-            {user ? `Welcome, ${user.name}! ` : ''}Select at least 3 topics to customize your
-            reading recommendations and author suggestions.
-          </p>
+  // Articles that match selected topics (for right panel preview)
+  const previewArticles = PREVIEW_ARTICLES.filter((a) =>
+    selectedTopics.some(
+      (t) =>
+        a.label.toLowerCase().includes(t.split('-')[0]) ||
+        t.includes(a.label.toLowerCase()),
+    ),
+  ).slice(0, 3).concat(PREVIEW_ARTICLES).slice(0, 3);
 
-          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-white border border-border-subtle rounded-full text-xs font-mono">
-            <Sparkles size={13} className="text-accent-crimson" />
-            <span className="text-ink-secondary">Selected:</span>
-            <span className="font-semibold text-ink-primary">
-              {selectedTopics.length} / 3 minimum
-            </span>
+  const getTopicById = (id: string): Topic | undefined => {
+    for (const s of TOPIC_SECTIONS) {
+      const found = s.topics.find((t) => t.id === id);
+      if (found) return found;
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex font-sans">
+      {/* ─── LEFT PANEL — Editorial Topic Selection ─── */}
+      <div className="flex-1 flex flex-col min-h-screen bg-canvas-paper overflow-y-auto">
+        {/* Top bar */}
+        <div className="px-10 pt-8 pb-0 flex items-center justify-between">
+          <span className="font-editorial text-sm font-semibold tracking-tight text-ink-primary">
+            EditorialHub
+          </span>
+          <span className="font-mono text-[11px] text-ink-secondary tabular-nums">
+            Step 1 of 1
+          </span>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 px-10 pt-12 pb-16 max-w-2xl">
+          {/* Heading block */}
+          <div className="mb-10">
+            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-accent-crimson font-semibold mb-3">
+              Personalise your reading desk
+            </p>
+            <h1 className="font-editorial text-4xl sm:text-5xl font-semibold text-ink-primary leading-[1.1] tracking-tight">
+              What should be
+              <br />
+              on your desk?
+            </h1>
+            <p className="mt-4 text-sm text-ink-secondary leading-relaxed max-w-sm">
+              Select at least 3 topics. Your choices shape the stories that
+              reach you — today and every day after.
+            </p>
+          </div>
+
+          {/* Topic sections */}
+          <div className="space-y-0">
+            {TOPIC_SECTIONS.map((section, si) => (
+              <div key={section.section}>
+                {/* Section header with hairline rule */}
+                <div className={`flex items-center gap-3 ${si > 0 ? 'mt-8' : ''} mb-4`}>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-secondary font-semibold whitespace-nowrap">
+                    {section.section}
+                  </span>
+                  <div className="flex-1 h-px bg-border-subtle" />
+                </div>
+
+                {/* Topic chips */}
+                <div className="flex flex-wrap gap-2">
+                  {section.topics.map((topic) => {
+                    const isSelected = selectedTopics.includes(topic.id);
+                    const isHovered = hoveredTopic === topic.id;
+
+                    return (
+                      <button
+                        key={topic.id}
+                        type="button"
+                        onClick={() => toggleTopic(topic.id)}
+                        onMouseEnter={() => setHoveredTopic(topic.id)}
+                        onMouseLeave={() => setHoveredTopic(null)}
+                        className={`
+                          relative inline-flex items-center gap-1.5
+                          px-3.5 py-1.5
+                          text-[13px] font-medium
+                          border transition-all duration-150
+                          ${
+                            isSelected
+                              ? 'bg-ink-primary text-white border-ink-primary'
+                              : 'bg-transparent text-ink-primary border-border-subtle hover:border-ink-secondary'
+                          }
+                        `}
+                        style={{ borderRadius: 2 }}
+                      >
+                        <span>{topic.name}</span>
+                        {/* Story count tooltip on hover */}
+                        {isHovered && !isSelected && (
+                          <span className="ml-1 font-mono text-[10px] text-ink-secondary">
+                            {topic.count}
+                          </span>
+                        )}
+                        {isSelected && (
+                          <span className="font-mono text-[10px] opacity-60">
+                            {topic.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom action bar */}
+          <div className="mt-12 pt-8 border-t border-border-subtle flex items-center justify-between gap-6">
+            <div className="space-y-0.5">
+              <p className="font-mono text-xs text-ink-secondary">
+                <span
+                  className={`font-semibold tabular-nums ${
+                    isReady ? 'text-ink-primary' : 'text-ink-secondary'
+                  }`}
+                >
+                  {selectedTopics.length}
+                </span>{' '}
+                selected · minimum 3
+              </p>
+              {selectedTopics.length > 0 && (
+                <p className="text-[11px] font-mono text-ink-secondary truncate max-w-xs">
+                  {selectedTopics
+                    .slice(0, 3)
+                    .map((id) => getTopicById(id)?.name)
+                    .filter(Boolean)
+                    .join(' · ')}
+                  {selectedTopics.length > 3 && ` +${selectedTopics.length - 3} more`}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleContinue}
+              disabled={!isReady || isSaving}
+              className={`
+                inline-flex items-center gap-2
+                px-6 py-2.5
+                text-sm font-semibold tracking-wide
+                transition-all duration-150
+                ${
+                  isReady && !isSaving
+                    ? 'bg-ink-primary text-white hover:bg-slate-800 cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }
+              `}
+              style={{ borderRadius: 2 }}
+            >
+              {isSaving ? (
+                <span className="font-mono text-xs">Saving…</span>
+              ) : (
+                <>
+                  <span>Go to my desk</span>
+                  <ArrowRight size={14} strokeWidth={2} />
+                </>
+              )}
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Topic Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {TOPICS.map((topic) => {
-            const isSelected = selectedTopics.includes(topic.id);
-            const Icon = topic.icon;
-
-            return (
-              <button
-                key={topic.id}
-                type="button"
-                onClick={() => toggleTopic(topic.id)}
-                className={`flex items-start gap-4 p-5 rounded-xl border text-left transition-all relative ${
-                  isSelected
-                    ? 'bg-white border-accent-crimson ring-2 ring-accent-crimson/15 shadow-sm'
-                    : 'bg-white/60 border-border-subtle hover:bg-white hover:border-slate-300'
-                }`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                    isSelected
-                      ? 'bg-accent-crimson text-white'
-                      : 'bg-slate-100 text-ink-secondary group-hover:text-ink-primary'
-                  }`}
-                >
-                  <Icon size={20} />
-                </div>
-
-                <div className="flex-1 min-w-0 pr-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">
-                      {topic.category}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-bold text-ink-primary mt-0.5">{topic.name}</h3>
-                  <p className="text-xs text-ink-secondary mt-1 leading-relaxed line-clamp-2">
-                    {topic.description}
-                  </p>
-                </div>
-
-                {/* Selection Check Circle */}
-                <div
-                  className={`absolute right-4 top-4 w-5 h-5 rounded-full flex items-center justify-center border transition-colors ${
-                    isSelected
-                      ? 'bg-accent-crimson border-accent-crimson text-white'
-                      : 'border-slate-300 bg-white'
-                  }`}
-                >
-                  {isSelected && <Check size={12} strokeWidth={3} />}
-                </div>
-              </button>
-            );
-          })}
+      {/* ─── RIGHT PANEL — Dark Editorial Preview ─── */}
+      <div className="hidden lg:flex w-[38%] xl:w-[36%] bg-ink-primary flex-col min-h-screen sticky top-0 overflow-hidden">
+        {/* Panel header */}
+        <div className="px-8 pt-8 pb-6 border-b border-white/10">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40 mb-1">
+            Your reading desk preview
+          </p>
+          <p className="font-editorial text-white text-lg font-semibold leading-snug">
+            {selectedTopics.length >= 3
+              ? `Based on ${selectedTopics.length} topics`
+              : 'Select topics to preview'}
+          </p>
         </div>
 
-        {/* Continue Action Footer */}
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border-subtle">
-          <p className="text-xs text-ink-secondary">
-            You can modify your topic preferences at any time in Profile Settings.
-          </p>
+        {/* Preview articles list */}
+        <div className="flex-1 px-8 pt-6 space-y-0 overflow-hidden">
+          {previewArticles.map((article, idx) => (
+            <div
+              key={idx}
+              className="py-5 border-b border-white/10 group"
+              style={{ opacity: 1 - idx * 0.12 }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-accent-crimson font-semibold">
+                  {article.label}
+                </span>
+                <span className="text-white/20 font-mono text-[10px]">·</span>
+                <span className="font-mono text-[10px] text-white/30">
+                  {article.time} read
+                </span>
+              </div>
+              <p className="font-editorial text-white text-base font-semibold leading-snug mb-2">
+                {article.title}
+              </p>
+              <p className="font-mono text-[11px] text-white/30">
+                {article.author}
+              </p>
+            </div>
+          ))}
 
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={!isReady || isSaving}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {isSaving ? (
-              <span>Saving preferences...</span>
-            ) : (
-              <>
-                <span>Continue to Dashboard</span>
-                <ArrowRight size={14} />
-              </>
-            )}
-          </button>
+          {/* Fade out at bottom */}
+          <div className="pointer-events-none h-32 -mx-8 -mb-6 bg-gradient-to-b from-transparent to-ink-primary" />
+        </div>
+
+        {/* Panel footer */}
+        <div className="px-8 pb-8 pt-4">
+          {/* Selected topic tags */}
+          {selectedTopics.length > 0 && (
+            <div className="mb-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-white/30 mb-2">
+                Following
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedTopics.slice(0, 6).map((id) => {
+                  const topic = getTopicById(id);
+                  if (!topic) return null;
+                  return (
+                    <span
+                      key={id}
+                      className="px-2 py-0.5 border border-white/20 font-mono text-[10px] text-white/50"
+                      style={{ borderRadius: 1 }}
+                    >
+                      {topic.name}
+                    </span>
+                  );
+                })}
+                {selectedTopics.length > 6 && (
+                  <span className="font-mono text-[10px] text-white/30 self-center">
+                    +{selectedTopics.length - 6}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <p className="font-editorial text-white/20 text-xs italic leading-relaxed">
+            "A reading desk shaped by what you care about."
+          </p>
         </div>
       </div>
     </div>

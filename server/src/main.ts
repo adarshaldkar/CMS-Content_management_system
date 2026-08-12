@@ -1,14 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { useContainer } from 'class-validator';
 import { AppModule } from './app.module';
 import type { EnvConfig } from './config/env.schema';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
   const config = app.get<ConfigService<EnvConfig, true>>(ConfigService);
   const port = config.get('PORT', { infer: true });
@@ -36,6 +39,17 @@ async function bootstrap() {
 
   // 2. Cookie Parser
   app.use(cookieParser());
+
+  // 2b. Global input validation (OWASP A03 Injection/Mass-Assignment defense)
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+      stopAtFirstError: false,
+    }),
+  );
 
   // 3. Global Prefix & Exception Filter
   app.setGlobalPrefix('api');

@@ -42,8 +42,24 @@ export enum Permission {
 
   // Comments
   COMMENT_CREATE = 'comment.create',
+  COMMENT_UPDATE_OWN = 'comment.update.own',
   COMMENT_DELETE_OWN = 'comment.delete.own',
+  COMMENT_DELETE_ANY = 'comment.delete.any',
   COMMENT_MODERATE = 'comment.moderate',
+  COMMENT_REPORT = 'comment.report',
+
+  // Bookmarks
+  BOOKMARK_CREATE = 'bookmark.create',
+  BOOKMARK_DELETE = 'bookmark.delete',
+  BOOKMARK_READ = 'bookmark.read',
+
+  // Likes
+  LIKE_TOGGLE = 'like.toggle',
+
+  // Follows
+  FOLLOW_CREATE = 'follow.create',
+  FOLLOW_DELETE = 'follow.delete',
+  FOLLOW_READ = 'follow.read',
 
   // System & Auditing
   AUDIT_READ = 'audit.read',
@@ -86,8 +102,17 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.USER_UPDATE_ROLE,
     Permission.USER_DEACTIVATE,
     Permission.COMMENT_CREATE,
+    Permission.COMMENT_UPDATE_OWN,
     Permission.COMMENT_DELETE_OWN,
     Permission.COMMENT_MODERATE,
+    Permission.COMMENT_REPORT,
+    Permission.BOOKMARK_CREATE,
+    Permission.BOOKMARK_DELETE,
+    Permission.BOOKMARK_READ,
+    Permission.LIKE_TOGGLE,
+    Permission.FOLLOW_CREATE,
+    Permission.FOLLOW_DELETE,
+    Permission.FOLLOW_READ,
     Permission.AUDIT_READ,
     Permission.DATABASE_VIEW_STATUS,
     Permission.SYSTEM_SETTINGS_UPDATE,
@@ -117,8 +142,17 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.USER_READ_PROFILE,
     Permission.USER_UPDATE_SELF,
     Permission.COMMENT_CREATE,
+    Permission.COMMENT_UPDATE_OWN,
     Permission.COMMENT_DELETE_OWN,
     Permission.COMMENT_MODERATE,
+    Permission.COMMENT_REPORT,
+    Permission.BOOKMARK_CREATE,
+    Permission.BOOKMARK_DELETE,
+    Permission.BOOKMARK_READ,
+    Permission.LIKE_TOGGLE,
+    Permission.FOLLOW_CREATE,
+    Permission.FOLLOW_DELETE,
+    Permission.FOLLOW_READ,
   ],
   [UserRole.AUTHOR]: [
     Permission.ARTICLE_READ_PUBLISHED,
@@ -133,7 +167,16 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.USER_READ_PROFILE,
     Permission.USER_UPDATE_SELF,
     Permission.COMMENT_CREATE,
+    Permission.COMMENT_UPDATE_OWN,
     Permission.COMMENT_DELETE_OWN,
+    Permission.COMMENT_REPORT,
+    Permission.BOOKMARK_CREATE,
+    Permission.BOOKMARK_DELETE,
+    Permission.BOOKMARK_READ,
+    Permission.LIKE_TOGGLE,
+    Permission.FOLLOW_CREATE,
+    Permission.FOLLOW_DELETE,
+    Permission.FOLLOW_READ,
   ],
   [UserRole.USER]: [
     Permission.ARTICLE_READ_PUBLISHED,
@@ -141,6 +184,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.USER_READ_PROFILE,
     Permission.USER_UPDATE_SELF,
     Permission.COMMENT_CREATE,
+    Permission.COMMENT_UPDATE_OWN,
     Permission.COMMENT_DELETE_OWN,
+    Permission.COMMENT_REPORT,
+    Permission.BOOKMARK_CREATE,
+    Permission.BOOKMARK_DELETE,
+    Permission.BOOKMARK_READ,
+    Permission.LIKE_TOGGLE,
+    Permission.FOLLOW_CREATE,
+    Permission.FOLLOW_DELETE,
+    Permission.FOLLOW_READ,
   ],
 };

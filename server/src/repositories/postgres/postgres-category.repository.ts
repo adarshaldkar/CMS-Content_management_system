@@ -67,19 +67,23 @@ export class PostgresCategoryRepository implements ICategoryRepository {
     };
   }
 
-  async findById(id: string): Promise<Category | null> {
+  async findById(id: string, includeInactive = false): Promise<Category | null> {
     await this.ensureSchema();
     const result = await this.postgres.pool.query<CategoryRow>(
-      'SELECT * FROM categories WHERE id = $1',
+      includeInactive
+        ? 'SELECT * FROM categories WHERE id = $1'
+        : "SELECT * FROM categories WHERE id = $1 AND status = 'active'",
       [id],
     );
     return result.rows[0] ? this.toDomain(result.rows[0]) : null;
   }
 
-  async findBySlug(slug: string): Promise<Category | null> {
+  async findBySlug(slug: string, includeInactive = false): Promise<Category | null> {
     await this.ensureSchema();
     const result = await this.postgres.pool.query<CategoryRow>(
-      'SELECT * FROM categories WHERE slug = $1',
+      includeInactive
+        ? 'SELECT * FROM categories WHERE slug = $1'
+        : "SELECT * FROM categories WHERE slug = $1 AND status = 'active'",
       [slug],
     );
     return result.rows[0] ? this.toDomain(result.rows[0]) : null;
@@ -95,9 +99,11 @@ export class PostgresCategoryRepository implements ICategoryRepository {
     const values: unknown[] = [];
     const clauses: string[] = [];
 
-    if (filters.status) {
+    if (filters.status !== undefined) {
       values.push(filters.status);
       clauses.push(`status = $${values.length}`);
+    } else {
+      clauses.push("status = 'active'");
     }
     if (filters.search) {
       values.push(`%${filters.search}%`);
@@ -124,7 +130,7 @@ export class PostgresCategoryRepository implements ICategoryRepository {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit) || 0,
+      totalPages: Math.ceil(total / limit) || 1,
     };
   }
 

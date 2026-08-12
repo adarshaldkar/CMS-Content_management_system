@@ -1,139 +1,240 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Bookmark,
-  BookOpen,
-  Clock,
-  ExternalLink,
-  History,
-  Trash2,
-} from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bookmark, X } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
 import { apiClient } from '../../api/client';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import type { Article, PaginatedResult } from '../../types';
+
+interface BookmarkItem {
+  id: string;
+  userId: string;
+  articleId: string;
+  createdAt: string;
+}
+
+interface BookmarksResponse {
+  items: BookmarkItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+const TABS = [
+  { id: 'bookmarks', label: 'Saved Articles' },
+  { id: 'history', label: 'Reading History' },
+];
 
 export const UserLibraryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'bookmarks' | 'history'>('bookmarks');
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
 
-  // Fetch published articles to simulate saved bookmarks / reading history
-  const { data: articlesData, isLoading } = useQuery({
-    queryKey: ['publicLibraryArticles'],
+  // ── Real bookmarks from API ──────────────────────────────────────────────────
+  const { data: bookmarksData, isLoading: isLoadingBookmarks } = useQuery({
+    queryKey: ['myBookmarks', user?.id],
     queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
-        params: { status: 'published', limit: 20 },
+      const { data } = await apiClient.get<BookmarksResponse>('/me/bookmarks', {
+        params: { limit: 50 },
       });
       return data;
     },
+    enabled: Boolean(user?.id) && activeTab === 'bookmarks',
   });
 
-  const articles = articlesData?.items || [];
+  // ── Fetch article details for each bookmark ──────────────────────────────────
+  const bookmarkArticleIds = (bookmarksData?.items || []).map((b) => b.articleId);
+  const { data: articlesData } = useQuery({
+    queryKey: ['bookmarkArticles', bookmarkArticleIds.join(',')],
+    queryFn: async () => {
+      if (bookmarkArticleIds.length === 0) return { items: [] };
+      // Fetch all published articles and filter by bookmark IDs
+      const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
+        params: { limit: 100, status: 'published' },
+      });
+      return data;
+    },
+    enabled: bookmarkArticleIds.length > 0,
+  });
+
+  const removeBookmarkMutation = useMutation({
+    mutationFn: async (articleId: string) => {
+      await apiClient.delete(`/articles/${articleId}/bookmark`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myBookmarks'] });
+      queryClient.invalidateQueries({ queryKey: ['bookmarkArticles'] });
+    },
+  });
+
+  const bookmarkedArticles = (articlesData?.items || []).filter((a) =>
+    bookmarkArticleIds.includes(a.id),
+  );
+
+  const bookmarks = bookmarksData?.items || [];
+  const isLoading = isLoadingBookmarks;
 
   return (
-    <div className="space-y-6 font-sans">
-      <div>
-        <h1 className="text-2xl font-editorial font-bold text-ink-primary">Personal Library</h1>
-        <p className="text-xs text-ink-secondary mt-0.5">
-          Your saved bookmarks, reading history, and offline reference lists
+    <div className="font-sans">
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-accent-crimson font-semibold mb-1">
+          Your Library
+        </p>
+        <h1 className="font-editorial text-3xl font-semibold text-ink-primary leading-tight">
+          Personal Library
+        </h1>
+        <p className="mt-1 text-sm text-ink-secondary">
+          Saved articles, reading history, and personal collections
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white border border-border-subtle rounded-xl p-4 shadow-sm">
-        <div className="flex items-center gap-2 border-b border-border-subtle pb-3">
-          <button
-            onClick={() => setActiveTab('bookmarks')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
-              activeTab === 'bookmarks'
-                ? 'bg-slate-100 text-ink-primary font-semibold'
-                : 'text-ink-secondary hover:text-ink-primary hover:bg-slate-50'
-            }`}
-          >
-            <Bookmark size={15} />
-            <span>Saved Bookmarks</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-slate-100 text-ink-secondary">
-              {articles.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
-              activeTab === 'history'
-                ? 'bg-slate-100 text-ink-primary font-semibold'
-                : 'text-ink-secondary hover:text-ink-primary hover:bg-slate-50'
-            }`}
-          >
-            <History size={15} />
-            <span>Reading History</span>
-          </button>
+      {/* ── Tab bar ──────────────────────────────────────────────────────────── */}
+      <div className="border-b border-border-subtle mb-0">
+        <div className="flex gap-0">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`
+                flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors
+                ${
+                  activeTab === tab.id
+                    ? 'border-ink-primary text-ink-primary'
+                    : 'border-transparent text-ink-secondary hover:text-ink-primary'
+                }
+              `}
+            >
+              {tab.label}
+              {tab.id === 'bookmarks' && bookmarks.length > 0 && (
+                <span className="font-mono text-[10px] tabular-nums text-ink-secondary">
+                  {bookmarks.length}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="pt-4">
+      {/* ── Bookmarks tab ────────────────────────────────────────────────────── */}
+      {activeTab === 'bookmarks' && (
+        <div>
           {isLoading ? (
-            <div className="p-8 text-center">
-              <LoadingSpinner label="Loading saved library..." />
+            <div className="py-16 text-center">
+              <p className="font-mono text-xs text-ink-secondary animate-pulse">Loading saved articles…</p>
             </div>
-          ) : articles.length > 0 ? (
-            <div className="divide-y divide-border-subtle">
-              {articles.map((article) => (
-                <div
-                  key={article.id}
-                  className="py-4 flex items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[11px] font-mono uppercase tracking-wider text-accent-crimson font-semibold">
-                        {article.categorySlug || 'Article'}
-                      </span>
-                      <span className="text-[11px] font-mono text-ink-secondary">
-                        · {article.readingTimeMinutes || 2} min read
-                      </span>
-                    </div>
-                    <Link
-                      to={`/articles/${article.slug}`}
-                      className="text-sm font-bold text-ink-primary hover:text-accent-crimson transition-colors truncate block"
-                    >
-                      {article.title}
-                    </Link>
-                    <p className="text-xs text-ink-secondary mt-0.5 line-clamp-1">
-                      {article.description || 'Editorial analysis and commentary.'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link
-                      to={`/articles/${article.slug}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-ink-primary rounded-lg text-xs font-medium transition-colors"
-                    >
-                      <span>Read</span>
-                      <ExternalLink size={12} />
-                    </Link>
-                  </div>
-                </div>
-              ))}
+          ) : bookmarks.length === 0 ? (
+            <div className="py-16">
+              <Bookmark size={20} className="text-ink-secondary mb-4" strokeWidth={1.5} />
+              <p className="font-editorial text-lg text-ink-secondary">
+                No saved articles yet.
+              </p>
+              <p className="mt-1 text-sm text-ink-secondary">
+                Click the bookmark icon on any article to save it here.
+              </p>
             </div>
           ) : (
-            <div className="p-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-ink-secondary">
-                <Bookmark size={20} />
-              </div>
-              <p className="text-xs font-semibold text-ink-primary">No saved stories yet</p>
-              <p className="text-xs text-ink-secondary mt-1">
-                Explore the publication front page and click bookmark to save stories for later.
-              </p>
-              <Link
-                to="/"
-                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors"
-              >
-                <span>Browse Front Page</span>
-              </Link>
+            <div className="divide-y divide-border-subtle">
+              {bookmarks.map((bookmark) => {
+                // Find corresponding article data
+                const article = bookmarkedArticles.find((a) => a.id === bookmark.articleId);
+                const savedAt = new Date(bookmark.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+
+                return (
+                  <div key={bookmark.id} className="py-5 group flex items-start gap-4">
+                    {/* Remove button */}
+                    <div className="flex-shrink-0 pt-1">
+                      <button
+                        onClick={() => removeBookmarkMutation.mutate(bookmark.articleId)}
+                        disabled={removeBookmarkMutation.isPending}
+                        className="text-ink-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remove bookmark"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+
+                    {/* Article info */}
+                    <div className="flex-1 min-w-0">
+                      {article ? (
+                        <>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-ink-secondary">
+                              Article
+                            </span>
+                            {article.readingTimeMinutes > 0 && (
+                              <>
+                                <span className="font-mono text-[10px] text-border-subtle">·</span>
+                                <span className="font-mono text-[10px] text-ink-secondary">
+                                  {article.readingTimeMinutes} min read
+                                </span>
+                              </>
+                            )}
+                            <span className="font-mono text-[10px] text-border-subtle">·</span>
+                            <span className="font-mono text-[10px] text-ink-secondary">
+                              Saved {savedAt}
+                            </span>
+                          </div>
+                          <Link to={`/articles/${article.slug}`}>
+                            <h3 className="font-editorial text-base font-semibold text-ink-primary leading-snug hover:text-accent-crimson transition-colors">
+                              {article.title}
+                            </h3>
+                          </Link>
+                          {article.description && (
+                            <p className="mt-0.5 text-sm text-ink-secondary line-clamp-1">
+                              {article.description}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="mb-1">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-ink-secondary">
+                              Saved {savedAt}
+                            </span>
+                          </div>
+                          <p className="text-sm text-ink-secondary font-mono">
+                            Article #{bookmark.articleId.slice(0, 8)}
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Read link */}
+                    {article?.slug && (
+                      <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Link
+                          to={`/articles/${article.slug}`}
+                          className="text-xs font-medium text-ink-secondary hover:text-ink-primary transition-colors font-mono"
+                        >
+                          Read →
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
+      )}
+
+      {/* ── Reading History tab ──────────────────────────────────────────────── */}
+      {activeTab === 'history' && (
+        <div className="py-16">
+          <p className="font-editorial text-lg text-ink-secondary">
+            Reading history coming soon.
+          </p>
+          <p className="mt-1 text-sm text-ink-secondary">
+            Articles you've read will appear here automatically.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

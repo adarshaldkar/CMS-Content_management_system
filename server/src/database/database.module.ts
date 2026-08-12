@@ -1,4 +1,4 @@
-import { forwardRef, Global, Module } from '@nestjs/common';
+import { forwardRef, Global, Module, OnModuleInit } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { EnvConfig } from '../config/env.schema';
@@ -6,6 +6,7 @@ import { PostgresService } from './postgres.service';
 import { DatabaseSwitcherService } from './database-switcher.service';
 import { DatabaseSwitcherController } from './database-switcher.controller';
 import { AuditModule } from '../modules/audit/audit.module';
+import { RepositoryRegistryService } from '../repositories/repository-registry.service';
 
 @Global()
 @Module({
@@ -30,7 +31,17 @@ import { AuditModule } from '../modules/audit/audit.module';
     forwardRef(() => AuditModule),
   ],
   controllers: [DatabaseSwitcherController],
-  providers: [PostgresService, DatabaseSwitcherService],
-  exports: [PostgresService, DatabaseSwitcherService, MongooseModule],
+  providers: [PostgresService, DatabaseSwitcherService, RepositoryRegistryService],
+  exports: [PostgresService, DatabaseSwitcherService, MongooseModule, RepositoryRegistryService],
 })
-export class DatabaseModule {}
+export class DatabaseModule implements OnModuleInit {
+  constructor(
+    private readonly registry: RepositoryRegistryService,
+    private readonly config: ConfigService<EnvConfig, true>,
+  ) {}
+
+  onModuleInit() {
+    const initialActive = this.config.get('ACTIVE_DATABASE', { infer: true });
+    this.registry.setInitialActive(initialActive);
+  }
+}

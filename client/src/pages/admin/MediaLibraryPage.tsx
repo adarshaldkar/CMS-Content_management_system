@@ -3,8 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   Copy,
-  FolderOpen,
-  HardDrive,
   Image as ImageIcon,
   Trash2,
   Upload,
@@ -60,124 +58,116 @@ export const MediaLibraryPage: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const assets = mediaData?.items || [];
-  const totalSizeBytes = assets.reduce((acc, a) => acc + (a.sizeBytes || 0), 0);
-  const totalSizeMB = (totalSizeBytes / (1024 * 1024)).toFixed(2);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+    }
+  };
+
+  const mediaItems = mediaData?.items || [];
 
   return (
-    <div className="space-y-8 font-sans">
+    <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-accent-crimson font-semibold mb-1">
-            <ImageIcon size={15} />
+          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-accent-crimson font-semibold mb-1">
+            <ImageIcon size={13} />
             <span>Digital Asset Management</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-editorial font-bold text-ink-primary">
-            Editorial Media Library
+          <h1 className="text-2xl sm:text-3xl font-editorial font-semibold text-ink-primary">
+            Media & Asset Library
           </h1>
           <p className="text-xs text-ink-secondary mt-1">
-            Inspect uploaded images, copy CDN URLs, and manage storage resources.
+            Upload cover photography, manage inline manuscript figures, and inspect storage metadata.
           </p>
         </div>
 
         {/* Upload Button */}
-        <label className="flex items-center gap-1.5 px-4 py-2 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-sm cursor-pointer self-start sm:self-auto">
-          <Upload size={14} />
-          <span>Upload Asset</span>
+        <label
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors font-mono cursor-pointer self-start sm:self-auto"
+          style={{ borderRadius: 2 }}
+        >
+          <Upload size={13} />
+          <span>{uploadMutation.isPending ? 'Uploading…' : 'Upload Asset'}</span>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) uploadMutation.mutate(file);
-            }}
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={handleFileChange}
             className="hidden"
+            disabled={uploadMutation.isPending}
           />
         </label>
-      </div>
-
-      {/* Storage Metrics Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-border-subtle text-xs font-mono">
-        <div className="flex items-center gap-2">
-          <HardDrive size={15} className="text-ink-secondary" />
-          <span>Storage Footprint: <strong className="text-ink-primary">{totalSizeMB} MB</strong></span>
-        </div>
-        <div>
-          <span>Total Assets: <strong className="text-ink-primary">{assets.length}</strong></span>
-        </div>
-        <div>
-          <span>Provider: <strong className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Local / Cloud CDN</strong></span>
-        </div>
       </div>
 
       {/* Media Grid */}
       {isLoading ? (
         <div className="py-20 text-center">
-          <LoadingSpinner label="Loading media assets..." />
+          <LoadingSpinner label="Indexing media repository..." />
         </div>
-      ) : assets.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {assets.map((asset) => (
+      ) : mediaItems.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {mediaItems.map((media) => (
             <div
-              key={asset.id}
-              className="bg-white border border-border-subtle rounded-xl overflow-hidden shadow-sm space-y-2 group hover:shadow-md transition-shadow flex flex-col justify-between"
+              key={media.id}
+              className="bg-white border border-border-subtle overflow-hidden group space-y-2 p-3 transition-colors hover:border-ink-primary"
+              style={{ borderRadius: 2 }}
             >
-              <div className="aspect-square bg-slate-100 relative overflow-hidden border-b border-border-subtle">
+              <div className="aspect-video bg-canvas-paper relative overflow-hidden border border-border-subtle/60" style={{ borderRadius: 2 }}>
                 <img
-                  src={asset.url}
-                  alt={asset.originalFilename || 'Media asset'}
-                  className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                  src={media.url}
+                  alt={media.filename}
+                  className="w-full h-full object-cover"
                 />
-                <span className="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-mono uppercase">
-                  {asset.mimeType?.split('/')[1] || 'IMAGE'}
-                </span>
               </div>
 
-              <div className="p-3 space-y-2">
-                <p className="text-xs font-bold text-ink-primary truncate">
-                  {asset.originalFilename || 'asset.jpg'}
+              <div className="space-y-1">
+                <p className="text-xs font-mono text-ink-primary truncate font-semibold">
+                  {media.filename}
                 </p>
-
-                <div className="flex items-center justify-between text-[11px] font-mono text-ink-secondary">
-                  <span>{((asset.sizeBytes || 0) / 1024).toFixed(0)} KB</span>
-                  <span>{asset.width && asset.height ? `${asset.width}x${asset.height}` : '2D'}</span>
+                <div className="flex items-center justify-between text-[10px] font-mono text-ink-secondary">
+                  <span>{(media.size / 1024).toFixed(0)} KB</span>
+                  <span>{media.mimeType.split('/')[1]?.toUpperCase()}</span>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
-                  <button
-                    onClick={() => handleCopyUrl(asset.id, asset.url)}
-                    className="flex items-center gap-1 text-[11px] text-ink-secondary hover:text-ink-primary font-mono"
-                  >
-                    {copiedId === asset.id ? (
-                      <>
-                        <Check size={12} className="text-emerald-600" />
-                        <span className="text-emerald-600 font-semibold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={12} />
-                        <span>Copy URL</span>
-                      </>
-                    )}
-                  </button>
+              <div className="flex items-center justify-between pt-2 border-t border-border-subtle text-xs">
+                <button
+                  onClick={() => handleCopyUrl(media.id, media.url)}
+                  className="flex items-center gap-1 text-[11px] font-mono text-ink-secondary hover:text-ink-primary transition-colors"
+                >
+                  {copiedId === media.id ? (
+                    <>
+                      <Check size={11} className="text-emerald-700" />
+                      <span className="text-emerald-700">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={11} />
+                      <span>Copy URL</span>
+                    </>
+                  )}
+                </button>
 
-                  <button
-                    onClick={() => deleteMutation.mutate(asset.id)}
-                    className="p-1 text-rose-500 hover:text-rose-700 rounded"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+                <button
+                  onClick={() => deleteMutation.mutate(media.id)}
+                  className="text-rose-600 hover:text-rose-800 transition-colors p-1"
+                  title="Delete Asset"
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="p-12 text-center bg-white border border-border-subtle rounded-2xl">
-          <FolderOpen size={28} className="mx-auto text-ink-secondary mb-2" />
-          <p className="text-xs font-semibold text-ink-primary">Media library is empty</p>
-          <p className="text-xs text-ink-secondary mt-1">Upload images to use them in article manuscripts.</p>
+        <div className="p-16 text-center bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
+          <ImageIcon size={28} className="mx-auto text-ink-secondary/40 mb-2" />
+          <p className="text-xs font-semibold text-ink-primary">No media assets uploaded yet</p>
+          <p className="text-xs text-ink-secondary mt-1 font-editorial italic">
+            Upload cover photos or editorial figures to display them here.
+          </p>
         </div>
       )}
     </div>

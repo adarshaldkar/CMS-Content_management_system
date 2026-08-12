@@ -13,3 +13,9 @@ export * from './taxonomy.model';
 export * from './media.model';
 export * from './comment.model';
 export * from './audit.model';
+// Enum values from social model (must use regular export)
+export { FollowTargetType } from './social.model';
+// Type-only exports from social model
+export type { Bookmark, CreateBookmarkDto, Like, CreateLikeDto, Follow, CreateFollowDto, FollowQueryFilters } from './social.model';
+
+

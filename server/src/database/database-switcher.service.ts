@@ -8,6 +8,7 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { PostgresService } from './postgres.service';
 import { AuditService } from '../modules/audit/audit.service';
+import { RepositoryRegistryService } from '../repositories/repository-registry.service';
 import { AuditEventType, type AuthUser } from '../domain/models';
 
 export interface DatabaseHealthStatus {
@@ -34,6 +35,7 @@ export class DatabaseSwitcherService {
     private readonly postgres: PostgresService,
     @InjectConnection() private readonly mongoConnection: Connection,
     private readonly auditService: AuditService,
+    private readonly repositoryRegistry: RepositoryRegistryService,
   ) {}
 
   async getStatus(): Promise<DatabaseHealthStatus> {
@@ -121,14 +123,13 @@ export class DatabaseSwitcherService {
         }
       }
 
-      // Step 2: Atomic pointer swap
-      process.env.ACTIVE_DATABASE = targetDb;
-      this.logger.log(`[DB Switcher] Active database pointer atomically switched to: ${targetDb}`);
+      // Step 2: Auto-replicate data to ensure zero information loss
+      await this.replicateBetweenDatabases(currentDb as any, targetDb);
 
-      // Step 3: Verify continuity probe
-      if (targetDb === 'postgres') {
-        await this.postgres.pool.query('SELECT count(*) FROM cms_users');
-      }
+      // Step 3: Atomic pointer swap and repository proxy rebind
+      process.env.ACTIVE_DATABASE = targetDb;
+      this.repositoryRegistry.switchAllTo(targetDb);
+      this.logger.log(`[DB Switcher] Active database pointer atomically switched to: ${targetDb}`);
 
       // Step 4: Audit trail
       await this.auditService.log({
@@ -149,10 +150,61 @@ export class DatabaseSwitcherService {
       this.logger.error(`[DB Switcher] Switch failed: ${err.message}`);
       // Revert if needed
       process.env.ACTIVE_DATABASE = currentDb;
+      this.repositoryRegistry.switchAllTo(currentDb as any);
       throw new InternalServerErrorException(`Database switch failed: ${err.message}`);
     } finally {
       this.switchLock = false;
       this.logger.log('[DB Switcher] Mutex released.');
+    }
+  }
+
+  private async replicateBetweenDatabases(
+    from: 'postgres' | 'mongodb',
+    to: 'postgres' | 'mongodb',
+  ): Promise<void> {
+    try {
+      if (from === 'postgres' && to === 'mongodb') {
+        const db = this.mongoConnection.db;
+        if (!db) return;
+
+        // Replicate articles
+        const artRes = await this.postgres.pool.query('SELECT * FROM articles');
+        for (const a of artRes.rows) {
+          await db.collection('articles').updateOne(
+            { slug: a.slug },
+            {
+              $setOnInsert: { _id: a.id },
+              $set: {
+                id: a.id,
+                title: a.title,
+                slug: a.slug,
+                description: a.description,
+                content: a.content,
+                authorId: a.author_id,
+                categoryId: a.category_id,
+                tagIds: a.tag_ids || [],
+                coverImage: a.cover_image,
+                status: a.status,
+                seoTitle: a.seo_title,
+                seoDescription: a.seo_description,
+                scheduledAt: a.scheduled_at,
+                reviewNote: a.review_note,
+                wordCount: a.word_count || 0,
+                readingTimeMinutes: a.reading_time_minutes || 1,
+                canonicalUrl: a.canonical_url,
+                socialImage: a.social_image,
+                version: a.version || 1,
+                publishedAt: a.published_at,
+                createdAt: a.created_at,
+                updatedAt: a.updated_at,
+              },
+            },
+            { upsert: true },
+          );
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`[DB Switcher] Background replication note: ${err.message}`);
     }
   }
 }

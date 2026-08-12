@@ -8,23 +8,39 @@ import type {
 } from '../../domain/models';
 import type { IUserRepository } from '../interfaces/user.repository.interface';
 
-/**
- * SeamlessUserRepository
- *
- * Wraps the primary (active) user repository and secondary (peer) user repository.
- * When a user is queried on the active database and not found (e.g. after a DB switch),
- * it queries the peer database. If found, it automatically replicates the user into
- * the active database so authentication and workflows continue with zero disruption.
- */
 export class SeamlessUserRepository implements IUserRepository {
   private readonly logger = new Logger(SeamlessUserRepository.name);
 
   constructor(
-    private readonly activeRepo: IUserRepository,
-    private readonly peerRepo: IUserRepository,
-    private readonly activeDbName: string,
-    private readonly peerDbName: string,
+    private readonly primaryRepo: IUserRepository,
+    private readonly secondaryRepo: IUserRepository,
+    public readonly primaryName: string,
+    public readonly secondaryName: string,
   ) {}
+
+  public get activeDbName(): string {
+    return this.primaryName;
+  }
+
+  public get peerDbName(): string {
+    return this.secondaryName;
+  }
+
+  private get activeRepo(): IUserRepository {
+    const active = process.env.ACTIVE_DATABASE || this.primaryName;
+    if (active === 'mongodb') {
+      return this.primaryName === 'mongodb' ? this.primaryRepo : this.secondaryRepo;
+    }
+    return this.primaryName === 'postgres' ? this.primaryRepo : this.secondaryRepo;
+  }
+
+  private get peerRepo(): IUserRepository {
+    const active = process.env.ACTIVE_DATABASE || this.primaryName;
+    if (active === 'mongodb') {
+      return this.primaryName === 'mongodb' ? this.secondaryRepo : this.primaryRepo;
+    }
+    return this.primaryName === 'postgres' ? this.secondaryRepo : this.primaryRepo;
+  }
 
   async findById(id: string): Promise<User | null> {
     const user = await this.activeRepo.findById(id);
@@ -34,7 +50,7 @@ export class SeamlessUserRepository implements IUserRepository {
       const peerUser = await this.peerRepo.findById(id);
       if (peerUser) {
         this.logger.log(
-          `[Seamless Sync] JIT replicating user ${peerUser.email} from ${this.peerDbName} to ${this.activeDbName} by ID`,
+          `[Seamless Sync] JIT replicating user ${peerUser.email} by ID`,
         );
         return await this.activeRepo.create({
           email: peerUser.email,
@@ -62,7 +78,7 @@ export class SeamlessUserRepository implements IUserRepository {
       const peerUser = await this.peerRepo.findByEmail(email);
       if (peerUser) {
         this.logger.log(
-          `[Seamless Sync] JIT replicating user ${peerUser.email} from ${this.peerDbName} to ${this.activeDbName} on login`,
+          `[Seamless Sync] JIT replicating user ${peerUser.email} on login`,
         );
         return await this.activeRepo.create({
           email: peerUser.email,
