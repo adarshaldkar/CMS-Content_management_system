@@ -25,7 +25,20 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
-# Test / cache
+# Documentation & internal specifications
+docs/
+
+# Tests & test scripts
+test/
+tests/
+server/test/
+scripts/
+*.spec.ts
+*.spec.tsx
+*.test.ts
+*.test.tsx
+*.e2e-spec.ts
+jest*.json
 .cache/
 .playwright/
 test-results/
