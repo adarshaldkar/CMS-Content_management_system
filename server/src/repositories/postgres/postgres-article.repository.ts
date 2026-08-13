@@ -33,6 +33,9 @@ interface ArticleRow extends QueryResultRow {
   created_at: Date;
   updated_at: Date;
   deleted_at: Date | null;
+  category_slug?: string | null;
+  author_name?: string | null;
+  author_avatar?: string | null;
 }
 
 interface CountRow extends QueryResultRow {
@@ -104,6 +107,14 @@ export class PostgresArticleRepository implements IArticleRepository {
       content: row.content,
       authorId: row.author_id,
       categoryId: row.category_id,
+      categorySlug: row.category_slug || undefined,
+      author: row.author_name
+        ? {
+            id: row.author_id,
+            name: row.author_name,
+            avatarUrl: row.author_avatar || null,
+          }
+        : undefined,
       tagIds: tagIds.map(String),
       coverImage: row.cover_image,
       status: row.status as ContentStatus,
@@ -124,7 +135,11 @@ export class PostgresArticleRepository implements IArticleRepository {
   async findById(id: string): Promise<Article | null> {
     await this.ensureSchema();
     const result = await this.postgres.pool.query<ArticleRow>(
-      'SELECT * FROM articles WHERE id = $1 AND deleted_at IS NULL',
+      `SELECT a.*, c.slug AS category_slug, u.name AS author_name, u.avatar_url AS author_avatar 
+       FROM articles a 
+       LEFT JOIN categories c ON a.category_id::text = c.id::text 
+       LEFT JOIN cms_users u ON a.author_id::text = u.id::text 
+       WHERE a.id = $1 AND a.deleted_at IS NULL`,
       [id],
     );
     return result.rows[0] ? this.toDomain(result.rows[0]) : null;
@@ -133,7 +148,11 @@ export class PostgresArticleRepository implements IArticleRepository {
   async findBySlug(slug: string): Promise<Article | null> {
     await this.ensureSchema();
     const result = await this.postgres.pool.query<ArticleRow>(
-      'SELECT * FROM articles WHERE slug = $1 AND deleted_at IS NULL',
+      `SELECT a.*, c.slug AS category_slug, u.name AS author_name, u.avatar_url AS author_avatar 
+       FROM articles a 
+       LEFT JOIN categories c ON a.category_id::text = c.id::text 
+       LEFT JOIN cms_users u ON a.author_id::text = u.id::text 
+       WHERE a.slug = $1 AND a.deleted_at IS NULL`,
       [slug],
     );
     return result.rows[0] ? this.toDomain(result.rows[0]) : null;
@@ -146,48 +165,66 @@ export class PostgresArticleRepository implements IArticleRepository {
     const offset = (page - 1) * limit;
 
     const values: unknown[] = [];
-    const clauses: string[] = ['deleted_at IS NULL'];
+    const clauses: string[] = ['a.deleted_at IS NULL'];
 
     if (filters.status) {
       values.push(filters.status);
-      clauses.push(`status = $${values.length}`);
+      clauses.push(`a.status = $${values.length}`);
     }
 
     if (filters.authorId) {
       values.push(filters.authorId);
-      clauses.push(`author_id = $${values.length}`);
+      clauses.push(`a.author_id = $${values.length}`);
     }
 
     if (filters.categoryId) {
       values.push(filters.categoryId);
-      clauses.push(`category_id = $${values.length}`);
+      clauses.push(`a.category_id = $${values.length}`);
+    }
+
+    if (filters.categorySlug) {
+      const slugAliases = [filters.categorySlug];
+      if (filters.categorySlug === 'ai') slugAliases.push('artificial-intelligence');
+      if (filters.categorySlug === 'artificial-intelligence') slugAliases.push('ai');
+      if (filters.categorySlug === 'governance') slugAliases.push('policy-governance');
+      if (filters.categorySlug === 'policy-governance') slugAliases.push('governance');
+      if (filters.categorySlug === 'media-culture') slugAliases.push('media-society', 'media');
+
+      values.push(slugAliases);
+      clauses.push(
+        `(a.category_id IN (SELECT id::text FROM categories WHERE slug = ANY($${values.length})) OR a.category_id = ANY($${values.length}))`,
+      );
     }
 
     if (filters.search) {
       values.push(`%${filters.search}%`);
       clauses.push(
-        `(title ILIKE $${values.length} OR description ILIKE $${values.length})`,
+        `(a.title ILIKE $${values.length} OR a.description ILIKE $${values.length})`,
       );
     }
 
     const where = `WHERE ${clauses.join(' AND ')}`;
 
     const countRes = await this.postgres.pool.query<CountRow>(
-      `SELECT count(*)::int AS total FROM articles ${where}`,
+      `SELECT count(*)::int AS total FROM articles a ${where}`,
       values,
     );
     const total = countRes.rows[0]?.total ?? 0;
 
-    let orderBy = 'ORDER BY created_at DESC';
+    let orderBy = 'ORDER BY a.created_at DESC';
     if (filters.sort === 'trending') {
-      orderBy = 'ORDER BY word_count DESC, created_at DESC';
+      orderBy = 'ORDER BY a.word_count DESC, a.created_at DESC';
     } else if (filters.sort === 'latest') {
-      orderBy = 'ORDER BY COALESCE(published_at, created_at) DESC';
+      orderBy = 'ORDER BY COALESCE(a.published_at, a.created_at) DESC';
     }
 
     const listValues = [...values, limit, offset];
     const dataRes = await this.postgres.pool.query<ArticleRow>(
-      `SELECT * FROM articles ${where} ${orderBy} LIMIT $${listValues.length - 1} OFFSET $${listValues.length}`,
+      `SELECT a.*, c.slug AS category_slug, u.name AS author_name, u.avatar_url AS author_avatar 
+       FROM articles a 
+       LEFT JOIN categories c ON a.category_id::text = c.id::text 
+       LEFT JOIN cms_users u ON a.author_id::text = u.id::text 
+       ${where} ${orderBy} LIMIT $${listValues.length - 1} OFFSET $${listValues.length}`,
       listValues,
     );
 

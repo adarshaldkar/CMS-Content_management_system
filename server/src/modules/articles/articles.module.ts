@@ -8,6 +8,10 @@ import {
   RevisionSchema,
   RevisionSchemaClass,
 } from '../../repositories/mongo/revision.schema';
+import {
+  CategorySchema,
+  CategorySchemaClass,
+} from '../../repositories/mongo/category.schema';
 import { PostgresArticleRepository } from '../../repositories/postgres/postgres-article.repository';
 import { MongoArticleRepository } from '../../repositories/mongo/mongo-article.repository';
 import { PostgresRevisionRepository } from '../../repositories/postgres/postgres-revision.repository';
@@ -29,6 +33,7 @@ import { AuditModule } from '../audit/audit.module';
     MongooseModule.forFeature([
       { name: ArticleSchemaClass.name, schema: ArticleSchema },
       { name: RevisionSchemaClass.name, schema: RevisionSchema },
+      { name: CategorySchemaClass.name, schema: CategorySchema },
     ]),
   ],
   controllers: [ArticlesController],

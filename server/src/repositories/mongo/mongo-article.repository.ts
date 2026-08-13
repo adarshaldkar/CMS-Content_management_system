@@ -10,6 +10,7 @@ import type {
   UpdateArticleDto,
 } from '../../domain/models';
 import { ArticleSchemaClass, type ArticleDocument } from './article.schema';
+import { CategorySchemaClass, type CategoryDocument } from './category.schema';
 import type { IArticleRepository } from '../interfaces/article.repository.interface';
 
 @Injectable()
@@ -17,9 +18,11 @@ export class MongoArticleRepository implements IArticleRepository {
   constructor(
     @InjectModel(ArticleSchemaClass.name)
     private readonly articleModel: Model<ArticleDocument>,
+    @InjectModel(CategorySchemaClass.name)
+    private readonly categoryModel: Model<CategoryDocument>,
   ) {}
 
-  private toDomain(doc: ArticleDocument): Article {
+  private toDomain(doc: ArticleDocument, categorySlug?: string): Article {
     return {
       id: doc._id.toString(),
       title: doc.title,
@@ -28,6 +31,7 @@ export class MongoArticleRepository implements IArticleRepository {
       content: doc.content,
       authorId: doc.authorId,
       categoryId: doc.categoryId,
+      categorySlug: categorySlug ?? undefined,
       tagIds: doc.tagIds,
       coverImage: doc.coverImage,
       status: doc.status as ContentStatus,
@@ -69,7 +73,30 @@ export class MongoArticleRepository implements IArticleRepository {
     const query: Record<string, unknown> = { deletedAt: null };
     if (filters.status) query.status = filters.status;
     if (filters.authorId) query.authorId = filters.authorId;
-    if (filters.categoryId) query.categoryId = filters.categoryId;
+
+    // Resolve categorySlug → categoryId for filtering
+    let resolvedCategorySlug = filters.categorySlug;
+    if (filters.categorySlug && !filters.categoryId) {
+      const slugAliases = [filters.categorySlug];
+      if (filters.categorySlug === 'ai') slugAliases.push('artificial-intelligence');
+      if (filters.categorySlug === 'artificial-intelligence') slugAliases.push('ai');
+      if (filters.categorySlug === 'governance') slugAliases.push('policy-governance');
+      if (filters.categorySlug === 'policy-governance') slugAliases.push('governance');
+      if (filters.categorySlug === 'media-culture') slugAliases.push('media-society', 'media');
+
+      const cats = await this.categoryModel
+        .find({ slug: { $in: slugAliases } })
+        .exec();
+      if (cats.length > 0) {
+        const catIds = cats.map((c) => c._id.toString());
+        query.$or = [{ categoryId: { $in: catIds } }, { categoryId: { $in: slugAliases } }];
+      } else {
+        query.categoryId = { $in: slugAliases };
+      }
+    } else if (filters.categoryId) {
+      query.categoryId = filters.categoryId;
+    }
+
     if (filters.search) {
       const safeSearch = filters.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
@@ -95,8 +122,25 @@ export class MongoArticleRepository implements IArticleRepository {
       this.articleModel.countDocuments(query).exec(),
     ]);
 
+    // Build a categoryId→slug map for all unique categoryIds in results
+    const catIdSet = new Set<string>(
+      docs.filter((d) => d.categoryId).map((d) => d.categoryId!),
+    );
+    const catMap = new Map<string, string>();
+    if (catIdSet.size > 0) {
+      const cats = await this.categoryModel
+        .find({ _id: { $in: Array.from(catIdSet) } })
+        .exec();
+      cats.forEach((c) => catMap.set(c._id.toString(), c.slug));
+    }
+
     return {
-      items: docs.map((d) => this.toDomain(d)),
+      items: docs.map((d) => {
+        const slug =
+          resolvedCategorySlug ??
+          (d.categoryId ? catMap.get(d.categoryId) : undefined);
+        return this.toDomain(d, slug);
+      }),
       total,
       page,
       limit,

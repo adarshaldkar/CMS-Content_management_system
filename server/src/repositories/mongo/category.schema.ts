@@ -5,6 +5,9 @@ export type CategoryDocument = HydratedDocument<CategorySchemaClass>;
 
 @Schema({ collection: 'categories', timestamps: true })
 export class CategorySchemaClass {
+  @Prop({ type: String })
+  _id?: string;
+
   @Prop({ required: true, trim: true })
   name!: string;
 

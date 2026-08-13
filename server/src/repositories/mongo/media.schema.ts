@@ -5,6 +5,9 @@ export type MediaDocument = HydratedDocument<MediaSchemaClass>;
 
 @Schema({ collection: 'media', timestamps: { createdAt: true, updatedAt: false } })
 export class MediaSchemaClass {
+  @Prop({ type: String })
+  _id?: string;
+
   @Prop({ required: true })
   filename!: string;
 

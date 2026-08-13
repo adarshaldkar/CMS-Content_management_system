@@ -50,15 +50,20 @@ export class ArticlesController {
     @Query('search') search?: string,
     @Query('authorId') authorId?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('categorySlug') categorySlug?: string,
+    @Query('category') category?: string,
     @Query('sort') sort?: 'trending' | 'latest' | 'popular',
   ): Promise<PaginatedResult<Article>> {
+    const resolvedSlug = categorySlug || category;
+    const resolvedStatus = status ? status : (authorId || resolvedSlug) ? (status || undefined) : undefined;
     return this.articleService.findMany({
       page: parseInt(page, 10) || 1,
       limit: parseInt(limit, 10) || 20,
-      status: status || ContentStatus.PUBLISHED,
+      status: resolvedStatus,
       search,
       authorId,
       categoryId,
+      categorySlug: resolvedSlug,
       sort,
     });
   }

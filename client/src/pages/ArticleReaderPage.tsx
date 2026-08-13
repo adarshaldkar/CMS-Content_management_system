@@ -409,6 +409,10 @@ export const ArticleReaderPage: React.FC = () => {
             <img
               src={article.coverImage}
               alt={article.title}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&auto=format&fit=crop&q=80';
+              }}
               className="w-full object-cover max-h-[460px] border border-border-subtle"
               style={{ borderRadius: 2 }}
             />
@@ -443,28 +447,38 @@ export const ArticleReaderPage: React.FC = () => {
             </div>
           </div>
 
-          <button
-            onClick={handleFollowToggle}
-            disabled={toggleFollowMutation.isPending}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide transition-colors shrink-0 ${
-              isFollowingAuthor
-                ? 'bg-slate-200 text-ink-primary'
-                : 'bg-ink-primary text-white hover:bg-slate-800'
-            }`}
-            style={{ borderRadius: 2 }}
-          >
-            {isFollowingAuthor ? (
-              <>
-                <UserCheck size={13} />
-                <span>Following</span>
-              </>
-            ) : (
-              <>
-                <UserPlus size={13} />
-                <span>Follow Author</span>
-              </>
-            )}
-          </button>
+          {user?.id === article.authorId ? (
+            <Link
+              to={`/write/${article.id}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide bg-white border border-border-subtle hover:border-ink-primary text-ink-primary transition-colors shrink-0 font-mono"
+              style={{ borderRadius: 2 }}
+            >
+              <span>Edit Your Story</span>
+            </Link>
+          ) : (
+            <button
+              onClick={handleFollowToggle}
+              disabled={toggleFollowMutation.isPending}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide transition-colors shrink-0 ${
+                isFollowingAuthor
+                  ? 'bg-slate-200 text-ink-primary'
+                  : 'bg-ink-primary text-white hover:bg-slate-800'
+              }`}
+              style={{ borderRadius: 2 }}
+            >
+              {isFollowingAuthor ? (
+                <>
+                  <UserCheck size={13} />
+                  <span>Following</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus size={13} />
+                  <span>Follow Author</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* 6. Comments Section */}

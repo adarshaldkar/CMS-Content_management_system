@@ -12,12 +12,12 @@ export class FollowsService {
   ) {}
 
   async followUser(targetUserId: string, actor: AuthUser) {
+    const count = await this.followRepo.countFollowers(FollowTargetType.USER, targetUserId);
     if (targetUserId === actor.id) {
-      throw new ConflictException('You cannot follow yourself.');
+      return { following: false, isSelf: true, followersCount: count };
     }
     const existing = await this.followRepo.findOne(actor.id, FollowTargetType.USER, targetUserId);
     if (existing) {
-      const count = await this.followRepo.countFollowers(FollowTargetType.USER, targetUserId);
       return { following: true, followersCount: count };
     }
     await this.followRepo.create({
@@ -31,8 +31,8 @@ export class FollowsService {
       resource: `User:${targetUserId}`,
       result: 'SUCCESS',
     });
-    const count = await this.followRepo.countFollowers(FollowTargetType.USER, targetUserId);
-    return { following: true, followersCount: count };
+    const updatedCount = await this.followRepo.countFollowers(FollowTargetType.USER, targetUserId);
+    return { following: true, followersCount: updatedCount };
   }
 
   async unfollowUser(targetUserId: string, actor: AuthUser) {

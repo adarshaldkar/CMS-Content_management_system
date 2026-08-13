@@ -11,6 +11,7 @@ import {
   FileEdit,
 } from 'lucide-react';
 import type { ArticleStatus } from '../../types';
+import { useAuthStore } from '../../stores/authStore';
 
 interface WorkflowActionBarProps {
   status: ArticleStatus;
@@ -39,6 +40,10 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
   loading,
   onTransition,
 }) => {
+  const { hasRole } = useAuthStore();
+  const canApprove = hasRole(['super_admin', 'admin', 'editor']);
+  const canPublish = hasRole(['super_admin', 'admin', 'editor']);
+
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -101,45 +106,67 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
 
           {status === 'pending_review' && (
             <>
-              <button
-                onClick={() => onTransition('approved')}
-                disabled={loading}
-                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
-                style={{ borderRadius: 2 }}
-              >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                Approve
-              </button>
-              <button
-                onClick={() => setRejectModalOpen(true)}
-                disabled={loading}
-                className="px-3.5 py-1.5 text-rose-700 border border-rose-300 hover:bg-rose-50 text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
-                style={{ borderRadius: 2 }}
-              >
-                <XCircle className="w-3.5 h-3.5" /> Request Changes
-              </button>
+              {canApprove ? (
+                <>
+                  <button
+                    onClick={() => onTransition('approved')}
+                    disabled={loading}
+                    className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
+                    style={{ borderRadius: 2 }}
+                  >
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => setRejectModalOpen(true)}
+                    disabled={loading}
+                    className="px-3.5 py-1.5 text-rose-700 border border-rose-300 hover:bg-rose-50 text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
+                    style={{ borderRadius: 2 }}
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Request Changes
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => onTransition('draft')}
+                  disabled={loading}
+                  className="px-3.5 py-1.5 border border-border-subtle text-ink-primary hover:bg-slate-50 text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
+                  style={{ borderRadius: 2 }}
+                  title="Pull back your manuscript from editorial review to make further edits"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Withdraw to Draft
+                </button>
+              )}
             </>
           )}
 
           {status === 'approved' && (
             <>
-              <button
-                onClick={() => onTransition('published')}
-                disabled={loading}
-                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
-                style={{ borderRadius: 2 }}
-              >
-                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-                Publish Now
-              </button>
-              <button
-                onClick={() => setScheduleModalOpen(true)}
-                disabled={loading}
-                className="px-3.5 py-1.5 border border-border-subtle text-ink-primary hover:bg-slate-50 text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
-                style={{ borderRadius: 2 }}
-              >
-                <Calendar className="w-3.5 h-3.5" /> Schedule
-              </button>
+              {canPublish ? (
+                <>
+                  <button
+                    onClick={() => onTransition('published')}
+                    disabled={loading}
+                    className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
+                    style={{ borderRadius: 2 }}
+                  >
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                    Publish Now
+                  </button>
+                  <button
+                    onClick={() => setScheduleModalOpen(true)}
+                    disabled={loading}
+                    className="px-3.5 py-1.5 border border-border-subtle text-ink-primary hover:bg-slate-50 text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
+                    style={{ borderRadius: 2 }}
+                  >
+                    <Calendar className="w-3.5 h-3.5" /> Schedule
+                  </button>
+                </>
+              ) : (
+                <span className="text-xs font-mono text-emerald-700 font-semibold px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded">
+                  Approved for Publication
+                </span>
+              )}
             </>
           )}
 

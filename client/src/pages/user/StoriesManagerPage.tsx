@@ -101,7 +101,8 @@ export const StoriesManagerPage: React.FC = () => {
         <div className="flex gap-0 overflow-x-auto">
           {TABS.map((tab) => {
             const count = tabCount(tab.id);
-            if (tab.id !== 'all' && count === 0) return null;
+            const isCoreTab = ['all', 'draft', 'pending_review', 'published', 'rejected'].includes(tab.id);
+            if (!isCoreTab && count === 0) return null;
             return (
               <button
                 key={tab.id}

@@ -1,11 +1,185 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, Compass, FileText } from 'lucide-react';
+import { Clock, BookOpen, ArrowRight } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import type { Article, PaginatedResult } from '../types';
 
+const CAT_LABELS: Record<string, { title: string; tagline: string }> = {
+  technology: {
+    title: 'Technology',
+    tagline: 'Developments, systems, and the machines shaping our digital world.',
+  },
+  ai: {
+    title: 'Artificial Intelligence',
+    tagline: 'Machine learning, autonomous reasoning, and the frontier of intelligent computing.',
+  },
+  cybersecurity: {
+    title: 'Cybersecurity',
+    tagline: 'Threat intelligence, defense protocols, and cryptography in practice.',
+  },
+  'editorial-design': {
+    title: 'Editorial Design',
+    tagline: 'Visual hierarchy, typography, and craftsmanship in digital publishing.',
+  },
+  'software-architecture': {
+    title: 'Software Architecture',
+    tagline: 'Distributed systems, zero-buffer continuity, and backend resilience.',
+  },
+  'media-culture': {
+    title: 'Media & Society',
+    tagline: 'How information networks shape discourse, sociology, and modern culture.',
+  },
+  science: {
+    title: 'Science',
+    tagline: 'Empirical discovery, mathematical methods, and natural phenomena.',
+  },
+  'policy-governance': {
+    title: 'Governance',
+    tagline: 'Regulatory dynamics, platform ethics, and technological policy.',
+  },
+};
+
+const cleanTitle = (t: string) => t.replace(/\s\d{10,}/g, '').trim();
+
+const fmtDate = (iso?: string | null) => {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(iso));
+};
+
+/* ─── Lead story card (large, left-aligned) ──── */
+const LeadCard: React.FC<{ article: Article }> = ({ article }) => {
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <Link to={`/articles/${article.slug}`} className="group block space-y-3">
+      {article.coverImage && !imgErr ? (
+        <div className="aspect-[16/10] overflow-hidden bg-slate-900 mb-4 relative">
+          <img
+            src={article.coverImage}
+            alt={cleanTitle(article.title)}
+            onError={() => setImgErr(true)}
+            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+          />
+          <span className="absolute top-3 left-3 bg-accent-crimson text-white text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1">
+            Featured in Section
+          </span>
+        </div>
+      ) : (
+        <div className="aspect-[16/10] bg-slate-900 flex items-center justify-center mb-4 p-8">
+          <span className="font-editorial text-2xl text-white font-bold text-center leading-snug">
+            {cleanTitle(article.title)}
+          </span>
+        </div>
+      )}
+      <h2 className="font-editorial text-2xl sm:text-3xl font-bold text-ink-primary leading-tight group-hover:text-accent-crimson transition-colors">
+        {cleanTitle(article.title)}
+      </h2>
+      <p className="text-sm text-ink-secondary leading-relaxed line-clamp-3">
+        {article.description || 'An architectural and investigative deep dive from the editorial desk.'}
+      </p>
+      <div className="flex items-center gap-3 text-xs font-mono text-ink-secondary border-t border-border-subtle pt-3">
+        <span className="font-semibold text-ink-primary">
+          {(article as any).author?.name || 'The Gazette Staff'}
+        </span>
+        <span>·</span>
+        <span className="flex items-center gap-1">
+          <Clock size={12} />
+          {article.readingTimeMinutes || 3} min read
+        </span>
+        <span>·</span>
+        <span>{fmtDate(article.publishedAt || article.createdAt)}</span>
+      </div>
+    </Link>
+  );
+};
+
+/* ─── Secondary story (compact card in right column) ─── */
+const SecondaryCard: React.FC<{ article: Article }> = ({ article }) => {
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <Link
+      to={`/articles/${article.slug}`}
+      className="group flex items-start gap-4 py-4 border-b border-border-subtle last:border-b-0"
+    >
+      {article.coverImage && !imgErr ? (
+        <div className="shrink-0 w-24 h-16 overflow-hidden bg-slate-900">
+          <img
+            src={article.coverImage}
+            alt={cleanTitle(article.title)}
+            onError={() => setImgErr(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+      ) : (
+        <div className="shrink-0 w-24 h-16 bg-slate-100 flex items-center justify-center">
+          <BookOpen size={16} className="text-slate-400" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="font-editorial text-sm font-bold text-ink-primary group-hover:text-accent-crimson transition-colors leading-snug line-clamp-2">
+          {cleanTitle(article.title)}
+        </h3>
+        <p className="text-xs text-ink-secondary line-clamp-1">
+          {article.description}
+        </p>
+        <div className="text-[11px] font-mono text-ink-secondary flex items-center gap-1.5 pt-0.5">
+          <Clock size={10} />
+          <span>{article.readingTimeMinutes || 3} min</span>
+          <span>·</span>
+          <span>{fmtDate(article.publishedAt || article.createdAt)}</span>
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+/* ─── Feed row (full-width list item) ─── */
+const FeedRow: React.FC<{ article: Article; index: number }> = ({ article, index }) => {
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <Link
+      to={`/articles/${article.slug}`}
+      className="group flex items-start gap-6 py-5 border-b border-border-subtle last:border-b-0 hover:bg-slate-50/50 transition-colors px-2 -mx-2 rounded"
+    >
+      <span className="text-2xl font-editorial font-bold text-accent-crimson/70 font-mono w-8 shrink-0">
+        {String(index + 1).padStart(2, '0')}
+      </span>
+
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <h3 className="font-editorial text-base sm:text-lg font-bold text-ink-primary group-hover:text-accent-crimson transition-colors leading-snug">
+          {cleanTitle(article.title)}
+        </h3>
+        <p className="text-xs text-ink-secondary line-clamp-2 leading-relaxed">
+          {article.description}
+        </p>
+        <div className="flex items-center gap-2.5 text-[11px] font-mono text-ink-secondary pt-1">
+          <Clock size={11} />
+          <span>{article.readingTimeMinutes || 3} min read</span>
+          <span>·</span>
+          <span>{fmtDate(article.publishedAt || article.createdAt)}</span>
+        </div>
+      </div>
+
+      {article.coverImage && !imgErr && (
+        <div className="shrink-0 hidden sm:block w-32 aspect-[16/10] overflow-hidden bg-slate-900">
+          <img
+            src={article.coverImage}
+            alt={cleanTitle(article.title)}
+            onError={() => setImgErr(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+      )}
+    </Link>
+  );
+};
+
+/* ─── Main CategoryArchivePage ─── */
 export const CategoryArchivePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
 
@@ -13,7 +187,7 @@ export const CategoryArchivePage: React.FC = () => {
     queryKey: ['categoryArchive', slug],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
-        params: { status: 'published', limit: 24, sort: 'latest' },
+        params: { status: 'published', categorySlug: slug, limit: 24, sort: 'latest' },
       });
       return data;
     },
@@ -21,79 +195,105 @@ export const CategoryArchivePage: React.FC = () => {
   });
 
   const articles = articlesData?.items || [];
-  const categoryTitle = slug
-    ? slug
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ')
-    : 'Category';
+  const catInfo = slug
+    ? (CAT_LABELS[slug] ?? {
+        title: slug
+          .split('-')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' '),
+        tagline: `Curated dispatches and architectural analysis filed under this section.`,
+      })
+    : { title: 'Section', tagline: '' };
+
+  const leadArticle = articles[0];
+  const secondaryArticles = articles.slice(1, 4);
+  const feedArticles = articles.slice(4);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 font-sans">
-      {/* Category Masthead Header */}
-      <div className="border-b border-border-subtle pb-6">
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-accent-crimson font-semibold mb-1">
-          <Compass size={14} />
-          <span>Editorial Section</span>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10 font-sans">
+      {/* ── Section Masthead ────────────────────────────── */}
+      <div className="border-b-2 border-ink-primary pb-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-2">
+          <div>
+            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-accent-crimson mb-1">
+              Editorial Department
+            </div>
+            <h1 className="font-editorial text-3xl sm:text-5xl font-bold text-ink-primary tracking-tight">
+              {catInfo.title}
+            </h1>
+            <p className="text-xs sm:text-sm text-ink-secondary mt-1.5 max-w-2xl leading-relaxed">
+              {catInfo.tagline}
+            </p>
+          </div>
+          <div className="text-xs font-mono text-ink-secondary border border-border-subtle px-3 py-1.5 self-start md:self-auto bg-white">
+            {articles.length} {articles.length === 1 ? 'Dispatch' : 'Dispatches'} Published
+          </div>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-editorial font-bold text-ink-primary">
-          {categoryTitle}
-        </h1>
-        <p className="text-xs text-ink-secondary mt-1.5 max-w-xl">
-          Curated dispatches, investigative reviews, and architectural analysis filed under {categoryTitle}.
-        </p>
       </div>
 
-      {/* Story Grid */}
+      {/* ── Content Area ────────────────────────────────── */}
       {isLoading ? (
-        <div className="py-20 text-center">
-          <LoadingSpinner label={`Loading ${categoryTitle} archive...`} />
+        <div className="py-24 text-center">
+          <LoadingSpinner label={`Loading ${catInfo.title} archive...`} />
         </div>
-      ) : articles.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article) => (
-            <article
-              key={article.id}
-              className="bg-white border border-border-subtle rounded-xl p-5 shadow-sm space-y-3 group hover:shadow-md transition-shadow flex flex-col justify-between"
+      ) : articles.length === 0 ? (
+        <div className="py-20 text-center bg-white border border-border-subtle p-8 space-y-2">
+          <p className="font-editorial text-xl font-bold text-ink-primary">
+            No published stories in this section yet.
+          </p>
+          <p className="text-xs text-ink-secondary font-mono">
+            Editorial manuscripts in this category are currently in review or preparation.
+          </p>
+          <div className="pt-4">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-accent-crimson hover:underline"
             >
-              <div className="space-y-2">
-                <div className="aspect-[16/9] rounded-lg overflow-hidden bg-slate-100 border border-border-subtle mb-3">
-                  {article.coverImage ? (
-                    <img
-                      src={article.coverImage}
-                      alt={article.title}
-                      className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
-                      <FileText size={28} />
-                    </div>
-                  )}
-                </div>
-
-                <Link to={`/articles/${article.slug}`}>
-                  <h2 className="text-base font-editorial font-bold text-ink-primary group-hover:text-accent-crimson transition-colors leading-snug line-clamp-2">
-                    {article.title}
-                  </h2>
-                </Link>
-
-                <p className="text-xs text-ink-secondary line-clamp-2 leading-relaxed">
-                  {article.description || 'Editorial analysis and commentary.'}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] font-mono text-ink-secondary pt-3 border-t border-border-subtle/60">
-                <span>{article.readingTimeMinutes || 3} min read</span>
-                <span>{new Date(article.createdAt).toLocaleDateString()}</span>
-              </div>
-            </article>
-          ))}
+              <span>Return to Front Page</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
         </div>
       ) : (
-        <div className="p-12 text-center bg-white border border-border-subtle rounded-xl">
-          <p className="text-xs font-semibold text-ink-primary">No published stories in this section yet.</p>
+        <div className="space-y-12">
+          {/* ── Hero Showcase Grid ──────────────────────── */}
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border-b border-border-subtle pb-10">
+            {/* Lead Story (7 cols) */}
+            {leadArticle && (
+              <div className="lg:col-span-7">
+                <LeadCard article={leadArticle} />
+              </div>
+            )}
+
+            {/* Secondary Stories Stack (5 cols) */}
+            {secondaryArticles.length > 0 && (
+              <div className="lg:col-span-5 border-t lg:border-t-0 lg:border-l border-border-subtle lg:pl-8 pt-6 lg:pt-0 space-y-1">
+                <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-ink-primary border-b border-border-subtle pb-2 mb-2">
+                  Section Highlights
+                </div>
+                {secondaryArticles.map((a) => (
+                  <SecondaryCard key={a.id} article={a} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── Chronological Feed ──────────────────────── */}
+          {feedArticles.length > 0 && (
+            <section className="space-y-4">
+              <div className="text-xs font-mono font-bold uppercase tracking-wider text-ink-primary border-b border-border-subtle pb-2">
+                All Archives & Dispatches
+              </div>
+              <div className="divide-y divide-border-subtle">
+                {feedArticles.map((a, idx) => (
+                  <FeedRow key={a.id} article={a} index={idx + 4} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
-    </div>
+    </main>
   );
 };
+

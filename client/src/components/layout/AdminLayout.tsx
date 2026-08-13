@@ -19,16 +19,25 @@ import {
 import { BrandLogo } from '../common/BrandLogo';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../api/auth.api';
-import { fetchHealth } from '../../api/client';
+import { apiClient, fetchHealth } from '../../api/client';
 
 export const AdminLayout: React.FC = () => {
   const { user, clearAuth, hasRole } = useAuthStore();
   const navigate = useNavigate();
 
+  const { data: dbStatus } = useQuery({
+    queryKey: ['databaseStatus'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/database/status');
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+
   const { data: health } = useQuery({
     queryKey: ['systemHealth'],
     queryFn: fetchHealth,
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const handleLogout = async () => {
@@ -52,7 +61,7 @@ export const AdminLayout: React.FC = () => {
     { label: 'Audit Trail', to: '/admin/audit', icon: ScrollText },
   ];
 
-  const activeDb = health?.activeDatabase || 'postgres';
+  const activeDb = (dbStatus?.activeDatabase || health?.activeDatabase || 'postgres').toUpperCase();
   const isPostgres = activeDb.toLowerCase() === 'postgres';
 
   return (

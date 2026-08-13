@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, Image as ImageIcon, X, Trash2, Loader2 } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon, X, Trash2, Loader2, Link2, Check } from 'lucide-react';
 import { listMediaAssets, uploadMediaAsset, deleteMediaAsset } from '../../api/media.api';
 import type { Media } from '../../types';
 
 interface MediaPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (url: string, media: Media) => void;
+  onSelect: (url: string, media?: Media) => void;
 }
 
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
@@ -14,11 +14,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   onClose,
   onSelect,
 }) => {
-  const [activeTab, setActiveTab] = useState<'library' | 'upload'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'upload' | 'url'>('library');
   const [mediaList, setMediaList] = useState<Media[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [customUrl, setCustomUrl] = useState('');
+  const [urlPreviewError, setUrlPreviewError] = useState(false);
 
   const fetchMedia = async () => {
     try {
@@ -36,6 +38,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     if (isOpen) {
       void fetchMedia();
       setUploadError(null);
+      setCustomUrl('');
+      setUrlPreviewError(false);
     }
   }, [isOpen]);
 
@@ -79,8 +83,15 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
   };
 
+  const handleApplyCustomUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customUrl.trim()) return;
+    onSelect(customUrl.trim());
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 font-sans animate-fade-in">
       <div
         className="bg-white border border-border-subtle w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
         style={{ borderRadius: 2 }}
@@ -92,7 +103,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               Editorial Media Library
             </p>
             <h2 className="font-editorial text-lg font-semibold text-ink-primary">
-              Select or Upload Asset
+              Select or Insert Image
             </h2>
           </div>
           <button
@@ -110,7 +121,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             onClick={() => setActiveTab('library')}
             className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
               activeTab === 'library'
-                ? 'border-ink-primary text-ink-primary'
+                ? 'border-ink-primary text-ink-primary font-semibold'
                 : 'border-transparent text-ink-secondary hover:text-ink-primary'
             }`}
           >
@@ -120,16 +131,88 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             onClick={() => setActiveTab('upload')}
             className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
               activeTab === 'upload'
-                ? 'border-ink-primary text-ink-primary'
+                ? 'border-ink-primary text-ink-primary font-semibold'
                 : 'border-transparent text-ink-secondary hover:text-ink-primary'
             }`}
           >
             Upload New File
           </button>
+          <button
+            onClick={() => setActiveTab('url')}
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'url'
+                ? 'border-ink-primary text-ink-primary font-semibold'
+                : 'border-transparent text-ink-secondary hover:text-ink-primary'
+            }`}
+          >
+            <Link2 className="w-3.5 h-3.5" />
+            <span>Cloudinary / Web URL</span>
+          </button>
         </div>
 
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-canvas-paper">
+          {activeTab === 'url' && (
+            <form onSubmit={handleApplyCustomUrl} className="space-y-4 max-w-xl mx-auto py-4">
+              <div className="bg-white p-6 border border-border-subtle space-y-4" style={{ borderRadius: 2 }}>
+                <div>
+                  <label className="block text-xs font-medium text-ink-primary mb-1 font-mono uppercase tracking-wider">
+                    Direct Image or Cloudinary URL
+                  </label>
+                  <p className="text-[11px] text-ink-secondary mb-3">
+                    Paste any public image link from Cloudinary, Unsplash, or CDN.
+                  </p>
+                  <input
+                    type="url"
+                    value={customUrl}
+                    onChange={(e) => {
+                      setCustomUrl(e.target.value);
+                      setUrlPreviewError(false);
+                    }}
+                    placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
+                    className="w-full px-3 py-2 text-xs border border-border-subtle focus:border-ink-primary bg-canvas-paper text-ink-primary focus:outline-none font-mono"
+                    style={{ borderRadius: 2 }}
+                    autoFocus
+                  />
+                </div>
+
+                {customUrl && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">
+                      Preview
+                    </p>
+                    <div className="aspect-video w-full bg-slate-100 border border-border-subtle flex items-center justify-center overflow-hidden" style={{ borderRadius: 2 }}>
+                      {urlPreviewError ? (
+                        <div className="text-center p-4 text-rose-600 text-xs font-mono">
+                          Unable to load image from this URL. Please verify the link.
+                        </div>
+                      ) : (
+                        <img
+                          src={customUrl}
+                          alt="Preview"
+                          onError={() => setUrlPreviewError(true)}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={!customUrl.trim() || urlPreviewError}
+                    className="px-5 py-2 bg-ink-primary hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide transition-colors flex items-center gap-1.5 font-mono"
+                    style={{ borderRadius: 2 }}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Apply Image URL</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
           {activeTab === 'upload' && (
             <div
               className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-border-subtle hover:border-ink-secondary bg-white transition-colors"
@@ -185,13 +268,23 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               ) : mediaList.length === 0 ? (
                 <div className="text-center py-16 text-ink-secondary">
                   <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm font-editorial italic">No media assets uploaded yet.</p>
-                  <button
-                    onClick={() => setActiveTab('upload')}
-                    className="mt-3 text-xs text-accent-crimson font-medium hover:underline font-mono"
-                  >
-                    Upload your first asset →
-                  </button>
+                  <p className="text-sm font-editorial italic">No media assets in library yet.</p>
+                  <div className="mt-4 flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => setActiveTab('upload')}
+                      className="px-3 py-1.5 bg-ink-primary text-white text-xs font-medium hover:bg-slate-800 font-mono"
+                      style={{ borderRadius: 2 }}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('url')}
+                      className="px-3 py-1.5 border border-border-subtle bg-white text-ink-primary text-xs font-medium hover:bg-canvas-paper font-mono"
+                      style={{ borderRadius: 2 }}
+                    >
+                      Paste Image URL
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -209,16 +302,17 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                         <img
                           src={media.url}
                           alt={media.originalName}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
-                      <div className="p-2 flex items-center justify-between border-t border-border-subtle">
-                        <p className="text-[11px] font-mono text-ink-secondary truncate max-w-[120px]">
+                      <div className="p-2 flex items-center justify-between border-t border-border-subtle bg-white">
+                        <p className="text-[11px] font-mono text-ink-primary truncate max-w-[120px]">
                           {media.originalName}
                         </p>
                         <button
+                          type="button"
                           onClick={(e) => handleDelete(media.id, e)}
-                          className="opacity-0 group-hover:opacity-100 text-ink-secondary hover:text-red-500 p-0.5 transition-opacity"
+                          className="text-ink-secondary hover:text-rose-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Delete asset"
                         >
                           <Trash2 className="w-3 h-3" />

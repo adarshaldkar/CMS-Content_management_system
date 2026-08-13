@@ -19,12 +19,17 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
 
         return {
           uri,
-          serverSelectionTimeoutMS: 10000,
-          connectTimeoutMS: 10000,
-          retryAttempts: 3,
-          retryDelay: 1000,
-          bufferCommands: true,
-          autoIndex: true,
+          serverSelectionTimeoutMS: 3000,
+          connectTimeoutMS: 3000,
+          lazyConnection: true,
+          bufferCommands: false,
+          autoIndex: false,
+          connectionFactory: (connection: any) => {
+            connection.on('error', () => {
+              // Gracefully handle idle TLS/network hiccups without crashing Node
+            });
+            return connection;
+          },
         };
       },
     }),

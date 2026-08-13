@@ -57,6 +57,8 @@ export const DatabaseSwitcherPage: React.FC = () => {
         `Active database atomically switched to ${data.activeDatabase.toUpperCase()}. Seamless data continuity verified.`,
       );
       queryClient.invalidateQueries({ queryKey: ['databaseStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['systemHealth'] });
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
       setTimeout(() => setSwitchState('IDLE'), 4000);
     },
     onError: (err: any) => {

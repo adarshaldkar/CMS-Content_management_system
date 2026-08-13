@@ -5,6 +5,8 @@ import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { useContainer } from 'class-validator';
+import express from 'express';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import type { EnvConfig } from './config/env.schema';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -17,6 +19,10 @@ async function bootstrap() {
   const port = config.get('PORT', { infer: true });
   const clientUrl = config.get('CLIENT_URL', { infer: true });
   const nodeEnv = config.get('NODE_ENV', { infer: true });
+
+  // Serve static uploaded assets
+  const uploadDir = path.resolve(process.cwd(), 'uploads');
+  app.use('/uploads', express.static(uploadDir));
 
   // 1. Security Headers with tailored Content Security Policy
   app.use(

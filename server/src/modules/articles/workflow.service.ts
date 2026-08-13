@@ -62,14 +62,13 @@ export class WorkflowService {
 
     const sanitizedContent = sanitizeArticleContent(dto.content || '');
     const { wordCount, readingTimeMinutes } = calculateReadingMetrics(sanitizedContent);
-    const slug = dto.slug ? this.slugify(dto.slug) : this.slugify(dto.title);
+    let slug = dto.slug ? this.slugify(dto.slug) : this.slugify(dto.title);
+    if (!slug) slug = `story-${Date.now()}`;
 
-    // Check slug uniqueness
+    // Check slug uniqueness; if already in use, automatically append a short unique suffix
     const existing = await this.articleRepo.findBySlug(slug);
     if (existing) {
-      throw new ConflictException(
-        `An article with the slug "${slug}" already exists. Please choose a unique title or slug.`,
-      );
+      slug = `${slug}-${Date.now().toString().slice(-6)}`;
     }
 
     const article = await this.articleRepo.create({
@@ -314,9 +313,27 @@ export class WorkflowService {
         break;
 
       case ContentStatus.PENDING_REVIEW:
+        if (target === ContentStatus.DRAFT) {
+          if (article.authorId === user.id || isEditorOrAdmin) {
+            return;
+          }
+          throw new ForbiddenException('Cannot withdraw manuscript.');
+        }
         if (target === ContentStatus.APPROVED) {
           if (!user.permissions.includes(Permission.ARTICLE_APPROVE)) {
             throw new ForbiddenException('Missing capability: article.approve');
+          }
+          return;
+        }
+        if (target === ContentStatus.PUBLISHED) {
+          if (!isEditorOrAdmin || !user.permissions.includes(Permission.ARTICLE_PUBLISH)) {
+            throw new ForbiddenException('Missing capability: article.publish');
+          }
+          return;
+        }
+        if (target === ContentStatus.SCHEDULED) {
+          if (!isEditorOrAdmin || !user.permissions.includes(Permission.ARTICLE_SCHEDULE)) {
+            throw new ForbiddenException('Missing capability: article.schedule');
           }
           return;
         }

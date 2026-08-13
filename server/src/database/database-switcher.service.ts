@@ -59,6 +59,13 @@ export class DatabaseSwitcherService {
     try {
       const start = Date.now();
       if (this.mongoConnection.readyState === 1) {
+        if (this.mongoConnection.db) {
+          await this.mongoConnection.db.admin().ping();
+        }
+        mongoLatency = Date.now() - start;
+        mongoStatus = 'healthy';
+      } else if (this.mongoConnection.readyState === 2) {
+        await this.mongoConnection.asPromise();
         mongoLatency = Date.now() - start;
         mongoStatus = 'healthy';
       }
@@ -119,7 +126,14 @@ export class DatabaseSwitcherService {
         await this.postgres.pool.query('SELECT 1');
       } else if (targetDb === 'mongodb') {
         if (this.mongoConnection.readyState !== 1) {
-          throw new Error('MongoDB Atlas connection is not ready');
+          try {
+            await this.mongoConnection.asPromise();
+          } catch {
+            // Handled below
+          }
+        }
+        if (this.mongoConnection.readyState !== 1) {
+          throw new Error('MongoDB Atlas connection is not ready. Please verify cluster status.');
         }
       }
 

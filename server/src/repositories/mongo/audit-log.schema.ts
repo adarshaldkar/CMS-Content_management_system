@@ -6,6 +6,9 @@ export type AuditLogDocument = HydratedDocument<AuditLogSchemaClass>;
 
 @Schema({ collection: 'audit_logs', timestamps: { createdAt: true, updatedAt: false } })
 export class AuditLogSchemaClass {
+  @Prop({ type: String })
+  _id?: string;
+
   @Prop({ type: String, default: null, index: true })
   actorId!: string | null;
 

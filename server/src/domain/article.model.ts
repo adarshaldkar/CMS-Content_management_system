@@ -18,6 +18,8 @@ export interface Article {
   content: string;
   authorId: string;
   categoryId: string | null;
+  categorySlug?: string | null;
+  author?: { id: string; name: string; avatarUrl?: string | null };
   tagIds: string[];
   coverImage: string | null;
   status: ContentStatus;

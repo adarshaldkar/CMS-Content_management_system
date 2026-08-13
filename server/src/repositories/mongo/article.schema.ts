@@ -5,6 +5,9 @@ export type ArticleDocument = HydratedDocument<ArticleSchemaClass>;
 
 @Schema({ collection: 'articles', timestamps: true })
 export class ArticleSchemaClass {
+  @Prop({ type: String })
+  _id?: string;
+
   @Prop({ required: true })
   title!: string;
 

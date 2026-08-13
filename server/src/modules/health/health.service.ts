@@ -11,8 +11,10 @@ export class HealthService {
       status: 'ok',
       phase: 'foundation',
       timestamp: new Date().toISOString(),
-      environment: this.config.get('NODE_ENV', { infer: true }),
-      activeDatabase: this.config.get('ACTIVE_DATABASE', { infer: true }),
+      activeDatabase:
+        (process.env.ACTIVE_DATABASE as any) ||
+        this.config.get('ACTIVE_DATABASE', { infer: true }) ||
+        'postgres',
     };
   }
 }

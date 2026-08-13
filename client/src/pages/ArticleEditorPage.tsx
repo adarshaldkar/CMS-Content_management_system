@@ -105,10 +105,10 @@ export const ArticleEditorPage: React.FC = () => {
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (): Promise<Article | null> => {
     if (!article.title?.trim()) {
       setErrorMessage('Please provide an article title.');
-      return;
+      return null;
     }
 
     try {
@@ -124,20 +124,23 @@ export const ArticleEditorPage: React.FC = () => {
         });
         setArticle(updated);
         setSuccessMessage('Draft saved successfully.');
+        return updated;
       } else {
         const created = await createArticle(article);
         setArticle(created);
         navigate(`/write/${created.id}`, { replace: true });
         setSuccessMessage('Story draft created.');
+        return created;
       }
     } catch (err: any) {
-      if (err.response?.status === 409) {
+      if (err.response?.status === 409 && id) {
         setErrorMessage(
           'Concurrency Conflict: This story was updated in another session. Please inspect revisions before overwriting.',
         );
       } else {
         setErrorMessage(err.response?.data?.message || 'Failed to save story.');
       }
+      return null;
     } finally {
       setSaving(false);
     }
@@ -148,22 +151,34 @@ export const ArticleEditorPage: React.FC = () => {
     note?: string,
     scheduledAt?: string,
   ) => {
-    if (!id) {
-      alert('Please save the draft before initiating workflow transitions.');
-      return;
-    }
-
     try {
       setSaving(true);
       setErrorMessage(null);
-      const updated = await transitionArticleWorkflow(id, {
+
+      let targetId = id;
+      let currentVersion = article.version || 1;
+
+      // Auto-save if it's a new manuscript
+      if (!targetId) {
+        if (!article.title?.trim()) {
+          setErrorMessage('Please provide an article title before submitting.');
+          return;
+        }
+        const created = await createArticle(article);
+        targetId = created.id;
+        currentVersion = created.version;
+        setArticle(created);
+        navigate(`/write/${created.id}`, { replace: true });
+      }
+
+      const updated = await transitionArticleWorkflow(targetId, {
         targetStatus,
         reviewNote: note,
         scheduledAt,
-        expectedVersion: article.version,
+        expectedVersion: currentVersion,
       });
       setArticle(updated);
-      setSuccessMessage(`Story successfully transitioned to ${targetStatus}.`);
+      setSuccessMessage(`Story successfully transitioned to ${targetStatus.replace('_', ' ')}.`);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Workflow transition failed.');
     } finally {
@@ -300,34 +315,86 @@ export const ArticleEditorPage: React.FC = () => {
         <div className="lg:col-span-4 space-y-6">
           {/* Cover Image */}
           <div className="bg-white border border-border-subtle p-5 space-y-3" style={{ borderRadius: 2 }}>
-            <label className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5 text-accent-crimson" /> Cover Image
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-accent-crimson" /> Cover Image
+              </label>
+              {article.coverImage && (
+                <button
+                  type="button"
+                  onClick={() => setArticle((prev) => ({ ...prev, coverImage: null }))}
+                  className="text-[11px] font-mono text-rose-600 hover:text-rose-800 transition-colors"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
             {article.coverImage ? (
-              <div className="relative border border-border-subtle aspect-video group overflow-hidden" style={{ borderRadius: 2 }}>
-                <img
-                  src={article.coverImage}
-                  alt="Cover"
-                  className="w-full h-full object-cover"
-                />
+              <div className="space-y-2">
+                <div className="relative border border-border-subtle aspect-video group overflow-hidden bg-slate-100" style={{ borderRadius: 2 }}>
+                  <img
+                    src={article.coverImage}
+                    alt="Cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&auto=format&fit=crop&q=80';
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMediaPickerOpen(true)}
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition-opacity font-mono"
+                  >
+                    Change Cover
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={article.coverImage}
+                    onChange={(e) => setArticle((prev) => ({ ...prev, coverImage: e.target.value }))}
+                    placeholder="https://res.cloudinary.com/... or image URL"
+                    className="flex-1 px-2.5 py-1.5 text-xs font-mono bg-canvas-paper border border-border-subtle focus:border-ink-primary focus:outline-none text-ink-primary"
+                    style={{ borderRadius: 2 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMediaPickerOpen(true)}
+                    className="px-2.5 py-1.5 bg-white border border-border-subtle hover:border-ink-primary text-xs font-mono text-ink-secondary hover:text-ink-primary transition-colors shrink-0"
+                    style={{ borderRadius: 2 }}
+                  >
+                    Browse…
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => setMediaPickerOpen(true)}
-                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-semibold text-white transition-opacity"
+                  className="w-full aspect-video border border-dashed border-border-subtle hover:border-ink-secondary bg-canvas-paper flex flex-col items-center justify-center text-ink-secondary hover:text-ink-primary transition-colors group"
+                  style={{ borderRadius: 2 }}
                 >
-                  Change Cover
+                  <ImageIcon className="w-6 h-6 mb-1.5 opacity-40 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-mono">Select or upload cover asset</span>
+                  <span className="text-[10px] text-ink-secondary/60 mt-0.5">Supports Cloudinary, Unsplash, or local upload</span>
                 </button>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    onChange={(e) => {
+                      if (e.target.value.trim()) {
+                        setArticle((prev) => ({ ...prev, coverImage: e.target.value.trim() }));
+                      }
+                    }}
+                    placeholder="Or paste Cloudinary / Web image URL…"
+                    className="w-full px-2.5 py-1.5 text-xs font-mono bg-canvas-paper border border-border-subtle focus:border-ink-primary focus:outline-none text-ink-primary"
+                    style={{ borderRadius: 2 }}
+                  />
+                </div>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setMediaPickerOpen(true)}
-                className="w-full aspect-video border border-dashed border-border-subtle hover:border-ink-secondary bg-canvas-paper flex flex-col items-center justify-center text-ink-secondary hover:text-ink-primary transition-colors"
-                style={{ borderRadius: 2 }}
-              >
-                <ImageIcon className="w-6 h-6 mb-1.5 opacity-40" />
-                <span className="text-xs font-mono">Select cover asset</span>
-              </button>
             )}
           </div>
 

@@ -5,6 +5,9 @@ export type RevisionDocument = HydratedDocument<RevisionSchemaClass>;
 
 @Schema({ collection: 'article_revisions', timestamps: { createdAt: true, updatedAt: false } })
 export class RevisionSchemaClass {
+  @Prop({ type: String })
+  _id?: string;
+
   @Prop({ required: true, index: true })
   articleId!: string;
 
