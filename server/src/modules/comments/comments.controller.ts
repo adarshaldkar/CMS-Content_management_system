@@ -42,6 +42,35 @@ export class CommentsController {
     );
   }
 
+  @Public()
+  @Get('users/:userId/comments')
+  @ApiOperation({ summary: 'Get recent comments made by a user' })
+  async getUserComments(
+    @Param('userId') userId: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.commentsService.getUserComments(
+      userId,
+      parseInt(page, 10) || 1,
+      parseInt(limit, 10) || 20,
+    );
+  }
+
+  @Get('me/comments')
+  @ApiOperation({ summary: 'Get comments made by the current logged-in user' })
+  async getMyComments(
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.commentsService.getUserComments(
+      user.id,
+      parseInt(page, 10) || 1,
+      parseInt(limit, 10) || 20,
+    );
+  }
+
   @Post('articles/:articleId/comments')
   @ApiOperation({ summary: 'Post a comment on an article' })
   @RequirePermissions(Permission.COMMENT_CREATE)

@@ -21,17 +21,20 @@ import { RichTextEditor } from '../components/editor/RichTextEditor';
 import { WorkflowActionBar } from '../components/editor/WorkflowActionBar';
 import { MediaPickerModal } from '../components/editor/MediaPickerModal';
 import { RevisionHistoryModal } from '../components/editor/RevisionHistoryModal';
-import type { Article, ArticleStatus } from '../types';
+import { apiClient } from '../api/client';
+import type { Article, ArticleStatus, Category } from '../types';
 
 export const ArticleEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  const [categories, setCategories] = useState<Category[]>([]);
   const [article, setArticle] = useState<Partial<Article>>({
     title: '',
     slug: '',
     description: '',
     content: '',
+    categoryId: '',
     coverImage: null,
     status: 'draft',
     version: 1,
@@ -51,6 +54,12 @@ export const ArticleEditorPage: React.FC = () => {
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
 
   useEffect(() => {
+    // Fetch categories
+    apiClient.get<Category[] | { items: Category[] }>('/categories').then((res) => {
+      const data = Array.isArray(res.data) ? res.data : res.data?.items || [];
+      setCategories(data);
+    }).catch(() => {});
+
     if (id) {
       void fetchArticle(id);
     }
@@ -396,6 +405,26 @@ export const ArticleEditorPage: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Editorial Section / Category */}
+          <div className="bg-white border border-border-subtle p-5 space-y-2" style={{ borderRadius: 2 }}>
+            <label className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold">
+              Editorial Section
+            </label>
+            <select
+              value={article.categoryId || ''}
+              onChange={(e) => setArticle((prev) => ({ ...prev, categoryId: e.target.value }))}
+              className="w-full bg-canvas-paper border border-border-subtle px-3 py-2 text-xs font-mono text-ink-primary focus:outline-none focus:border-ink-primary transition-colors cursor-pointer"
+              style={{ borderRadius: 2 }}
+            >
+              <option value="">-- Select Editorial Section --</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name} ({cat.slug})
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* URL Slug */}

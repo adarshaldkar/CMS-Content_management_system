@@ -31,15 +31,27 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
-  const lastHtmlRef = useRef<string>(value || '');
+  const lastHtmlRef = useRef<string>('');
 
-  // Synchronize incoming external value changes (async load from API, revision restores)
+  // Synchronize incoming external value changes (async load from API, revision restores, initial mount)
   useEffect(() => {
-    if (editorRef.current && value !== lastHtmlRef.current) {
-      editorRef.current.innerHTML = value || '';
-      lastHtmlRef.current = value || '';
+    if (editorRef.current) {
+      const currentContent = editorRef.current.innerHTML;
+      const targetContent = value || '';
+      if (currentContent !== targetContent && targetContent !== lastHtmlRef.current) {
+        editorRef.current.innerHTML = targetContent;
+        lastHtmlRef.current = targetContent;
+      }
     }
   }, [value]);
+
+  // Ensure initial mount populates editor content if value is provided
+  useEffect(() => {
+    if (editorRef.current && value && editorRef.current.innerHTML === '') {
+      editorRef.current.innerHTML = value;
+      lastHtmlRef.current = value;
+    }
+  }, []);
 
   const handleInput = () => {
     if (editorRef.current) {

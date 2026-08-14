@@ -30,6 +30,10 @@ export class CommentsService {
     return this.commentRepo.findMany({ articleId, page, limit });
   }
 
+  async getUserComments(authorId: string, page = 1, limit = 20) {
+    return this.commentRepo.findMany({ authorId, page, limit });
+  }
+
   async createComment(articleId: string, dto: { body: string; parentId?: string }, actor: AuthUser) {
     const sanitized = sanitizeCommentBody(dto.body);
     if (!sanitized || sanitized.length < 1) {
