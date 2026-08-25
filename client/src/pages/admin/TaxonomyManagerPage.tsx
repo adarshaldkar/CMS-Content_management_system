@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { TableRowSkeleton } from '../../components/common/SkeletonLoader';
 import type { Category } from '../../types';
 
 export const TaxonomyManagerPage: React.FC = () => {
@@ -121,8 +122,23 @@ export const TaxonomyManagerPage: React.FC = () => {
 
       {/* Categories Table */}
       {isLoading ? (
-        <div className="py-20 text-center">
-          <LoadingSpinner label="Loading taxonomy trees..." />
+        <div className="bg-white border border-border-subtle overflow-hidden" style={{ borderRadius: 2 }}>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-canvas-paper border-b border-border-subtle font-mono uppercase text-[10px] text-ink-secondary">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Category</th>
+                <th className="px-5 py-3 font-semibold">Slug Identifier</th>
+                <th className="px-5 py-3 font-semibold">Description</th>
+                <th className="px-5 py-3 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              <TableRowSkeleton cols={4} />
+              <TableRowSkeleton cols={4} />
+              <TableRowSkeleton cols={4} />
+              <TableRowSkeleton cols={4} />
+            </tbody>
+          </table>
         </div>
       ) : categories.length > 0 ? (
         <div className="bg-white border border-border-subtle overflow-hidden" style={{ borderRadius: 2 }}>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { TableRowSkeleton } from '../../components/common/SkeletonLoader';
 import type { AuditLog } from '../../types';
 
 export const AuditLogExplorerPage: React.FC = () => {
@@ -115,8 +116,25 @@ export const AuditLogExplorerPage: React.FC = () => {
       {/* Audit Log Ledger Table */}
       <div className="bg-white border border-border-subtle overflow-hidden" style={{ borderRadius: 2 }}>
         {isLoading ? (
-          <div className="p-16 text-center">
-            <LoadingSpinner label="Decrypting audit ledger..." />
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border-subtle bg-canvas-paper text-[10px] font-mono uppercase tracking-wider text-ink-secondary">
+                  <th className="py-3 px-4 font-semibold">Action</th>
+                  <th className="py-3 px-4 font-semibold">Resource</th>
+                  <th className="py-3 px-4 font-semibold">Actor ID</th>
+                  <th className="py-3 px-4 font-semibold">Result</th>
+                  <th className="py-3 px-4 font-semibold text-right">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                <TableRowSkeleton cols={5} />
+                <TableRowSkeleton cols={5} />
+                <TableRowSkeleton cols={5} />
+                <TableRowSkeleton cols={5} />
+                <TableRowSkeleton cols={5} />
+              </tbody>
+            </table>
           </div>
         ) : filteredLogs.length === 0 ? (
           <div className="p-16 text-center text-xs text-ink-secondary font-editorial italic">

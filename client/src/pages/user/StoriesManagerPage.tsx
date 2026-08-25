@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Edit3, ExternalLink, Plus } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { apiClient } from '../../api/client';
+import { Skeleton } from '../../components/common/SkeletonLoader';
 import type { Article, PaginatedResult } from '../../types';
 
 const STATUS_LABELS: Record<string, { label: string; dot: string }> = {
@@ -143,8 +144,22 @@ export const StoriesManagerPage: React.FC = () => {
 
       {/* ── Story list ──────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="py-16 text-center">
-          <p className="font-mono text-xs text-ink-secondary animate-pulse">Loading stories…</p>
+        <div className="divide-y divide-border-subtle">
+          <div className="py-5 space-y-2">
+            <Skeleton className="w-24 h-4" />
+            <Skeleton className="w-2/3 h-5" />
+            <Skeleton className="w-full h-3.5" />
+          </div>
+          <div className="py-5 space-y-2">
+            <Skeleton className="w-24 h-4" />
+            <Skeleton className="w-2/3 h-5" />
+            <Skeleton className="w-full h-3.5" />
+          </div>
+          <div className="py-5 space-y-2">
+            <Skeleton className="w-24 h-4" />
+            <Skeleton className="w-2/3 h-5" />
+            <Skeleton className="w-full h-3.5" />
+          </div>
         </div>
       ) : filteredArticles.length === 0 ? (
         <div className="py-16">

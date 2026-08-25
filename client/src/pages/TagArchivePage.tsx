@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Hash, Clock, FileText } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { ArticleCardSkeleton } from '../components/common/SkeletonLoader';
 import type { Article, PaginatedResult } from '../types';
 
 export const TagArchivePage: React.FC = () => {
@@ -36,8 +37,10 @@ export const TagArchivePage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="py-20 text-center">
-          <LoadingSpinner label={`Loading #${slug} stories...`} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
         </div>
       ) : articles.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

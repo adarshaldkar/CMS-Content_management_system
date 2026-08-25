@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bookmark, X } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { apiClient } from '../../api/client';
+import { ArticleCardSkeleton } from '../../components/common/SkeletonLoader';
 import type { Article, PaginatedResult } from '../../types';
 
 interface BookmarkItem {
@@ -121,8 +122,9 @@ export const UserLibraryPage: React.FC = () => {
       {activeTab === 'bookmarks' && (
         <div>
           {isLoading ? (
-            <div className="py-16 text-center">
-              <p className="font-mono text-xs text-ink-secondary animate-pulse">Loading saved articles…</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+              <ArticleCardSkeleton />
+              <ArticleCardSkeleton />
             </div>
           ) : bookmarks.length === 0 ? (
             <div className="py-16">

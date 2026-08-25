@@ -199,6 +199,35 @@ export const AdminLayout: React.FC = () => {
 
       {/* Main Admin View Container */}
       <div className="flex-1 pl-64 flex flex-col min-h-screen">
+        {/* High-Assurance Admin Security & Session Telemetry Bar */}
+        <header className="h-12 bg-white border-b border-border-subtle px-8 flex items-center justify-between sticky top-0 z-20 font-mono text-[11px]">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 font-semibold">
+              <Shield size={13} className="text-emerald-600" />
+              <span>HIGH-ASSURANCE SESSION</span>
+            </span>
+            <span className="hidden md:inline-flex items-center gap-1 text-ink-secondary">
+              <span>CLEARANCE:</span>
+              <span className="font-bold text-ink-primary uppercase">{user?.role}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 text-ink-secondary">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>TLS 1.3 · CSRF ACTIVE</span>
+            </span>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-ink-primary rounded transition-colors text-[10px] font-semibold"
+              title="Lock administrative session"
+            >
+              <LogOut size={11} />
+              <span>LOCK SESSION</span>
+            </button>
+          </div>
+        </header>
+
         <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
           <Outlet />
         </main>

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { Skeleton } from '../../components/common/SkeletonLoader';
 
 interface Comment {
   id: string;
@@ -147,8 +148,23 @@ export const CommentsModerationPage: React.FC = () => {
 
       {/* Comment List */}
       {isLoading ? (
-        <div className="py-20 text-center">
-          <LoadingSpinner label="Loading comments..." />
+        <div className="space-y-3">
+          <div className="p-4 bg-white border border-border-subtle rounded-xl space-y-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-8 h-8 rounded-full" />
+              <Skeleton className="w-32 h-4" />
+            </div>
+            <Skeleton className="w-full h-4" />
+            <Skeleton className="w-3/4 h-4" />
+          </div>
+          <div className="p-4 bg-white border border-border-subtle rounded-xl space-y-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-8 h-8 rounded-full" />
+              <Skeleton className="w-32 h-4" />
+            </div>
+            <Skeleton className="w-full h-4" />
+            <Skeleton className="w-3/4 h-4" />
+          </div>
         </div>
       ) : filteredComments.length === 0 ? (
         <div className="py-16 text-center border border-dashed border-border-subtle rounded-xl">

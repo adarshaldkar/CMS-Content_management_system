@@ -16,6 +16,7 @@ import {
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { Skeleton, ArticleCardSkeleton } from '../components/common/SkeletonLoader';
 import type { Article, PaginatedResult, User } from '../types';
 
 const cleanTitle = (t: string) => t.replace(/\s\d{10,}/g, '').trim();
@@ -289,8 +290,10 @@ export const ForYouFeedPage: React.FC = () => {
           </div>
 
           {isLoading ? (
-            <div className="py-24 text-center">
-              <LoadingSpinner label="Curating your personal reading feed..." />
+            <div className="space-y-4 py-4">
+              <ArticleCardSkeleton />
+              <ArticleCardSkeleton />
+              <ArticleCardSkeleton />
             </div>
           ) : articles.length > 0 ? (
             <div>

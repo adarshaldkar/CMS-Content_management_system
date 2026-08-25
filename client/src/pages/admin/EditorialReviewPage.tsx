@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { Skeleton } from '../../components/common/SkeletonLoader';
 import type { Article, ArticleRevision, PaginatedResult } from '../../types';
 
 export const EditorialReviewPage: React.FC = () => {
@@ -141,8 +142,22 @@ export const EditorialReviewPage: React.FC = () => {
           </p>
 
           {isLoading ? (
-            <div className="py-12 text-center">
-              <LoadingSpinner label="Loading submissions..." />
+            <div className="space-y-3 p-2">
+              <div className="p-4 bg-white border border-border-subtle space-y-2">
+                <Skeleton className="w-20 h-3" />
+                <Skeleton className="w-full h-5" />
+                <Skeleton className="w-3/4 h-3.5" />
+              </div>
+              <div className="p-4 bg-white border border-border-subtle space-y-2">
+                <Skeleton className="w-20 h-3" />
+                <Skeleton className="w-full h-5" />
+                <Skeleton className="w-3/4 h-3.5" />
+              </div>
+              <div className="p-4 bg-white border border-border-subtle space-y-2">
+                <Skeleton className="w-20 h-3" />
+                <Skeleton className="w-full h-5" />
+                <Skeleton className="w-3/4 h-3.5" />
+              </div>
             </div>
           ) : articles.length > 0 ? (
             <div className="divide-y divide-border-subtle bg-white border border-border-subtle" style={{ borderRadius: 2 }}>

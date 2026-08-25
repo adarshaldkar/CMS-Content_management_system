@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { StatusBadge } from '../../components/common/StatusBadge';
+import { Skeleton } from '../../components/common/SkeletonLoader';
 import { apiClient } from '../../api/client';
 import type { Article, PaginatedResult } from '../../types';
 
@@ -128,7 +129,20 @@ export const UserDashboardPage: React.FC = () => {
         </div>
 
         <div className="divide-y divide-border-subtle">
-          {recentDrafts.length > 0 ? (
+          {isLoading ? (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-white border border-border-subtle space-y-2">
+                <Skeleton className="w-24 h-4" />
+                <Skeleton className="w-3/4 h-5" />
+                <Skeleton className="w-full h-3.5" />
+              </div>
+              <div className="p-4 bg-white border border-border-subtle space-y-2">
+                <Skeleton className="w-24 h-4" />
+                <Skeleton className="w-3/4 h-5" />
+                <Skeleton className="w-full h-3.5" />
+              </div>
+            </div>
+          ) : recentDrafts.length > 0 ? (
             recentDrafts.map((draft) => (
               <article
                 key={draft.id}

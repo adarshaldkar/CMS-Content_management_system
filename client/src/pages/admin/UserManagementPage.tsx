@@ -11,6 +11,7 @@ import {
 import { apiClient } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { TableRowSkeleton } from '../../components/common/SkeletonLoader';
 import type { PaginatedResult, User, UserRole } from '../../types';
 
 export const UserManagementPage: React.FC = () => {
@@ -138,7 +139,16 @@ export const UserManagementPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
-                {users.map((u) => {
+                {isLoading ? (
+                  <>
+                    <TableRowSkeleton cols={6} />
+                    <TableRowSkeleton cols={6} />
+                    <TableRowSkeleton cols={6} />
+                    <TableRowSkeleton cols={6} />
+                    <TableRowSkeleton cols={6} />
+                  </>
+                ) : (
+                  users.map((u) => {
                   const isSelf = u.id === currentActor?.id;
                   const isTargetSuperAdmin = u.role === 'SUPER_ADMIN';
                   const canModifyRole = isSuperAdmin || (!isTargetSuperAdmin && !isSelf);
@@ -232,7 +242,7 @@ export const UserManagementPage: React.FC = () => {
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
