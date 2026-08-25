@@ -4,12 +4,13 @@ import { AuditService } from './audit.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { HighAssuranceAdminGuard } from '../../common/guards/admin-security.guard';
 import { RequirePermissions } from '../../common/decorators/security.decorators';
 import { Permission, type AuditLog } from '../../domain/models';
 
 @ApiTags('audit')
 @Controller('audit')
-@UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard, HighAssuranceAdminGuard)
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 

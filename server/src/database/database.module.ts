@@ -11,6 +11,7 @@ import { MultiDatabaseMeshService } from './multi-database-mesh.service';
 import { DatabaseSwitcherService } from './database-switcher.service';
 import { DatabaseSwitcherController } from './database-switcher.controller';
 import { AuditModule } from '../modules/audit/audit.module';
+import { UsersModule } from '../modules/users/users.module';
 import { RepositoryRegistryService } from '../repositories/repository-registry.service';
 
 @Global()
@@ -39,6 +40,7 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
       },
     }),
     forwardRef(() => AuditModule),
+    forwardRef(() => UsersModule),
   ],
   controllers: [DatabaseSwitcherController],
   providers: [

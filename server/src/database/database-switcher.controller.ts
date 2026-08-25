@@ -5,12 +5,13 @@ import type { DatabaseEngine } from './multi-database-mesh.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CsrfGuard } from '../common/guards/csrf.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { HighAssuranceAdminGuard } from '../common/guards/admin-security.guard';
 import { CurrentUser, RequirePermissions } from '../common/decorators/security.decorators';
 import { Permission, type AuthUser } from '../domain/models';
 
 @ApiTags('database')
 @Controller('database')
-@UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard, HighAssuranceAdminGuard)
 export class DatabaseSwitcherController {
   constructor(private readonly switcherService: DatabaseSwitcherService) {}
 

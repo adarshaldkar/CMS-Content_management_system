@@ -12,6 +12,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { HighAssuranceAdminGuard } from '../../common/guards/admin-security.guard';
 import {
   CurrentUser,
   RequirePermissions,
@@ -26,7 +27,7 @@ import {
 
 @ApiTags('users')
 @Controller('users')
-@UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard, HighAssuranceAdminGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
