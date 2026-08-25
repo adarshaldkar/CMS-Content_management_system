@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search as SearchIcon, RotateCcw } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { ArticleCardSkeleton } from '../components/common/SkeletonLoader';
 import { EditorialTopicNav } from '../components/articles/EditorialTopicNav';
 import { EditorialFilterBar } from '../components/articles/EditorialFilterBar';
 import type { EditorialFilterState } from '../components/articles/EditorialFilterBar';
@@ -176,8 +177,11 @@ export const SearchPage: React.FC = () => {
 
       {/* Results List */}
       {isLoading ? (
-        <div className="py-20 text-center">
-          <LoadingSpinner label="Searching manuscripts..." />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
         </div>
       ) : articles.length > 0 ? (
         <div className="space-y-8 divide-y divide-stone-200 dark:divide-stone-800">

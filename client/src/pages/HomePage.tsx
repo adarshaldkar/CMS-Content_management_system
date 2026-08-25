@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Clock, TrendingUp, ArrowRight, Send, BookOpen, Flame } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { Skeleton, ArticleCardSkeleton } from '../components/common/SkeletonLoader';
 import type { Article, PaginatedResult } from '../types';
 
 /* ─── helpers ─────────────────────────────────────────────────────── */
@@ -179,8 +180,25 @@ export const HomePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <LoadingSpinner label="Loading today's edition…" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-pulse">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-4">
+            <Skeleton className="w-full h-80 rounded" />
+            <Skeleton className="w-2/3 h-8" />
+            <Skeleton className="w-full h-4" />
+            <Skeleton className="w-4/5 h-4" />
+          </div>
+          <div className="lg:col-span-4 space-y-4">
+            <Skeleton className="w-full h-40 rounded" />
+            <Skeleton className="w-full h-40 rounded" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-border-subtle">
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
+          <ArticleCardSkeleton />
+        </div>
       </div>
     );
   }

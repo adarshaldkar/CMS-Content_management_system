@@ -19,6 +19,7 @@ import {
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { ArticleReaderSkeleton } from '../components/common/SkeletonLoader';
 import { ReadingPaywallGate } from '../components/articles/ReadingPaywallGate';
 import type { Article } from '../types';
 
@@ -234,11 +235,7 @@ export const ArticleReaderPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen py-24 text-center">
-        <LoadingSpinner label="Opening editorial manuscript..." />
-      </div>
-    );
+    return <ArticleReaderSkeleton />;
   }
 
   if (!article) {

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Clock, BookOpen, ArrowRight } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { Skeleton, ArticleCardSkeleton } from '../components/common/SkeletonLoader';
 import type { Article, PaginatedResult } from '../types';
 
 const CAT_LABELS: Record<string, { title: string; tagline: string }> = {
@@ -233,8 +234,23 @@ export const CategoryArchivePage: React.FC = () => {
 
       {/* ── Content Area ────────────────────────────────── */}
       {isLoading ? (
-        <div className="py-24 text-center">
-          <LoadingSpinner label={`Loading ${catInfo.title} archive...`} />
+        <div className="space-y-8 animate-pulse">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-7 space-y-4">
+              <Skeleton className="w-full h-80 rounded" />
+              <Skeleton className="w-2/3 h-8" />
+              <Skeleton className="w-full h-4" />
+            </div>
+            <div className="lg:col-span-5 space-y-4">
+              <Skeleton className="w-full h-36 rounded" />
+              <Skeleton className="w-full h-36 rounded" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4 border-t border-border-subtle">
+            <ArticleCardSkeleton />
+            <ArticleCardSkeleton />
+            <ArticleCardSkeleton />
+          </div>
         </div>
       ) : articles.length === 0 ? (
         <div className="py-20 text-center bg-white border border-border-subtle p-8 space-y-2">

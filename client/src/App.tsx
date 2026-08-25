@@ -32,6 +32,8 @@ import { MediaLibraryPage } from './pages/admin/MediaLibraryPage';
 import { CommentsModerationPage } from './pages/admin/CommentsModerationPage';
 import { AuditLogExplorerPage } from './pages/admin/AuditLogExplorerPage';
 import { DatabaseSwitcherPage } from './pages/admin/DatabaseSwitcherPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 import { useAuthStore } from './stores/authStore';
 
@@ -44,6 +46,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* 1. Public Editorial Layout */}
         <Route element={<PublicLayout />}>
@@ -105,6 +108,9 @@ export default function App() {
             <Route path="/admin/*" element={<EditorialReviewPage />} />
           </Route>
         </Route>
+
+        {/* 7. Dedicated 404 Catch-All Route */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );
