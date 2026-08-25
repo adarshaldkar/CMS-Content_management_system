@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { DatabaseSwitcherService, type DatabaseHealthStatus } from './database-switcher.service';
 import type { DatabaseEngine } from './multi-database-mesh.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -25,6 +26,7 @@ export class DatabaseSwitcherController {
   @Post('switch')
   @ApiOperation({ summary: 'Atomically switch active database with mutex' })
   @RequirePermissions(Permission.DATABASE_SWITCH)
+  @Throttle({ 'admin-critical': { limit: 5, ttl: 60000 } })
   async switchDb(
     @Body() body: { targetDatabase: DatabaseEngine },
     @CurrentUser() user: AuthUser,

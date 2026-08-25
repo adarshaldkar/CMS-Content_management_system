@@ -2,13 +2,11 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  Inject,
   Injectable,
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { USER_REPOSITORY, type IUserRepository } from '../../repositories/interfaces/user.repository.interface';
 import { AuditService } from '../../modules/audit/audit.service';
 import { AuditEventType, type AuthUser } from '../../domain/models';
 
@@ -16,10 +14,7 @@ import { AuditEventType, type AuthUser } from '../../domain/models';
 export class HighAssuranceAdminGuard implements CanActivate {
   private readonly logger = new Logger(HighAssuranceAdminGuard.name);
 
-  constructor(
-    @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
-    private readonly auditService: AuditService,
-  ) {}
+  constructor(private readonly auditService: AuditService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const http = context.switchToHttp();
@@ -66,10 +61,9 @@ export class HighAssuranceAdminGuard implements CanActivate {
       });
     }
 
-    // 3. Real-Time Active Status Check (Verify user was not banned or suspended)
-    const freshUser = await this.userRepo.findById(user.id);
-    if (!freshUser || !freshUser.isActive) {
-      this.logger.warn(`[SECURITY ALERT] Suspended administrator ${user.id} attempted action ${request.method} ${request.originalUrl}`);
+    // 3. Verify Active Account Flag on token
+    if (user.isActive === false) {
+      this.logger.warn(`[SECURITY ALERT] Inactive administrator ${user.id} attempted action ${request.method} ${request.originalUrl}`);
       throw new ForbiddenException({
         statusCode: 403,
         error: 'Forbidden',
