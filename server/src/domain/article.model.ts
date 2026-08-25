@@ -110,6 +110,12 @@ export interface ArticleQueryFilters extends PaginationQuery {
   authorId?: string;
   categoryId?: string;
   categorySlug?: string;
+  categorySlugs?: string | string[];
+  tagSlugs?: string | string[];
+  contentType?: 'article' | 'video' | 'gallery' | 'series' | 'all';
   search?: string;
-  sort?: 'trending' | 'latest' | 'popular';
+  sortBy?: 'latest' | 'trending' | 'most_read' | 'most_discussed' | 'most_liked';
+  sortOrder?: 'asc' | 'desc';
+  fromDate?: string;
+  toDate?: string;
 }

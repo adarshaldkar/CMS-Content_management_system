@@ -35,17 +35,17 @@ import { FollowsModule } from './modules/follows/follows.module';
       {
         name: 'default',
         ttl: 60000,
-        limit: 1000,
+        limit: 300,
       },
       {
         name: 'auth-sensitive',
         ttl: 60000,
-        limit: 1000,
+        limit: 10, // Brute-force protection for login/register/forgot-password
       },
       {
         name: 'auth-relaxed',
         ttl: 60000,
-        limit: 1000,
+        limit: 60, // Token refresh, logout
       },
     ]),
   ],

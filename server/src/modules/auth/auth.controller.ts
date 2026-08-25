@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -18,8 +19,10 @@ import type { EnvConfig } from '../../config/env.schema';
 import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
+  ForgotPasswordDto,
   LoginDto,
   RegisterDto,
+  ResetPasswordDto,
   UpdateProfileDto,
 } from './dto/auth.dto';
 import { CurrentUser, Public } from '../../common/decorators/security.decorators';
@@ -119,10 +122,7 @@ export class AuthController {
     const rawRefreshToken = this.extractRefreshToken(req);
     if (!rawRefreshToken) {
       clearAuthCookies(res, this.isProduction(), this.isCookieSecure());
-      return res.status(HttpStatus.UNAUTHORIZED).json({
-        statusCode: 401,
-        message: 'Refresh token cookie missing.',
-      }) as any;
+      throw new UnauthorizedException('Refresh token cookie missing.');
     }
 
     const meta = {
@@ -222,5 +222,42 @@ export class AuthController {
     await this.authService.changePassword(user.id, dto, meta);
     clearAuthCookies(res, this.isProduction(), this.isCookieSecure());
     return { message: 'Password changed successfully. Please log in again.' };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ 'auth-sensitive': { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Request a password reset link (anti-enumeration: always returns 200)' })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @Req() req: Request,
+  ): Promise<{ message: string }> {
+    const meta = {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    };
+    // Always responds with the same message regardless of account existence
+    await this.authService.forgotPassword(dto.email, meta);
+    return {
+      message: 'If an account with that email exists, a password reset link has been sent.',
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ 'auth-sensitive': { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Reset password using a valid reset token' })
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @Req() req: Request,
+  ): Promise<{ message: string }> {
+    const meta = {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    };
+    await this.authService.resetPassword(dto.token, dto.newPassword, meta);
+    return { message: 'Password reset successfully. Please log in with your new password.' };
   }
 }

@@ -1,4 +1,14 @@
-export type UserRole = 'super_admin' | 'admin' | 'editor' | 'author' | 'user';
+export type UserRole =
+  | 'super_admin'
+  | 'admin'
+  | 'editor'
+  | 'author'
+  | 'user'
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'EDITOR'
+  | 'AUTHOR'
+  | 'USER';
 
 export interface User {
   id: string;
@@ -8,6 +18,7 @@ export interface User {
   isActive: boolean;
   bio?: string | null;
   avatarUrl?: string | null;
+  preferredTopics?: string[];
   createdAt: string;
   updatedAt: string;
 }

@@ -115,4 +115,23 @@ export class CommentsController {
   ) {
     return this.commentsService.hideComment(id, body.moderationNote || 'Hidden by moderator', user);
   }
+
+  @Get('comments')
+  @ApiOperation({ summary: 'Admin: list all comments with optional filters' })
+  @RequirePermissions(Permission.COMMENT_MODERATE)
+  async listAllComments(
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+    @Query('flagged') flagged?: string,
+    @Query('hidden') hidden?: string,
+    @Query('articleId') articleId?: string,
+  ) {
+    return this.commentsService.listAllComments({
+      page: parseInt(page, 10) || 1,
+      limit: Math.min(parseInt(limit, 10) || 50, 100),
+      flagged: flagged === 'true',
+      hidden: hidden === 'true',
+      articleId,
+    });
+  }
 }

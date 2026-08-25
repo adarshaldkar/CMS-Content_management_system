@@ -6,7 +6,13 @@ import type { IAuditLogRepository } from './interfaces/audit-log.repository.inte
 import type { IRevisionRepository } from './interfaces/revision.repository.interface';
 import type { IMediaRepository } from './interfaces/media.repository.interface';
 
-export type SupportedDbName = 'postgres' | 'mongodb';
+export type SupportedDbName =
+  | 'postgres'
+  | 'mongodb'
+  | 'mariadb'
+  | 'mysql'
+  | 'cockroach'
+  | 'clickhouse';
 
 export interface IRuntimeSwitchableRepository {
   /** Swap the active repository implementation pointer in-process (no DI re-resolution). */
@@ -27,35 +33,39 @@ type AnyRepository =
 /**
  * RepositoryProxy<TRepo>
  *
- * A nest-injectable singleton that wraps two pre-built Seamless* configurations
- * (one for postgres-active, one for mongodb-active) and delegates every method
- * call to whichever is currently active.
- *
- * DatabaseSwitcherService calls `__switchActive(target)` AFTER the healthcheck on
- * the target DB has passed — this performs an atomic pointer swap (reads and writes
- * that land after this call route to the new repository; in-flight calls continue
- * against the old delegate, matching the "at-most-once semantic per request").
+ * An injectable singleton that wraps pre-built delegates for all 6 engines
+ * (PostgreSQL, MongoDB, MariaDB, MySQL, CockroachDB, ClickHouse) and delegates
+ * every method call to whichever engine is currently active.
  */
 export class RepositoryProxy<TRepo extends AnyRepository> implements IRuntimeSwitchableRepository {
-  private readonly postgresDelegate: TRepo;
-  private readonly mongoDelegate: TRepo;
+  private readonly delegates: Partial<Record<SupportedDbName, TRepo>>;
   private currentDelegate: TRepo;
   private _active: SupportedDbName;
 
   constructor(
-    postgresDelegate: TRepo,
-    mongoDelegate: TRepo,
-    initialActive: SupportedDbName,
+    delegatesOrPg: Partial<Record<SupportedDbName, TRepo>> | TRepo,
+    mongoOrInitial?: TRepo | SupportedDbName,
+    initialActive: SupportedDbName = 'postgres',
   ) {
-    this.postgresDelegate = postgresDelegate;
-    this.mongoDelegate = mongoDelegate;
-    this._active = initialActive;
-    this.currentDelegate = initialActive === 'postgres' ? postgresDelegate : mongoDelegate;
+    if (typeof delegatesOrPg === 'object' && delegatesOrPg !== null && !('findById' in delegatesOrPg || 'create' in delegatesOrPg)) {
+      this.delegates = delegatesOrPg as Partial<Record<SupportedDbName, TRepo>>;
+      this._active = (mongoOrInitial as SupportedDbName) || 'postgres';
+    } else {
+      // Legacy signature compatibility (pg, mg, initial)
+      this.delegates = {
+        postgres: delegatesOrPg as TRepo,
+        mongodb: mongoOrInitial as TRepo,
+      };
+      this._active = initialActive;
+    }
+    this.currentDelegate = (this.delegates[this._active] || this.delegates.postgres || this.delegates.mongodb)!;
   }
 
   __switchActive(target: SupportedDbName): void {
     this._active = target;
-    this.currentDelegate = target === 'postgres' ? this.postgresDelegate : this.mongoDelegate;
+    if (this.delegates[target]) {
+      this.currentDelegate = this.delegates[target]!;
+    }
   }
 
   __activeDb(): SupportedDbName {
@@ -66,15 +76,14 @@ export class RepositoryProxy<TRepo extends AnyRepository> implements IRuntimeSwi
 /**
  * Creates a proxy class (not an instance) that extends RepositoryProxy and
  * dispatches every concrete interface method to `this.currentDelegate`.
- *
- * Using a generated subclass avoids `new Proxy()` traps that break with NestJS DI
- * metadata for injections. TypeScript interfaces cannot be implemented at runtime,
- * so we generate method dispatchers for all methods known to be used across the
- * 7 repository interfaces.
  */
 export function makeDispatchProxyClass<TRepo extends AnyRepository>(
   methods: string[],
-): new (pg: TRepo, mg: TRepo, initial: SupportedDbName) => RepositoryProxy<TRepo> & TRepo {
+): new (
+  delegatesOrPg: Partial<Record<SupportedDbName, TRepo>> | TRepo,
+  mongoOrInitial?: TRepo | SupportedDbName,
+  initial?: SupportedDbName,
+) => RepositoryProxy<TRepo> & TRepo {
   class ConcreteProxy extends RepositoryProxy<TRepo> {}
   for (const method of methods) {
     (ConcreteProxy.prototype as any)[method] = function (this: ConcreteProxy, ...args: any[]) {
@@ -85,7 +94,7 @@ export function makeDispatchProxyClass<TRepo extends AnyRepository>(
   return ConcreteProxy as any;
 }
 
-/** Union of method names from all 7 repository interfaces. Each list exactly matches the corresponding interface to guarantee full dispatch coverage. */
+/** Union of method names from all 7 repository interfaces. */
 export const REPO_METHODS_BY_TYPE: Record<string, string[]> = {
   article: [
     'findById',

@@ -19,6 +19,8 @@ export interface User {
   preferredTopics?: string[] | null;
   role: UserRole;
   isActive: boolean;
+  passwordResetToken?: string | null;
+  passwordResetExpiresAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -44,6 +46,8 @@ export interface UpdateUserDto {
   preferredTopics?: string[] | null;
   role?: UserRole;
   isActive?: boolean;
+  passwordResetToken?: string | null;
+  passwordResetExpiresAt?: Date | null;
 }
 
 export interface UserQueryFilters extends PaginationQuery {

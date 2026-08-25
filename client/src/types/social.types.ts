@@ -6,8 +6,13 @@ export interface Comment {
   authorId: string;
   authorName: string;
   authorAvatar?: string | null;
-  content: string;
+  body: string;
+  content?: string; // Alias for body — kept for backward compatibility
+  status: 'pending' | 'approved' | 'hidden' | 'flagged';
+  isHidden: boolean;
+  flagCount?: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Bookmark {

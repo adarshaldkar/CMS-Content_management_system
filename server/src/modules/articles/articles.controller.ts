@@ -51,20 +51,33 @@ export class ArticlesController {
     @Query('authorId') authorId?: string,
     @Query('categoryId') categoryId?: string,
     @Query('categorySlug') categorySlug?: string,
+    @Query('categorySlugs') categorySlugs?: string | string[],
+    @Query('tagSlugs') tagSlugs?: string | string[],
+    @Query('contentType') contentType?: 'article' | 'video' | 'gallery' | 'series' | 'all',
     @Query('category') category?: string,
     @Query('sort') sort?: 'trending' | 'latest' | 'popular',
+    @Query('sortBy') sortBy?: 'latest' | 'trending' | 'most_read' | 'most_discussed' | 'most_liked',
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ): Promise<PaginatedResult<Article>> {
     const resolvedSlug = categorySlug || category;
-    const resolvedStatus = status ? status : (authorId || resolvedSlug) ? (status || undefined) : undefined;
+    const resolvedStatus = status ? status : (authorId || resolvedSlug || categorySlugs) ? (status || undefined) : undefined;
     return this.articleService.findMany({
-      page: parseInt(page, 10) || 1,
-      limit: parseInt(limit, 10) || 20,
+      page: Math.max(1, parseInt(page, 10) || 1),
+      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 20)),
       status: resolvedStatus,
       search,
       authorId,
       categoryId,
       categorySlug: resolvedSlug,
-      sort,
+      categorySlugs,
+      tagSlugs,
+      contentType,
+      sortBy: sortBy || (sort === 'popular' ? 'most_liked' : sort === 'trending' ? 'trending' : 'latest'),
+      sortOrder,
+      fromDate,
+      toDate,
     });
   }
 

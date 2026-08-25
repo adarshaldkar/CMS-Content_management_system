@@ -112,3 +112,26 @@
   line-height: 1.75;
 }
 
+/* Continuous Horizontal Ticker / Marquee */
+@keyframes ticker-marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  display: flex;
+  width: max-content;
+  animation: ticker-marquee 45s linear infinite;
+  will-change: transform;
+}
+
+.pause-on-hover:hover .animate-ticker,
+.ticker-paused .animate-ticker {
+  animation-play-state: paused !important;
+}
+
+

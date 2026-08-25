@@ -523,7 +523,7 @@ export const UserProfilePage: React.FC = () => {
 
                 <div className="flex flex-wrap gap-2.5">
                   {(user?.preferredTopics || []).length > 0 ? (
-                    user?.preferredTopics.map((topic) => (
+                    (user?.preferredTopics || []).map((topic: string) => (
                       <div
                         key={topic}
                         className="px-3.5 py-2 bg-slate-50 border border-border-subtle rounded flex items-center gap-2 text-xs font-mono uppercase tracking-wider font-semibold text-ink-primary"

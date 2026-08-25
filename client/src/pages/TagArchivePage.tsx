@@ -13,7 +13,7 @@ export const TagArchivePage: React.FC = () => {
     queryKey: ['tagArchive', slug],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
-        params: { status: 'published', limit: 20 },
+        params: { status: 'published', tagSlugs: slug, limit: 20 },
       });
       return data;
     },

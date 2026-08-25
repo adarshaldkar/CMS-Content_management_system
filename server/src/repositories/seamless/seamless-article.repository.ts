@@ -8,6 +8,10 @@ import type {
   ContentStatus,
 } from '../../domain/models';
 import type { IArticleRepository } from '../interfaces/article.repository.interface';
+import type { MariaDbService } from '../../database/mariadb.service';
+import type { MySqlService } from '../../database/mysql.service';
+import type { CockroachDbService } from '../../database/cockroach.service';
+import type { ClickHouseService } from '../../database/clickhouse.service';
 
 export class SeamlessArticleRepository implements IArticleRepository {
   private readonly logger = new Logger(SeamlessArticleRepository.name);
@@ -17,6 +21,10 @@ export class SeamlessArticleRepository implements IArticleRepository {
     private readonly secondaryRepo: IArticleRepository,
     public readonly primaryName: string,
     public readonly secondaryName: string,
+    private readonly mariadb?: MariaDbService,
+    private readonly mysql?: MySqlService,
+    private readonly cockroach?: CockroachDbService,
+    private readonly clickhouse?: ClickHouseService,
   ) {}
 
   public get activeDbName(): string {
@@ -43,6 +51,144 @@ export class SeamlessArticleRepository implements IArticleRepository {
     return this.primaryName === 'postgres' ? this.secondaryRepo : this.primaryRepo;
   }
 
+  private async replicateToAll(article: Article): Promise<void> {
+    const tasks: Promise<any>[] = [];
+
+    // 1. Peer Mongo/Postgres
+    tasks.push(
+      this.peerRepo.create({
+        title: article.title,
+        slug: article.slug,
+        description: article.description,
+        content: article.content,
+        authorId: article.authorId,
+        categoryId: article.categoryId,
+        tagIds: article.tagIds || [],
+        coverImage: article.coverImage,
+        status: article.status,
+        wordCount: article.wordCount,
+        readingTimeMinutes: article.readingTimeMinutes,
+        seoTitle: article.seoTitle,
+        seoDescription: article.seoDescription,
+        reviewNote: article.reviewNote,
+        scheduledAt: article.scheduledAt,
+      }).catch((e) => this.logger.debug(`Peer article sync note: ${e.message}`)),
+    );
+
+    // 2. MariaDB
+    if (this.mariadb) {
+      tasks.push(
+        this.mariadb.pool.query(
+          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), description=VALUES(description), status=VALUES(status), version=VALUES(version), word_count=VALUES(word_count), reading_time_minutes=VALUES(reading_time_minutes), cover_image=VALUES(cover_image), category_id=VALUES(category_id);`,
+          [
+            article.id,
+            article.title,
+            article.slug,
+            article.description || null,
+            article.content || null,
+            article.authorId,
+            article.categoryId || null,
+            article.coverImage || null,
+            article.status,
+            article.version || 1,
+            article.wordCount || 0,
+            article.readingTimeMinutes || 1,
+            article.seoTitle || null,
+            article.seoDescription || null,
+            article.reviewNote || null,
+            JSON.stringify(article.tagIds || []),
+          ],
+        ).catch((e: any) => this.logger.warn(`MariaDB article sync failed: ${e.message}`)),
+      );
+    }
+
+    // 3. MySQL
+    if (this.mysql) {
+      tasks.push(
+        this.mysql.pool.query(
+          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), description=VALUES(description), status=VALUES(status), version=VALUES(version), word_count=VALUES(word_count), reading_time_minutes=VALUES(reading_time_minutes), cover_image=VALUES(cover_image), category_id=VALUES(category_id);`,
+          [
+            article.id,
+            article.title,
+            article.slug,
+            article.description || null,
+            article.content || null,
+            article.authorId,
+            article.categoryId || null,
+            article.coverImage || null,
+            article.status,
+            article.version || 1,
+            article.wordCount || 0,
+            article.readingTimeMinutes || 1,
+            article.seoTitle || null,
+            article.seoDescription || null,
+            article.reviewNote || null,
+            JSON.stringify(article.tagIds || []),
+          ],
+        ).catch((e: any) => this.logger.warn(`MySQL article sync failed: ${e.message}`)),
+      );
+    }
+
+    // 4. CockroachDB
+    if (this.cockroach) {
+      tasks.push(
+        this.cockroach.pool.query(
+          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+           ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title, content=EXCLUDED.content, description=EXCLUDED.description, status=EXCLUDED.status, version=EXCLUDED.version, word_count=EXCLUDED.word_count, reading_time_minutes=EXCLUDED.reading_time_minutes, cover_image=EXCLUDED.cover_image, category_id=EXCLUDED.category_id, updated_at=now();`,
+          [
+            article.id,
+            article.title,
+            article.slug,
+            article.description || null,
+            article.content || null,
+            article.authorId,
+            article.categoryId || null,
+            article.coverImage || null,
+            article.status,
+            article.version || 1,
+            article.wordCount || 0,
+            article.readingTimeMinutes || 1,
+            article.seoTitle || null,
+            article.seoDescription || null,
+            article.reviewNote || null,
+            JSON.stringify(article.tagIds || []),
+          ],
+        ).catch((e: any) => this.logger.warn(`CockroachDB article sync failed: ${e.message}`)),
+      );
+    }
+
+    // 5. ClickHouse
+    if (this.clickhouse) {
+      tasks.push(
+        this.clickhouse.client.insert({
+          table: 'cms_platform.article_snapshots',
+          values: [
+            {
+              id: String(article.id),
+              title: article.title,
+              slug: article.slug,
+              description: article.description || '',
+              author_id: String(article.authorId),
+              category_id: String(article.categoryId || ''),
+              status: article.status,
+              version: article.version || 1,
+              word_count: article.wordCount || 0,
+              reading_time_minutes: article.readingTimeMinutes || 1,
+            },
+          ],
+          format: 'JSONEachRow',
+        }).catch((e: any) => this.logger.warn(`ClickHouse article sync failed: ${e.message}`)),
+      );
+    }
+
+    await Promise.allSettled(tasks);
+  }
+
   async findById(id: string): Promise<Article | null> {
     const article = await this.activeRepo.findById(id);
     if (article) return article;
@@ -50,26 +196,26 @@ export class SeamlessArticleRepository implements IArticleRepository {
     try {
       const peerArticle = await this.peerRepo.findById(id);
       if (peerArticle) {
-        this.logger.log(
-          `[Seamless Sync] JIT replicating article "${peerArticle.title}" by ID`,
-        );
-        return await this.activeRepo.create({
+        this.logger.log(`[Seamless Sync] JIT replicating article "${peerArticle.title}" by ID`);
+        const replicated = await this.activeRepo.create({
           title: peerArticle.title,
           slug: peerArticle.slug,
           description: peerArticle.description,
           content: peerArticle.content,
           authorId: peerArticle.authorId,
           categoryId: peerArticle.categoryId,
-          tagIds: peerArticle.tagIds,
+          tagIds: peerArticle.tagIds || [],
           coverImage: peerArticle.coverImage,
           status: peerArticle.status,
-          seoTitle: peerArticle.seoTitle,
-          seoDescription: peerArticle.seoDescription,
-          scheduledAt: peerArticle.scheduledAt,
-          reviewNote: peerArticle.reviewNote,
           wordCount: peerArticle.wordCount,
           readingTimeMinutes: peerArticle.readingTimeMinutes,
+          seoTitle: peerArticle.seoTitle,
+          seoDescription: peerArticle.seoDescription,
+          reviewNote: peerArticle.reviewNote,
+          scheduledAt: peerArticle.scheduledAt,
         });
+        this.replicateToAll(replicated).catch(() => {});
+        return replicated;
       }
     } catch (err: any) {
       this.logger.warn(`[Seamless Sync] Peer DB lookup by ID failed: ${err.message}`);
@@ -85,26 +231,26 @@ export class SeamlessArticleRepository implements IArticleRepository {
     try {
       const peerArticle = await this.peerRepo.findBySlug(slug);
       if (peerArticle) {
-        this.logger.log(
-          `[Seamless Sync] JIT replicating article "${peerArticle.title}" by Slug`,
-        );
-        return await this.activeRepo.create({
+        this.logger.log(`[Seamless Sync] JIT replicating article "${peerArticle.title}" by slug`);
+        const replicated = await this.activeRepo.create({
           title: peerArticle.title,
           slug: peerArticle.slug,
           description: peerArticle.description,
           content: peerArticle.content,
           authorId: peerArticle.authorId,
           categoryId: peerArticle.categoryId,
-          tagIds: peerArticle.tagIds,
+          tagIds: peerArticle.tagIds || [],
           coverImage: peerArticle.coverImage,
           status: peerArticle.status,
-          seoTitle: peerArticle.seoTitle,
-          seoDescription: peerArticle.seoDescription,
-          scheduledAt: peerArticle.scheduledAt,
-          reviewNote: peerArticle.reviewNote,
           wordCount: peerArticle.wordCount,
           readingTimeMinutes: peerArticle.readingTimeMinutes,
+          seoTitle: peerArticle.seoTitle,
+          seoDescription: peerArticle.seoDescription,
+          reviewNote: peerArticle.reviewNote,
+          scheduledAt: peerArticle.scheduledAt,
         });
+        this.replicateToAll(replicated).catch(() => {});
+        return replicated;
       }
     } catch (err: any) {
       this.logger.warn(`[Seamless Sync] Peer DB lookup by Slug failed: ${err.message}`);
@@ -114,62 +260,32 @@ export class SeamlessArticleRepository implements IArticleRepository {
   }
 
   async findMany(filters: ArticleQueryFilters): Promise<PaginatedResult<Article>> {
-    const result = await this.activeRepo.findMany(filters);
-    if (result.items.length > 0 || result.total > 0) {
-      return result;
-    }
-
-    try {
-      const peerResult = await this.peerRepo.findMany(filters);
-      if (peerResult.items.length > 0) {
-        this.logger.log(
-          `[Seamless Sync] JIT replicating ${peerResult.items.length} articles from peer repository for query`,
-        );
-        for (const peerArticle of peerResult.items) {
-          try {
-            await this.activeRepo.create({
-              title: peerArticle.title,
-              slug: peerArticle.slug,
-              description: peerArticle.description,
-              content: peerArticle.content,
-              authorId: peerArticle.authorId,
-              categoryId: peerArticle.categoryId,
-              tagIds: peerArticle.tagIds,
-              coverImage: peerArticle.coverImage,
-              status: peerArticle.status,
-              seoTitle: peerArticle.seoTitle,
-              seoDescription: peerArticle.seoDescription,
-              scheduledAt: peerArticle.scheduledAt,
-              reviewNote: peerArticle.reviewNote,
-              wordCount: peerArticle.wordCount,
-              readingTimeMinutes: peerArticle.readingTimeMinutes,
-            });
-          } catch {
-            // Safe ignore duplicates
-          }
-        }
-        return peerResult;
-      }
-    } catch (err: any) {
-      this.logger.warn(`[Seamless Sync] Peer findMany fallback failed: ${err.message}`);
-    }
-
-    return result;
+    return this.activeRepo.findMany(filters);
   }
 
   async create(data: CreateArticleDto): Promise<Article> {
-    return this.activeRepo.create(data);
+    const article = await this.activeRepo.create(data);
+    this.replicateToAll(article).catch((e) => this.logger.warn(`Multi-DB Article create sync failed: ${e.message}`));
+    return article;
   }
 
   async update(id: string, data: UpdateArticleDto): Promise<Article> {
-    return this.activeRepo.update(id, data);
+    const article = await this.activeRepo.update(id, data);
+    this.replicateToAll(article).catch((e) => this.logger.warn(`Multi-DB Article update sync failed: ${e.message}`));
+    return article;
+  }
+
+  async updateStatus(id: string, status: ContentStatus, note?: string): Promise<Article> {
+    const article = await this.activeRepo.updateStatus(id, status);
+    if (note) {
+      await this.activeRepo.update(id, { reviewNote: note }).catch(() => {});
+    }
+    this.replicateToAll(article).catch((e) => this.logger.warn(`Multi-DB Article status sync failed: ${e.message}`));
+    return article;
   }
 
   async softDelete(id: string): Promise<boolean> {
-    return this.activeRepo.softDelete(id);
-  }
-
-  async updateStatus(id: string, status: ContentStatus): Promise<Article> {
-    return this.activeRepo.updateStatus(id, status);
+    const result = await this.activeRepo.softDelete(id);
+    return result;
   }
 }

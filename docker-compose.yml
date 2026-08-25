@@ -35,6 +35,84 @@ services:
       timeout: 5s
       retries: 5
 
+  mariadb:
+    image: mariadb:11
+    container_name: cms-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_USER: cms
+      MARIADB_PASSWORD: cms_dev_password
+      MARIADB_ROOT_PASSWORD: cms_dev_password
+      MARIADB_DATABASE: cms_platform
+    ports:
+      - '3307:3306'
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.4
+    container_name: cms-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_USER: cms
+      MYSQL_PASSWORD: cms_dev_password
+      MYSQL_ROOT_PASSWORD: cms_dev_password
+      MYSQL_DATABASE: cms_platform
+    ports:
+      - '3308:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'cms', '-pcms_dev_password']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cockroachdb:
+    image: cockroachdb/cockroach:latest
+    container_name: cms-cockroachdb
+    restart: unless-stopped
+    command: start-single-node --insecure
+    ports:
+      - '26257:26257'
+      - '8080:8080'
+    volumes:
+      - cockroach_data:/cockroach/cockroach-data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health?ready=1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: cms-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: cms_platform
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: cms_dev_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:8123/ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   mongo_data:
+  mariadb_data:
+  mysql_data:
+  cockroach_data:
+  clickhouse_data:

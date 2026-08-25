@@ -15,4 +15,9 @@ export interface IUserRepository {
   create(data: CreateUserDto): Promise<User>;
   update(id: string, data: UpdateUserDto): Promise<User>;
   softDelete(id: string): Promise<boolean>;
+  // Password reset
+  setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+  findByPasswordResetToken(tokenHash: string): Promise<User | null>;
+  clearPasswordResetToken(userId: string): Promise<void>;
+  updatePassword(userId: string, newPasswordHash: string): Promise<void>;
 }

@@ -62,7 +62,25 @@ export const AdminLayout: React.FC = () => {
   ];
 
   const activeDb = (dbStatus?.activeDatabase || health?.activeDatabase || 'postgres').toUpperCase();
-  const isPostgres = activeDb.toLowerCase() === 'postgres';
+
+  const getDbBadgeStyle = (db: string) => {
+    switch (db) {
+      case 'MONGODB':
+        return { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' };
+      case 'MARIADB':
+        return { bg: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500' };
+      case 'MYSQL':
+        return { bg: 'bg-cyan-50 text-cyan-800 border-cyan-200', dot: 'bg-cyan-500' };
+      case 'COCKROACH':
+        return { bg: 'bg-purple-50 text-purple-800 border-purple-200', dot: 'bg-purple-500' };
+      case 'CLICKHOUSE':
+        return { bg: 'bg-orange-50 text-orange-800 border-orange-200', dot: 'bg-orange-500' };
+      default:
+        return { bg: 'bg-sky-50 text-sky-800 border-sky-200', dot: 'bg-sky-500' };
+    }
+  };
+
+  const badgeStyle = getDbBadgeStyle(activeDb);
 
   return (
     <div className="min-h-screen bg-canvas-paper text-ink-primary flex font-sans">
@@ -81,18 +99,10 @@ export const AdminLayout: React.FC = () => {
               <span>ACTIVE DB:</span>
             </span>
             <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 border text-[11px] font-mono font-medium uppercase ${
-                isPostgres
-                  ? 'bg-sky-50 text-sky-800 border-sky-200'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 border text-[11px] font-mono font-medium uppercase ${badgeStyle.bg}`}
               style={{ borderRadius: 2 }}
             >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isPostgres ? 'bg-sky-500' : 'bg-emerald-500'
-                }`}
-              />
+              <span className={`w-1.5 h-1.5 rounded-full ${badgeStyle.dot}`} />
               {activeDb}
             </span>
           </div>

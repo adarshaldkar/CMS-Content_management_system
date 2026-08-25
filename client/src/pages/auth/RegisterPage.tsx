@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -30,8 +30,8 @@ const registerSchema = z
       .regex(/[0-9]/, 'Must include at least one number')
       .regex(/[^A-Za-z0-9]/, 'Must include at least one special symbol'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
-    agreeTerms: z.literal(true, {
-      errorMap: () => ({ message: 'You must agree to the editorial publishing terms' }),
+    agreeTerms: z.boolean().refine((val) => val === true, {
+      message: 'You must agree to the editorial publishing terms',
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -48,6 +48,10 @@ export const RegisterPage: React.FC = () => {
 
   const { setAuthUser } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get('redirect');
 
   const {
     register,
@@ -102,8 +106,8 @@ export const RegisterPage: React.FC = () => {
       });
 
       setAuthUser(response.user as any);
-      // Route new user to topic onboarding to seed personalized feed
-      navigate('/onboarding');
+      // Route new user to requested article or topic onboarding
+      navigate(redirectParam || '/onboarding');
     } catch (err: any) {
       if (err.response?.status === 409) {
         setErrorMessage('An account with this email address already exists. Please sign in instead.');

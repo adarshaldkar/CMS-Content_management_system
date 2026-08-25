@@ -440,4 +440,75 @@ export class AuthService {
 
     return { success: true };
   }
+
+  // ─── Forgot Password (Token Request) ──────────────────────────────────────────
+
+  async forgotPassword(email: string, meta: RequestMetadata = {}): Promise<void> {
+    // Always respond successfully to prevent user enumeration timing attacks
+    const user = await this.userRepo.findByEmail(email.toLowerCase().trim());
+
+    if (!user || !user.isActive) {
+      // Constant-time dummy delay to prevent timing-based enumeration
+      await dummyVerifyPassword('placeholder');
+      return;
+    }
+
+    // Generate a cryptographically secure reset token (32 bytes = 64 hex chars)
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Persist hashed token + expiry on user record
+    await this.userRepo.setPasswordResetToken(user.id, tokenHash, expiresAt);
+
+    await this.auditService.log({
+      actorId: user.id,
+      action: AuditEventType.PASSWORD_RESET_REQUESTED,
+      resource: `User:${user.id}`,
+      result: 'SUCCESS',
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    // In development: log the reset link to the console for testing
+    // In production: replace this with an email-sending service (e.g. SendGrid, Nodemailer)
+    const clientUrl = this.config.get('CLIENT_URL', { infer: true }) || 'http://localhost:5173';
+    const resetLink = `${clientUrl}/reset-password?token=${rawToken}`;
+    console.log('\n--- PASSWORD RESET LINK (dev-only, replace with email in prod) ---');
+    console.log(`Email: ${email}`);
+    console.log(`Reset URL: ${resetLink}`);
+    console.log('Token expires in: 1 hour\n');
+  }
+
+  // ─── Reset Password (Token Validation + Update) ────────────────────────────────
+
+  async resetPassword(token: string, newPassword: string, meta: RequestMetadata = {}): Promise<void> {
+    if (!token || token.length !== 64) {
+      throw new UnauthorizedException('Invalid or expired reset token.');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await this.userRepo.findByPasswordResetToken(tokenHash);
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Invalid or expired reset token.');
+    }
+
+    // Hash the new password and clear the reset token
+    const hashedPassword = await hashPassword(newPassword);
+    await this.userRepo.updatePassword(user.id, hashedPassword);
+    await this.userRepo.clearPasswordResetToken(user.id);
+
+    // Revoke all sessions so existing sessions are invalidated
+    await this.sessionRepo.revokeAllUserSessions(user.id);
+
+    await this.auditService.log({
+      actorId: user.id,
+      action: AuditEventType.PASSWORD_RESET_COMPLETED,
+      resource: `User:${user.id}`,
+      result: 'SUCCESS',
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+  }
 }

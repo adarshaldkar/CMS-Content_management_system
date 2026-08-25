@@ -21,6 +21,8 @@ interface UserRow extends QueryResultRow {
   preferred_topics: string[] | null;
   role: string;
   is_active: boolean;
+  password_reset_token: string | null;
+  password_reset_expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
   deleted_at: Date | null;
@@ -52,16 +54,21 @@ export class PostgresUserRepository implements IUserRepository {
           preferred_topics text[] DEFAULT '{}',
           role text NOT NULL DEFAULT 'USER',
           is_active boolean NOT NULL DEFAULT true,
+          password_reset_token text,
+          password_reset_expires_at timestamptz,
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now(),
           deleted_at timestamptz
         );
 
         ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS preferred_topics text[] DEFAULT '{}';
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS password_reset_token text;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS password_reset_expires_at timestamptz;
 
         CREATE INDEX IF NOT EXISTS idx_cms_users_role ON cms_users(role);
         CREATE INDEX IF NOT EXISTS idx_cms_users_is_active ON cms_users(is_active);
         CREATE INDEX IF NOT EXISTS idx_cms_users_created_at ON cms_users(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_cms_users_reset_token ON cms_users(password_reset_token) WHERE password_reset_token IS NOT NULL;
       `,
       )
       .then(() => undefined);
@@ -80,6 +87,8 @@ export class PostgresUserRepository implements IUserRepository {
       preferredTopics: row.preferred_topics || [],
       role: row.role as UserRole,
       isActive: row.is_active,
+      passwordResetToken: row.password_reset_token,
+      passwordResetExpiresAt: row.password_reset_expires_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       deletedAt: row.deleted_at,
@@ -217,5 +226,47 @@ export class PostgresUserRepository implements IUserRepository {
       [id],
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.ensureSchema();
+    await this.postgres.pool.query(
+      `UPDATE cms_users
+       SET password_reset_token = $1, password_reset_expires_at = $2, updated_at = now()
+       WHERE id = $3 AND deleted_at IS NULL`,
+      [tokenHash, expiresAt, userId],
+    );
+  }
+
+  async findByPasswordResetToken(tokenHash: string): Promise<User | null> {
+    await this.ensureSchema();
+    const result = await this.postgres.pool.query<UserRow>(
+      `SELECT * FROM cms_users
+       WHERE password_reset_token = $1
+         AND password_reset_expires_at > now()
+         AND deleted_at IS NULL`,
+      [tokenHash],
+    );
+    return result.rows[0] ? this.toDomain(result.rows[0]) : null;
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    await this.ensureSchema();
+    await this.postgres.pool.query(
+      `UPDATE cms_users
+       SET password_reset_token = NULL, password_reset_expires_at = NULL, updated_at = now()
+       WHERE id = $1`,
+      [userId],
+    );
+  }
+
+  async updatePassword(userId: string, newPasswordHash: string): Promise<void> {
+    await this.ensureSchema();
+    await this.postgres.pool.query(
+      `UPDATE cms_users
+       SET password_hash = $1, updated_at = now()
+       WHERE id = $2 AND deleted_at IS NULL`,
+      [newPasswordHash, userId],
+    );
   }
 }

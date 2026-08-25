@@ -14,6 +14,14 @@ export interface ArticleFilters {
   search?: string;
   authorId?: string;
   categoryId?: string;
+  categorySlug?: string;
+  categorySlugs?: string | string[];
+  tagSlugs?: string | string[];
+  contentType?: 'article' | 'video' | 'gallery' | 'series' | 'all';
+  sortBy?: 'latest' | 'trending' | 'most_read' | 'most_discussed' | 'most_liked';
+  sortOrder?: 'asc' | 'desc';
+  fromDate?: string;
+  toDate?: string;
 }
 
 export async function listArticles(

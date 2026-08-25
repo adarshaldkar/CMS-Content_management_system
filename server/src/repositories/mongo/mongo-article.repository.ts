@@ -106,9 +106,9 @@ export class MongoArticleRepository implements IArticleRepository {
     }
 
     let sortOption: Record<string, 1 | -1> = { createdAt: -1 };
-    if (filters.sort === 'trending') {
+    if (filters.sortBy === 'trending') {
       sortOption = { wordCount: -1, createdAt: -1 };
-    } else if (filters.sort === 'latest') {
+    } else if (filters.sortBy === 'latest' || !filters.sortBy) {
       sortOption = { publishedAt: -1, createdAt: -1 };
     }
 

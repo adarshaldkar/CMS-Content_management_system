@@ -9,7 +9,7 @@ import type { Article, PaginatedResult } from '../types';
 /* ─── helpers ─────────────────────────────────────────────────────── */
 const cleanTitle = (t: string) => t.replace(/\s\d{10,}/g, '').trim();
 
-const fmtDate = (iso?: string) => {
+const fmtDate = (iso?: string | null) => {
   if (!iso) return '';
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',

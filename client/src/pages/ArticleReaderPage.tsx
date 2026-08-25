@@ -19,6 +19,7 @@ import {
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { ReadingPaywallGate } from '../components/articles/ReadingPaywallGate';
 import type { Article } from '../types';
 
 interface CommentItem {
@@ -44,6 +45,22 @@ export const ArticleReaderPage: React.FC = () => {
   const [shareDropdownOpen, setShareDropdownOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [commentText, setCommentText] = useState('');
+
+  // Timed Paywall Lock State for Unauthenticated Guests
+  const [isPaywallLocked, setIsPaywallLocked] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setIsPaywallLocked(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setIsPaywallLocked(true);
+    }, 7000); // 7-second complimentary preview
+
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, slug]);
 
   // 1. Fetch Article by Slug
   const { data: article, isLoading } = useQuery({
@@ -246,11 +263,24 @@ export const ArticleReaderPage: React.FC = () => {
     <div className="font-sans text-ink-primary relative bg-canvas-paper min-h-screen">
       {/* 1. Viewport-Pinned Reading Progress Bar */}
       <div
-        className="fixed top-0 left-0 h-1 bg-accent-crimson z-50 transition-all duration-75"
+        className="fixed top-0 left-0 h-1 bg-accent-crimson z-30 transition-all duration-75"
         style={{ width: `${scrollProgress}%` }}
       />
 
-      <article className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-8">
+      {/* 2. Strict Timed Paywall Modal for Unauthenticated Guests */}
+      <ReadingPaywallGate
+        articleTitle={article.title}
+        articleSlug={article.slug}
+        previewSeconds={7}
+      />
+
+      <article
+        className={`max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-8 transition-all duration-700 ${
+          isPaywallLocked && !isAuthenticated
+            ? 'filter blur-md select-none pointer-events-none opacity-40 scale-[0.99] max-h-[85vh] overflow-hidden'
+            : ''
+        }`}
+      >
         {/* Category Breadcrumb */}
         <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary">
           <Link to="/" className="hover:text-ink-primary transition-colors">

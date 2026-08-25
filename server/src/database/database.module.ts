@@ -3,6 +3,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { EnvConfig } from '../config/env.schema';
 import { PostgresService } from './postgres.service';
+import { MariaDbService } from './mariadb.service';
+import { MySqlService } from './mysql.service';
+import { CockroachDbService } from './cockroach.service';
+import { ClickHouseService } from './clickhouse.service';
+import { MultiDatabaseMeshService } from './multi-database-mesh.service';
 import { DatabaseSwitcherService } from './database-switcher.service';
 import { DatabaseSwitcherController } from './database-switcher.controller';
 import { AuditModule } from '../modules/audit/audit.module';
@@ -36,8 +41,27 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
     forwardRef(() => AuditModule),
   ],
   controllers: [DatabaseSwitcherController],
-  providers: [PostgresService, DatabaseSwitcherService, RepositoryRegistryService],
-  exports: [PostgresService, DatabaseSwitcherService, MongooseModule, RepositoryRegistryService],
+  providers: [
+    PostgresService,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    ClickHouseService,
+    MultiDatabaseMeshService,
+    DatabaseSwitcherService,
+    RepositoryRegistryService,
+  ],
+  exports: [
+    PostgresService,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    ClickHouseService,
+    MultiDatabaseMeshService,
+    DatabaseSwitcherService,
+    MongooseModule,
+    RepositoryRegistryService,
+  ],
 })
 export class DatabaseModule implements OnModuleInit {
   constructor(

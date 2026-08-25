@@ -65,14 +65,14 @@ export const PublicHeader: React.FC = () => {
 
           {/* Right: Search & Auth Actions */}
           <div className="flex items-center gap-3">
-            {/* Search Toggle */}
-            <button
-              onClick={() => setSearchOpen(!searchOpen)}
+            {/* Search Link */}
+            <Link
+              to="/search"
               className="p-2 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded-full transition-colors"
-              title="Search Articles"
+              title="Search & Filter Stories"
             >
               <Search size={19} />
-            </button>
+            </Link>
 
             {isAuthenticated && user ? (
               <>

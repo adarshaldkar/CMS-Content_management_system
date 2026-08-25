@@ -123,4 +123,42 @@ export class MongoUserRepository implements IUserRepository {
       .exec();
     return result.modifiedCount > 0;
   }
+
+  async setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId, deletedAt: null },
+        { $set: { passwordResetToken: tokenHash, passwordResetExpiresAt: expiresAt, updatedAt: new Date() } },
+      )
+      .exec();
+  }
+
+  async findByPasswordResetToken(tokenHash: string): Promise<User | null> {
+    const doc = await this.userModel
+      .findOne({
+        passwordResetToken: tokenHash,
+        passwordResetExpiresAt: { $gt: new Date() },
+        deletedAt: null,
+      })
+      .exec();
+    return doc ? this.toDomain(doc) : null;
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        { $set: { passwordResetToken: null, passwordResetExpiresAt: null, updatedAt: new Date() } },
+      )
+      .exec();
+  }
+
+  async updatePassword(userId: string, newPasswordHash: string): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId, deletedAt: null },
+        { $set: { passwordHash: newPasswordHash, updatedAt: new Date() } },
+      )
+      .exec();
+  }
 }

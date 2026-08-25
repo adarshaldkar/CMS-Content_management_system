@@ -192,8 +192,60 @@ export class PostgresArticleRepository implements IArticleRepository {
 
       values.push(slugAliases);
       clauses.push(
-        `(a.category_id IN (SELECT id::text FROM categories WHERE slug = ANY($${values.length})) OR a.category_id = ANY($${values.length}))`,
+        `(
+          a.category_id IN (SELECT id::text FROM categories WHERE slug = ANY($${values.length}))
+          OR a.id IN (
+            SELECT a2.id FROM articles a2
+            JOIN categories cat ON cat.slug = ANY($${values.length})
+            WHERE (a2.title ILIKE '%' || cat.name || '%'
+                   OR a2.description ILIKE '%' || cat.name || '%')
+              AND a2.category_id IS NULL
+              AND a2.deleted_at IS NULL
+          )
+        )`,
       );
+    }
+
+    if (filters.categorySlugs) {
+      const slugs = Array.isArray(filters.categorySlugs)
+        ? filters.categorySlugs
+        : filters.categorySlugs.split(',').map((s) => s.trim()).filter(Boolean);
+      if (slugs.length > 0) {
+        values.push(slugs);
+        // Match articles whose category_id matches the slug, OR whose title/description
+        // matches the category name (for articles filed with NULL category_id)
+        clauses.push(
+          `(
+            a.category_id IN (SELECT id::text FROM categories WHERE slug = ANY($${values.length}))
+            OR a.id IN (
+              SELECT a2.id FROM articles a2
+              JOIN categories cat ON cat.slug = ANY($${values.length})
+              WHERE (a2.title ILIKE '%' || cat.name || '%'
+                     OR a2.description ILIKE '%' || cat.name || '%')
+                AND a2.category_id IS NULL
+                AND a2.deleted_at IS NULL
+            )
+          )`,
+        );
+      }
+    }
+
+    if (filters.tagSlugs) {
+      const tags = Array.isArray(filters.tagSlugs) ? filters.tagSlugs : filters.tagSlugs.split(',').map((t) => t.trim()).filter(Boolean);
+      if (tags.length > 0) {
+        values.push(tags);
+        clauses.push(`a.tag_ids && $${values.length}`);
+      }
+    }
+
+    if (filters.fromDate) {
+      values.push(new Date(filters.fromDate));
+      clauses.push(`COALESCE(a.published_at, a.created_at) >= $${values.length}`);
+    }
+
+    if (filters.toDate) {
+      values.push(new Date(filters.toDate));
+      clauses.push(`COALESCE(a.published_at, a.created_at) <= $${values.length}`);
     }
 
     if (filters.search) {
@@ -212,10 +264,16 @@ export class PostgresArticleRepository implements IArticleRepository {
     const total = countRes.rows[0]?.total ?? 0;
 
     let orderBy = 'ORDER BY a.created_at DESC';
-    if (filters.sort === 'trending') {
-      orderBy = 'ORDER BY a.word_count DESC, a.created_at DESC';
-    } else if (filters.sort === 'latest') {
-      orderBy = 'ORDER BY COALESCE(a.published_at, a.created_at) DESC';
+    const sortOrder = filters.sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    if (filters.sortBy === 'trending') {
+      orderBy = `ORDER BY a.word_count ${sortOrder}, a.created_at ${sortOrder}`;
+    } else if (filters.sortBy === 'most_discussed') {
+      orderBy = `ORDER BY (SELECT COUNT(*) FROM comments c WHERE c.article_id::text = a.id::text) ${sortOrder}, a.created_at DESC`;
+    } else if (filters.sortBy === 'most_liked') {
+      orderBy = `ORDER BY (SELECT COUNT(*) FROM likes l WHERE l.article_id::text = a.id::text) ${sortOrder}, a.created_at DESC`;
+    } else if (filters.sortBy === 'latest') {
+      orderBy = `ORDER BY COALESCE(a.published_at, a.created_at) ${sortOrder}`;
     }
 
     const listValues = [...values, limit, offset];

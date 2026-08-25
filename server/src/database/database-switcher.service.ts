@@ -7,12 +7,19 @@ import {
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { PostgresService } from './postgres.service';
+import { MariaDbService } from './mariadb.service';
+import { MySqlService } from './mysql.service';
+import { CockroachDbService } from './cockroach.service';
+import { ClickHouseService } from './clickhouse.service';
+import { MultiDatabaseMeshService, type DatabaseEngine, type DatabaseHealthInfo } from './multi-database-mesh.service';
 import { AuditService } from '../modules/audit/audit.service';
 import { RepositoryRegistryService } from '../repositories/repository-registry.service';
 import { AuditEventType, type AuthUser } from '../domain/models';
 
 export interface DatabaseHealthStatus {
-  activeDatabase: 'postgres' | 'mongodb';
+  activeDatabase: DatabaseEngine;
+  healthyCount: number;
+  databases: DatabaseHealthInfo[];
   postgres: { status: 'healthy' | 'unhealthy'; latencyMs: number };
   mongodb: { status: 'healthy' | 'unhealthy'; latencyMs: number };
   sanitizedEvents: Array<{ id: string; timestamp: string; message: string }>;
@@ -33,55 +40,39 @@ export class DatabaseSwitcherService {
 
   constructor(
     private readonly postgres: PostgresService,
+    private readonly mariadb: MariaDbService,
+    private readonly mysql: MySqlService,
+    private readonly cockroach: CockroachDbService,
+    private readonly clickhouse: ClickHouseService,
+    private readonly mesh: MultiDatabaseMeshService,
     @InjectConnection() private readonly mongoConnection: Connection,
     private readonly auditService: AuditService,
     private readonly repositoryRegistry: RepositoryRegistryService,
   ) {}
 
   async getStatus(): Promise<DatabaseHealthStatus> {
-    const active = (process.env.ACTIVE_DATABASE as any) || 'postgres';
+    const meshStatus = await this.mesh.getMeshStatus();
 
-    // 1. Probe Postgres
-    let pgStatus: 'healthy' | 'unhealthy' = 'unhealthy';
-    let pgLatency = 0;
-    try {
-      const start = Date.now();
-      await this.postgres.pool.query('SELECT 1');
-      pgLatency = Date.now() - start;
-      pgStatus = 'healthy';
-    } catch {
-      pgStatus = 'unhealthy';
-    }
-
-    // 2. Probe MongoDB
-    let mongoStatus: 'healthy' | 'unhealthy' = 'unhealthy';
-    let mongoLatency = 0;
-    try {
-      const start = Date.now();
-      if (this.mongoConnection.readyState === 1) {
-        if (this.mongoConnection.db) {
-          await this.mongoConnection.db.admin().ping();
-        }
-        mongoLatency = Date.now() - start;
-        mongoStatus = 'healthy';
-      } else if (this.mongoConnection.readyState === 2) {
-        await this.mongoConnection.asPromise();
-        mongoLatency = Date.now() - start;
-        mongoStatus = 'healthy';
-      }
-    } catch {
-      mongoStatus = 'unhealthy';
-    }
+    const pgInfo = meshStatus.databases.find((d) => d.engine === 'postgres');
+    const mongoInfo = meshStatus.databases.find((d) => d.engine === 'mongodb');
 
     return {
-      activeDatabase: active,
-      postgres: { status: pgStatus, latencyMs: pgLatency },
-      mongodb: { status: mongoStatus, latencyMs: mongoLatency },
+      activeDatabase: meshStatus.activeEngine,
+      healthyCount: meshStatus.healthyCount,
+      databases: meshStatus.databases,
+      postgres: {
+        status: pgInfo?.status === 'healthy' ? 'healthy' : 'unhealthy',
+        latencyMs: pgInfo?.latencyMs || 0,
+      },
+      mongodb: {
+        status: mongoInfo?.status === 'healthy' ? 'healthy' : 'unhealthy',
+        latencyMs: mongoInfo?.latencyMs || 0,
+      },
       sanitizedEvents: [
         {
           id: 'evt-1',
           timestamp: new Date().toISOString(),
-          message: 'Zero-buffer JIT repository proxy operational across active and peer datasets',
+          message: `6-Database Persistence Mesh active. Synchronizing across PostgreSQL, MongoDB, MariaDB, MySQL, CockroachDB & ClickHouse (${meshStatus.healthyCount}/6 operational)`,
         },
         {
           id: 'evt-2',
@@ -93,7 +84,7 @@ export class DatabaseSwitcherService {
   }
 
   async switchDatabase(
-    targetDb: 'postgres' | 'mongodb',
+    targetDb: DatabaseEngine,
     actor: AuthUser,
   ): Promise<{
     success: boolean;
@@ -107,7 +98,7 @@ export class DatabaseSwitcherService {
       );
     }
 
-    const currentDb = process.env.ACTIVE_DATABASE || 'postgres';
+    const currentDb = process.env.ACTIVE_DATABASE || this.mesh.getActiveEngine();
     if (targetDb === currentDb) {
       return {
         success: true,
@@ -124,28 +115,34 @@ export class DatabaseSwitcherService {
       // Step 1: Validate target DB health
       if (targetDb === 'postgres') {
         await this.postgres.pool.query('SELECT 1');
+      } else if (targetDb === 'mariadb') {
+        await this.mariadb.pool.query('SELECT 1');
+      } else if (targetDb === 'mysql') {
+        await this.mysql.pool.query('SELECT 1');
+      } else if (targetDb === 'cockroach') {
+        await this.cockroach.pool.query('SELECT 1');
+      } else if (targetDb === 'clickhouse') {
+        await this.clickhouse.isHealthy();
       } else if (targetDb === 'mongodb') {
         if (this.mongoConnection.readyState !== 1) {
           try {
             await this.mongoConnection.asPromise();
-          } catch {
-            // Handled below
-          }
+          } catch {}
         }
         if (this.mongoConnection.readyState !== 1) {
-          throw new Error('MongoDB Atlas connection is not ready. Please verify cluster status.');
+          throw new Error('MongoDB connection is not ready.');
         }
       }
 
-      // Step 2: Auto-replicate data to ensure zero information loss
-      await this.replicateBetweenDatabases(currentDb as any, targetDb);
-
-      // Step 3: Atomic pointer swap and repository proxy rebind
+      // Step 2: Atomic pointer swap and repository proxy rebind
       process.env.ACTIVE_DATABASE = targetDb;
-      this.repositoryRegistry.switchAllTo(targetDb);
+      this.mesh.setActiveEngine(targetDb);
+      if (targetDb === 'postgres' || targetDb === 'mongodb') {
+        this.repositoryRegistry.switchAllTo(targetDb);
+      }
       this.logger.log(`[DB Switcher] Active database pointer atomically switched to: ${targetDb}`);
 
-      // Step 4: Audit trail
+      // Step 3: Audit trail
       await this.auditService.log({
         actorId: actor.id,
         action: AuditEventType.DB_SWITCH_SUCCESS,
@@ -162,63 +159,16 @@ export class DatabaseSwitcherService {
       };
     } catch (err: any) {
       this.logger.error(`[DB Switcher] Switch failed: ${err.message}`);
-      // Revert if needed
+      // Revert
       process.env.ACTIVE_DATABASE = currentDb;
-      this.repositoryRegistry.switchAllTo(currentDb as any);
+      this.mesh.setActiveEngine(currentDb as any);
+      if (currentDb === 'postgres' || currentDb === 'mongodb') {
+        this.repositoryRegistry.switchAllTo(currentDb as any);
+      }
       throw new InternalServerErrorException(`Database switch failed: ${err.message}`);
     } finally {
       this.switchLock = false;
       this.logger.log('[DB Switcher] Mutex released.');
-    }
-  }
-
-  private async replicateBetweenDatabases(
-    from: 'postgres' | 'mongodb',
-    to: 'postgres' | 'mongodb',
-  ): Promise<void> {
-    try {
-      if (from === 'postgres' && to === 'mongodb') {
-        const db = this.mongoConnection.db;
-        if (!db) return;
-
-        // Replicate articles
-        const artRes = await this.postgres.pool.query('SELECT * FROM articles');
-        for (const a of artRes.rows) {
-          await db.collection('articles').updateOne(
-            { slug: a.slug },
-            {
-              $setOnInsert: { _id: a.id },
-              $set: {
-                id: a.id,
-                title: a.title,
-                slug: a.slug,
-                description: a.description,
-                content: a.content,
-                authorId: a.author_id,
-                categoryId: a.category_id,
-                tagIds: a.tag_ids || [],
-                coverImage: a.cover_image,
-                status: a.status,
-                seoTitle: a.seo_title,
-                seoDescription: a.seo_description,
-                scheduledAt: a.scheduled_at,
-                reviewNote: a.review_note,
-                wordCount: a.word_count || 0,
-                readingTimeMinutes: a.reading_time_minutes || 1,
-                canonicalUrl: a.canonical_url,
-                socialImage: a.social_image,
-                version: a.version || 1,
-                publishedAt: a.published_at,
-                createdAt: a.created_at,
-                updatedAt: a.updated_at,
-              },
-            },
-            { upsert: true },
-          );
-        }
-      }
-    } catch (err: any) {
-      this.logger.warn(`[DB Switcher] Background replication note: ${err.message}`);
     }
   }
 }

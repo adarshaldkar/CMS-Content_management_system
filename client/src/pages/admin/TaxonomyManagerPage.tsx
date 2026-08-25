@@ -20,12 +20,16 @@ export const TaxonomyManagerPage: React.FC = () => {
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
 
-  // 1. Fetch Categories
+  // 1. Fetch Categories — API returns PaginatedResult<Category>
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ['adminCategories'],
     queryFn: async () => {
-      const { data } = await apiClient.get<Category[]>('/categories');
-      return data;
+      const { data } = await apiClient.get<{ items: Category[]; total: number } | Category[]>('/categories', {
+        params: { limit: 100 },
+      });
+      // Handle both PaginatedResult<Category> and legacy Category[] shapes
+      if (Array.isArray(data)) return data;
+      return data.items || [];
     },
   });
 

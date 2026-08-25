@@ -1,15 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Activity,
-  CheckCircle2,
-  Database,
-  KeyRound,
-  Lock,
   RefreshCw,
   Search,
   Shield,
-  ShieldAlert,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -30,11 +24,13 @@ export const AuditLogExplorerPage: React.FC = () => {
   });
 
   const filteredLogs = logs.filter((log) => {
+    const resText = (log.resource || log.resourceId || '').toLowerCase();
+    const actorText = (log.actorId || log.userId || '').toLowerCase();
     const matchesSearch =
       !searchTerm ||
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.actorId && log.actorId.toLowerCase().includes(searchTerm.toLowerCase()));
+      resText.includes(searchTerm.toLowerCase()) ||
+      actorText.includes(searchTerm.toLowerCase());
 
     const matchesAction = selectedAction === 'all' || log.action === selectedAction;
     return matchesSearch && matchesAction;
@@ -158,13 +154,13 @@ export const AuditLogExplorerPage: React.FC = () => {
 
                       {/* Resource */}
                       <td className="py-3 px-4 font-mono text-[11px] text-ink-secondary max-w-[280px] truncate">
-                        {log.resource}
+                        {log.resource || log.resourceId || '—'}
                       </td>
 
                       {/* Actor */}
                       <td className="py-3 px-4 font-mono text-[11px] text-ink-secondary">
-                        {log.actorId ? (
-                          <span title={log.actorId}>{log.actorId.slice(0, 8)}…</span>
+                        {log.actorId || log.userId ? (
+                          <span title={log.actorId || log.userId || ''}>{(log.actorId || log.userId)!.slice(0, 8)}…</span>
                         ) : (
                           <span className="text-ink-secondary/50">system</span>
                         )}
@@ -174,10 +170,10 @@ export const AuditLogExplorerPage: React.FC = () => {
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase ${
-                            log.result === 'SUCCESS' ? 'text-emerald-700' : 'text-rose-700'
+                            (log.result || log.status) === 'SUCCESS' ? 'text-emerald-700' : 'text-rose-700'
                           }`}
                         >
-                          {log.result === 'SUCCESS' ? '✓ SUCCESS' : '✕ FAILURE'}
+                          {(log.result || log.status) === 'SUCCESS' ? '✓ SUCCESS' : '✕ FAILURE'}
                         </span>
                       </td>
 

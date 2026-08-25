@@ -112,4 +112,20 @@ export class CommentsService {
   async countComments(articleId: string): Promise<number> {
     return this.commentRepo.countByArticle(articleId);
   }
+
+  async listAllComments(filters: {
+    page: number;
+    limit: number;
+    flagged?: boolean;
+    hidden?: boolean;
+    articleId?: string;
+  }) {
+    return this.commentRepo.findMany({
+      page: filters.page,
+      limit: filters.limit,
+      ...(filters.flagged ? { flagged: true } : {}),
+      ...(filters.hidden ? { status: CommentStatus.HIDDEN } : {}),
+      ...(filters.articleId ? { articleId: filters.articleId } : {}),
+    });
+  }
 }

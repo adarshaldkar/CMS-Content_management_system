@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.1",
     "@nestjs/common": "11.1.29",
     "@nestjs/config": "4.0.4",
     "@nestjs/core": "11.1.29",
@@ -40,6 +41,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.1",
     "multer": "^2.2.0",
+    "mysql2": "^3.24.1",
     "nestjs-pino": "^4.6.1",
     "pg": "^8.23.0",
     "pino-http": "^11.0.0",
