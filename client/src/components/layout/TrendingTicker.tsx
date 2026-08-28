@@ -1,88 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Flame, Pause, Play, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play, TrendingUp } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { Article, PaginatedResult } from '../../types';
 
-interface CategoryBadgeConfig {
-  icon: string;
-  borderColor: string;
-  badgeBg: string;
-  textColor: string;
-}
-
-const CATEGORY_STYLE_MAP: Record<string, CategoryBadgeConfig> = {
-  'artificial-intelligence': {
-    icon: '🔥',
-    borderColor: 'border-l-rose-500',
-    badgeBg: 'bg-rose-50',
-    textColor: 'text-rose-700',
-  },
-  ai: {
-    icon: '🔥',
-    borderColor: 'border-l-rose-500',
-    badgeBg: 'bg-rose-50',
-    textColor: 'text-rose-700',
-  },
-  cybersecurity: {
-    icon: '⚡',
-    borderColor: 'border-l-indigo-500',
-    badgeBg: 'bg-indigo-50',
-    textColor: 'text-indigo-700',
-  },
-  'software-architecture': {
-    icon: '🏛️',
-    borderColor: 'border-l-sky-500',
-    badgeBg: 'bg-sky-50',
-    textColor: 'text-sky-700',
-  },
-  science: {
-    icon: '🔬',
-    borderColor: 'border-l-emerald-500',
-    badgeBg: 'bg-emerald-50',
-    textColor: 'text-emerald-700',
-  },
-  'editorial-design': {
-    icon: '🖋️',
-    borderColor: 'border-l-amber-500',
-    badgeBg: 'bg-amber-50',
-    textColor: 'text-amber-700',
-  },
-  money: {
-    icon: '📈',
-    borderColor: 'border-l-emerald-600',
-    badgeBg: 'bg-emerald-50',
-    textColor: 'text-emerald-700',
-  },
-  technology: {
-    icon: '💻',
-    borderColor: 'border-l-blue-500',
-    badgeBg: 'bg-blue-50',
-    textColor: 'text-blue-700',
-  },
-  governance: {
-    icon: '⚖️',
-    borderColor: 'border-l-purple-500',
-    badgeBg: 'bg-purple-50',
-    textColor: 'text-purple-700',
-  },
-  'media-culture': {
-    icon: '🗞️',
-    borderColor: 'border-l-slate-700',
-    badgeBg: 'bg-slate-100',
-    textColor: 'text-slate-800',
-  },
-};
-
-const DEFAULT_CATEGORY_STYLE: CategoryBadgeConfig = {
-  icon: '✨',
-  borderColor: 'border-l-accent-crimson',
-  badgeBg: 'bg-rose-50',
-  textColor: 'text-accent-crimson',
-};
-
 export const TrendingTicker: React.FC = () => {
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
   // Dynamically fetch published trending articles from the backend
@@ -93,98 +17,118 @@ export const TrendingTicker: React.FC = () => {
         params: {
           status: 'published',
           sortBy: 'trending',
-          limit: 12,
+          limit: 10,
         },
       });
       return data?.items || [];
     },
-    staleTime: 1000 * 60 * 2, // Refresh every 2 minutes for live updates
-    refetchInterval: 1000 * 60 * 3, // Polling background refresh
+    staleTime: 1000 * 60 * 2,
   });
 
-  const articles: Article[] = data || [];
+  const articles = data || [];
 
-  if (articles.length === 0) {
-    return null;
-  }
+  // Automated gentle rotation every 5 seconds if not paused
+  useEffect(() => {
+    if (articles.length <= 1 || isPaused) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % articles.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [articles.length, isPaused]);
 
-  // Duplicate items to make the continuous loop infinite & seamless
-  const tickerItems = [...articles, ...articles];
+  if (articles.length === 0) return null;
+
+  const currentArticle = articles[currentIndex] || articles[0];
+  const total = articles.length;
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev === 0 ? total - 1 : prev - 1));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % total);
+  };
 
   return (
     <div
-      className={`border-b border-border-subtle bg-slate-50/90 dark:bg-stone-900/90 overflow-hidden relative select-none pause-on-hover ${
-        isPaused ? 'ticker-paused' : ''
-      }`}
-      aria-label="Trending Stories Ticker"
+      className="border-b border-border-subtle bg-slate-50/80 transition-colors"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
     >
-      <div className="flex items-center">
-        {/* Left Fixed Badge: TRENDING DISPATCH */}
-        <div className="flex items-center gap-1.5 px-3.5 py-2 bg-ink-primary text-white text-[11px] font-mono font-semibold tracking-wider uppercase whitespace-nowrap z-20 shrink-0 shadow-sm">
-          <Flame size={13} className="text-amber-400 animate-pulse" />
-          <span className="hidden sm:inline">Trending</span>
-          <span className="sm:hidden">Hot</span>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between py-2 text-xs">
+          {/* Left: Monospaced Label + Current Rotated Story */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-900 text-white rounded text-[10px] font-mono font-bold tracking-widest uppercase shrink-0">
+              <TrendingUp size={12} className="text-emerald-400" />
+              <span>Trending</span>
+            </div>
 
-        {/* Marquee Scrolling Container */}
-        <div className="flex-1 overflow-hidden relative py-1.5">
-          <div className="animate-ticker flex items-center gap-3">
-            {tickerItems.map((article, idx) => {
-              const catSlug = article.categorySlug || 'general';
-              const style = CATEGORY_STYLE_MAP[catSlug] || DEFAULT_CATEGORY_STYLE;
-              const categoryName = (article.categorySlug || 'Trending')
-                .replace(/-/g, ' ')
-                .toUpperCase();
+            <div className="h-3.5 w-px bg-border-subtle shrink-0 hidden sm:block" />
 
-              return (
-                <Link
-                  key={`${article.id}-${idx}`}
-                  to={`/articles/${article.slug}`}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-stone-800/90 border border-border-subtle border-l-[3px] ${style.borderColor} rounded-md shadow-xs hover:shadow-md hover:border-ink-primary transition-all group shrink-0 whitespace-nowrap cursor-pointer`}
-                  title={article.title}
-                >
-                  {/* Category Topic Pill */}
-                  <span
-                    className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded ${style.badgeBg} ${style.textColor}`}
-                  >
-                    <span>{style.icon}</span>
-                    <span>{categoryName}</span>
-                  </span>
+            {/* Current Item with Smooth Transition */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              {currentArticle.categorySlug && (
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent-crimson shrink-0 hidden sm:inline">
+                  {currentArticle.categorySlug.replace(/-/g, ' ')}
+                </span>
+              )}
 
-                  {/* Article Title */}
-                  <span className="text-xs font-serif font-medium text-ink-primary dark:text-stone-100 group-hover:text-accent-crimson transition-colors max-w-[280px] sm:max-w-[340px] truncate">
-                    {article.title}
-                  </span>
+              <Link
+                to={`/articles/${currentArticle.slug}`}
+                className="font-serif text-ink-primary hover:text-accent-crimson transition-colors truncate font-medium text-xs sm:text-sm"
+                title={currentArticle.title}
+              >
+                {currentArticle.title}
+              </Link>
 
-                  {/* Author Byline / Reading Time */}
-                  {article.authorName && (
-                    <span className="hidden md:inline-flex items-center text-[10px] font-mono text-ink-secondary dark:text-stone-400">
-                      <span className="mx-1 text-stone-300">·</span>
-                      <span className="truncate max-w-[120px]">{article.authorName}</span>
-                    </span>
-                  )}
+              {currentArticle.authorName && (
+                <span className="text-[11px] text-ink-secondary hidden md:inline shrink-0">
+                  — by {currentArticle.authorName}
+                </span>
+              )}
 
-                  {/* Live Activity Metric */}
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-emerald-600 font-medium">
-                    <TrendingUp size={11} />
-                    <span>{article.readingTimeMinutes || 2}m</span>
-                  </span>
-                </Link>
-              );
-            })}
+              <span className="text-[10px] font-mono text-slate-500 shrink-0 hidden lg:inline">
+                ({currentArticle.readingTimeMinutes || 2} min read)
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Right Manual Play/Pause Control Button */}
-        <div className="px-2.5 z-20 shrink-0 bg-slate-50/95 dark:bg-stone-900/95 border-l border-border-subtle py-1.5">
-          <button
-            onClick={() => setIsPaused(!isPaused)}
-            className="p-1 text-ink-secondary hover:text-ink-primary hover:bg-slate-200/70 dark:hover:bg-stone-800 rounded transition-colors"
-            title={isPaused ? 'Resume live ticker' : 'Pause ticker'}
-            aria-label={isPaused ? 'Resume live ticker' : 'Pause ticker'}
-          >
-            {isPaused ? <Play size={13} className="text-emerald-600" /> : <Pause size={13} />}
-          </button>
+          {/* Right: Stepper Controls & Counter */}
+          <div className="flex items-center gap-2 shrink-0 pl-3 border-l border-border-subtle">
+            <span className="text-[10px] font-mono text-ink-secondary font-medium">
+              {currentIndex + 1}/{total}
+            </span>
+
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={handlePrev}
+                className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded transition-colors"
+                title="Previous story"
+                aria-label="Previous trending story"
+              >
+                <ChevronLeft size={13} />
+              </button>
+
+              <button
+                onClick={handleNext}
+                className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded transition-colors"
+                title="Next story"
+                aria-label="Next trending story"
+              >
+                <ChevronRight size={13} />
+              </button>
+
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded transition-colors ml-1"
+                title={isPaused ? 'Resume auto-rotation' : 'Pause rotation'}
+                aria-label={isPaused ? 'Resume auto-rotation' : 'Pause rotation'}
+              >
+                {isPaused ? <Play size={11} className="text-emerald-700" /> : <Pause size={11} />}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

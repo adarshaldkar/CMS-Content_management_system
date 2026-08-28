@@ -1,30 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search as SearchIcon, RotateCcw } from 'lucide-react';
+import { Search as SearchIcon, RotateCcw, X, Clock, Calendar, ArrowRight } from 'lucide-react';
 import { apiClient } from '../api/client';
-import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ArticleCardSkeleton } from '../components/common/SkeletonLoader';
-import { EditorialTopicNav } from '../components/articles/EditorialTopicNav';
-import { EditorialFilterBar } from '../components/articles/EditorialFilterBar';
-import type { EditorialFilterState } from '../components/articles/EditorialFilterBar';
+import { FacetedFilterSidebar, type FacetedFilterState } from '../components/articles/FacetedFilterSidebar';
+import { ActiveFilterChips } from '../components/articles/ActiveFilterChips';
 import type { Article, PaginatedResult } from '../types';
 
 export const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Read URL state
+  // Parse query parameters
   const qParam = searchParams.get('q') || '';
   const categoryParam = searchParams.get('category') || searchParams.get('categorySlugs') || '';
-  const tagParam = searchParams.get('tagSlugs') || '';
-  const authorParam = searchParams.get('authorId') || '';
-  const formatParam = (searchParams.get('contentType') as any) || 'all';
-  const sortParam = (searchParams.get('sortBy') as any) || 'latest';
   const rangeParam = (searchParams.get('dateRange') as any) || 'all';
+  const readingParam = (searchParams.get('readingTime') as any) || 'all';
+  const sortParam = (searchParams.get('sortBy') as any) || 'latest';
 
   const [searchTerm, setSearchTerm] = useState(qParam);
 
-  // Sync debounced search input with URL
+  // Sync debounced search input with URL query string
   useEffect(() => {
     const handler = setTimeout(() => {
       const newParams = new URLSearchParams(searchParams);
@@ -40,85 +36,101 @@ export const SearchPage: React.FC = () => {
   }, [searchTerm, searchParams, setSearchParams]);
 
   // Compute date filter bounds
-  let fromDate: string | undefined = undefined;
-  if (rangeParam === '24h') {
-    fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  } else if (rangeParam === '7d') {
-    fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  } else if (rangeParam === '30d') {
-    fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  }
+  const fromDate = useMemo(() => {
+    if (rangeParam === '24h') return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    if (rangeParam === '7d') return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    if (rangeParam === '30d') return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    if (rangeParam === '365d') return new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    return undefined;
+  }, [rangeParam]);
+
+  // Parse multi-category array
+  const categorySlugsArray = useMemo(() => {
+    if (!categoryParam) return [];
+    return categoryParam.split(',').map((s) => s.trim()).filter(Boolean);
+  }, [categoryParam]);
 
   // Fetch articles via react-query
   const { data: searchData, isLoading, isError } = useQuery({
     queryKey: [
-      'articleSearch',
+      'articleFacetedSearch',
       qParam,
       categoryParam,
-      tagParam,
-      authorParam,
-      formatParam,
       sortParam,
       rangeParam,
+      fromDate,
     ],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
         params: {
           status: 'published',
           search: qParam || undefined,
-          categorySlugs: categoryParam || undefined,
-          tagSlugs: tagParam || undefined,
-          authorId: authorParam || undefined,
-          contentType: formatParam !== 'all' ? formatParam : undefined,
+          categorySlugs: categorySlugsArray.length > 0 ? categorySlugsArray : undefined,
           sortBy: sortParam,
           fromDate,
-          limit: 30,
+          limit: 40,
         },
       });
       return data;
     },
   });
 
-  const articles = searchData?.items || [];
-  const total = searchData?.total ?? articles.length;
+  const rawArticles = searchData?.items || [];
 
-  const currentFilters: EditorialFilterState = {
-    categorySlug: categoryParam,
-    tagSlugs: tagParam,
-    authorId: authorParam,
-    contentType: formatParam,
-    sortBy: sortParam,
-    dateRange: rangeParam,
+  // Client-side reading time filter
+  const articles = useMemo(() => {
+    if (readingParam === 'quick') {
+      return rawArticles.filter((a) => (a.readingTimeMinutes || 3) < 3);
+    }
+    if (readingParam === 'medium') {
+      return rawArticles.filter((a) => {
+        const rt = a.readingTimeMinutes || 3;
+        return rt >= 3 && rt <= 7;
+      });
+    }
+    if (readingParam === 'deep') {
+      return rawArticles.filter((a) => (a.readingTimeMinutes || 3) > 7);
+    }
+    return rawArticles;
+  }, [rawArticles, readingParam]);
+
+  const total = articles.length;
+
+  const currentFilters: FacetedFilterState = {
     search: qParam,
+    categorySlugs: categorySlugsArray,
+    readingTime: readingParam,
+    dateRange: rangeParam,
+    sortBy: sortParam,
   };
 
-  const handleFilterChange = (newFilters: EditorialFilterState) => {
+  const handleFilterChange = (newFilters: FacetedFilterState) => {
     const nextParams = new URLSearchParams(searchParams);
-    if (newFilters.categorySlug) nextParams.set('category', newFilters.categorySlug);
-    else nextParams.delete('category');
 
-    if (newFilters.tagSlugs) nextParams.set('tagSlugs', newFilters.tagSlugs);
-    else nextParams.delete('tagSlugs');
-
-    if (newFilters.authorId) nextParams.set('authorId', newFilters.authorId);
-    else nextParams.delete('authorId');
-
-    if (newFilters.contentType && newFilters.contentType !== 'all') {
-      nextParams.set('contentType', newFilters.contentType);
+    if (newFilters.categorySlugs && newFilters.categorySlugs.length > 0) {
+      nextParams.set('categorySlugs', newFilters.categorySlugs.join(','));
+      nextParams.delete('category');
     } else {
-      nextParams.delete('contentType');
+      nextParams.delete('categorySlugs');
+      nextParams.delete('category');
     }
 
-    if (newFilters.sortBy && newFilters.sortBy !== 'latest') {
-      nextParams.set('sortBy', newFilters.sortBy);
+    if (newFilters.readingTime && newFilters.readingTime !== 'all') {
+      nextParams.set('readingTime', newFilters.readingTime);
     } else {
-      nextParams.delete('sortBy');
+      nextParams.delete('readingTime');
     }
 
     if (newFilters.dateRange && newFilters.dateRange !== 'all') {
       nextParams.set('dateRange', newFilters.dateRange);
     } else {
       nextParams.delete('dateRange');
+    }
+
+    if (newFilters.sortBy && newFilters.sortBy !== 'latest') {
+      nextParams.set('sortBy', newFilters.sortBy);
+    } else {
+      nextParams.delete('sortBy');
     }
 
     setSearchParams(nextParams);
@@ -129,13 +141,34 @@ export const SearchPage: React.FC = () => {
     setSearchParams({});
   };
 
+  const handleRemoveCategory = (slug: string) => {
+    const updated = categorySlugsArray.filter((s) => s !== slug);
+    handleFilterChange({ ...currentFilters, categorySlugs: updated });
+  };
+
+  const handleRemoveReadingTime = () => {
+    handleFilterChange({ ...currentFilters, readingTime: 'all' });
+  };
+
+  const handleRemoveDateRange = () => {
+    handleFilterChange({ ...currentFilters, dateRange: 'all' });
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6 font-sans">
-      {/* Editorial Header */}
-      <div className="space-y-4">
-        <h1 className="text-3xl font-serif font-bold text-stone-900 dark:text-stone-100 tracking-tight">
-          Search & Discover
-        </h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-sans">
+      {/* Header & Main Search Box */}
+      <div className="space-y-4 max-w-3xl">
+        <div>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-accent-crimson font-semibold block">
+            The Gazette Archives &amp; Intelligence
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-ink-primary tracking-tight mt-1">
+            Search &amp; Discovery Studio
+          </h1>
+          <p className="text-xs text-ink-secondary mt-1">
+            Filter historical stories across multiple desks, durations, and publication timelines.
+          </p>
+        </div>
 
         {/* Search Input Box */}
         <div className="relative">
@@ -143,96 +176,142 @@ export const SearchPage: React.FC = () => {
             type="search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search stories by headline, keyword, or topic..."
-            className="w-full pl-11 pr-4 py-3.5 text-sm bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-900 dark:focus:border-stone-100 transition-colors"
+            placeholder="Search stories by headline, topic, author, or keyword..."
+            className="w-full pl-11 pr-10 py-3 text-sm bg-white border border-border-subtle rounded-xl text-ink-primary placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800 shadow-xs transition-all"
             autoFocus
           />
           <SearchIcon
             size={18}
-            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-stone-400"
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              aria-label="Clear search text"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Two-Column Faceted Grid Layout */}
+      <div className="grid grid-cols-12 gap-8 items-start">
+        {/* Left Column: Faceted Filter Console */}
+        <div className="col-span-12 lg:col-span-4 sticky top-4">
+          <FacetedFilterSidebar
+            filters={currentFilters}
+            onFilterChange={handleFilterChange}
+            onReset={handleResetFilters}
+            totalResults={total}
           />
         </div>
 
-        {/* Dynamic Admin Editorial Topic Navigation */}
-        <EditorialTopicNav
-          selectedSlug={categoryParam}
-          onSelectTopic={(slug) => handleFilterChange({ ...currentFilters, categorySlug: slug })}
-        />
+        {/* Right Column: Active Chips & Results Stream */}
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          {/* Active Chips Bar */}
+          <ActiveFilterChips
+            filters={currentFilters}
+            onRemoveCategory={handleRemoveCategory}
+            onRemoveReadingTime={handleRemoveReadingTime}
+            onRemoveDateRange={handleRemoveDateRange}
+            onClearAll={handleResetFilters}
+          />
 
-        {/* Expandable Editorial Filter Controls & Active Summary */}
-        <EditorialFilterBar
-          filters={currentFilters}
-          onFilterChange={handleFilterChange}
-          onReset={handleResetFilters}
-          totalResults={total}
-        />
-      </div>
+          {/* Query Error Notice */}
+          {isError && (
+            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-mono rounded-lg">
+              Unable to validate search criteria. Please adjust filters.
+            </div>
+          )}
 
-      {/* Invalid Query Error Display */}
-      {isError && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-xs font-mono">
-          Unable to validate query parameters. Please check search parameters.
-        </div>
-      )}
+          {/* Results Stream */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <ArticleCardSkeleton />
+              <ArticleCardSkeleton />
+              <ArticleCardSkeleton />
+              <ArticleCardSkeleton />
+            </div>
+          ) : articles.length > 0 ? (
+            <div className="space-y-4">
+              {articles.map((article) => (
+                <article
+                  key={article.id}
+                  className="bg-white border border-border-subtle rounded-xl p-5 hover:border-slate-700 hover:shadow-xs transition-all flex flex-col justify-between gap-3 group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-accent-crimson">
+                        {article.categorySlug?.replace(/-/g, ' ') || 'General Desk'}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                        <Calendar size={11} />
+                        <span>{new Date(article.publishedAt || article.createdAt).toLocaleDateString()}</span>
+                      </span>
+                    </div>
 
-      {/* Results List */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-          <ArticleCardSkeleton />
-          <ArticleCardSkeleton />
-          <ArticleCardSkeleton />
-          <ArticleCardSkeleton />
-        </div>
-      ) : articles.length > 0 ? (
-        <div className="space-y-8 divide-y divide-stone-200 dark:divide-stone-800">
-          {articles.map((article) => (
-            <article key={article.id} className="pt-6 first:pt-0 space-y-2 group">
-              <span className="text-[11px] font-mono uppercase tracking-widest text-stone-500 font-medium">
-                {article.categorySlug || 'Editorial'}
-              </span>
+                    <Link to={`/articles/${article.slug}`}>
+                      <h2 className="text-lg font-serif font-bold text-ink-primary group-hover:text-accent-crimson leading-snug transition-colors">
+                        {article.title}
+                      </h2>
+                    </Link>
 
-              <Link to={`/articles/${article.slug}`}>
-                <h2 className="text-xl font-serif font-bold text-stone-900 dark:text-stone-100 group-hover:underline leading-snug">
-                  {article.title}
-                </h2>
-              </Link>
+                    {article.description && (
+                      <p className="text-xs text-ink-secondary mt-1.5 line-clamp-2 leading-relaxed">
+                        {article.description}
+                      </p>
+                    )}
+                  </div>
 
-              <p className="text-xs text-stone-600 dark:text-stone-400 line-clamp-2 leading-relaxed font-sans">
-                {article.description}
-              </p>
+                  <div className="pt-3 border-t border-border-subtle flex items-center justify-between text-[11px] text-ink-secondary">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-ink-primary">
+                        {article.authorName || 'Staff Writer'}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1 font-mono text-slate-500">
+                        <Clock size={11} />
+                        <span>{article.readingTimeMinutes || 3} min read</span>
+                      </span>
+                    </div>
 
-              <div className="flex items-center gap-3 text-[11px] font-mono text-stone-400 pt-1">
-                {article.authorName && (
-                  <>
-                    <span>By {article.authorName}</span>
-                    <span>·</span>
-                  </>
-                )}
-                <span>{article.readingTimeMinutes || 3} min read</span>
-                <span>·</span>
-                <span>{new Date(article.createdAt).toLocaleDateString()}</span>
+                    <Link
+                      to={`/articles/${article.slug}`}
+                      className="text-xs font-serif font-bold text-ink-primary group-hover:text-accent-crimson flex items-center gap-1 transition-colors"
+                    >
+                      <span>Read Story</span>
+                      <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            /* Empty State */
+            <div className="bg-white border border-dashed border-border-subtle rounded-xl p-12 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                <SearchIcon size={20} />
               </div>
-            </article>
-          ))}
+              <h3 className="font-serif text-lg font-bold text-ink-primary">
+                No stories match these active filters
+              </h3>
+              <p className="text-xs text-ink-secondary max-w-md mx-auto leading-relaxed">
+                Try deselecting some desks or broadening your reading time and timeline settings.
+              </p>
+              <button
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-mono uppercase tracking-wider bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors mt-2"
+              >
+                <RotateCcw size={13} />
+                <span>Reset All Filters</span>
+              </button>
+            </div>
+          )}
         </div>
-      ) : (
-        /* Empty State UX */
-        <div className="py-16 px-6 text-center border border-dashed border-stone-300 dark:border-stone-800">
-          <p className="text-base font-serif font-semibold text-stone-900 dark:text-stone-100 mb-2">
-            No stories match these filters.
-          </p>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mb-4 font-sans">
-            Try adjusting your search terms or clearing active category and date filters.
-          </p>
-          <button
-            onClick={handleResetFilters}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-mono uppercase tracking-widest bg-stone-900 text-stone-50 dark:bg-stone-100 dark:text-stone-900 hover:opacity-90 transition-opacity"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset all filters
-          </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
+export default SearchPage;
