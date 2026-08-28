@@ -65,7 +65,7 @@ export const SearchPage: React.FC = () => {
         params: {
           status: 'published',
           search: qParam || undefined,
-          categorySlugs: categorySlugsArray.length > 0 ? categorySlugsArray : undefined,
+          categorySlugs: categorySlugsArray.length > 0 ? categorySlugsArray.join(',') : undefined,
           sortBy: sortParam,
           fromDate,
           limit: 40,

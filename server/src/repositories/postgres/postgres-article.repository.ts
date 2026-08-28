@@ -207,13 +207,30 @@ export class PostgresArticleRepository implements IArticleRepository {
     }
 
     if (filters.categorySlugs) {
-      const slugs = Array.isArray(filters.categorySlugs)
+      const rawSlugs = Array.isArray(filters.categorySlugs)
         ? filters.categorySlugs
         : filters.categorySlugs.split(',').map((s) => s.trim()).filter(Boolean);
+      
+      const expandedSlugs = new Set<string>();
+      for (const s of rawSlugs) {
+        expandedSlugs.add(s);
+        if (s === 'ai') expandedSlugs.add('artificial-intelligence');
+        if (s === 'artificial-intelligence') expandedSlugs.add('ai');
+        if (s === 'governance') expandedSlugs.add('policy-governance');
+        if (s === 'policy-governance') expandedSlugs.add('governance');
+        if (s === 'media-culture') {
+          expandedSlugs.add('media-society');
+          expandedSlugs.add('media');
+        }
+        if (s === 'media-society') {
+          expandedSlugs.add('media-culture');
+          expandedSlugs.add('media');
+        }
+      }
+
+      const slugs = Array.from(expandedSlugs);
       if (slugs.length > 0) {
         values.push(slugs);
-        // Match articles whose category_id matches the slug, OR whose title/description
-        // matches the category name (for articles filed with NULL category_id)
         clauses.push(
           `(
             a.category_id IN (SELECT id::text FROM categories WHERE slug = ANY($${values.length}))

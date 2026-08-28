@@ -62,7 +62,9 @@ export class ArticlesController {
     @Query('toDate') toDate?: string,
   ): Promise<PaginatedResult<Article>> {
     const resolvedSlug = categorySlug || category;
-    const resolvedStatus = status ? status : (authorId || resolvedSlug || categorySlugs) ? (status || undefined) : undefined;
+    const resolvedCategorySlugs = categorySlugs || (resolvedSlug ? [resolvedSlug] : undefined);
+    const resolvedStatus = status || ContentStatus.PUBLISHED;
+
     return this.articleService.findMany({
       page: Math.max(1, parseInt(page, 10) || 1),
       limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 20)),
@@ -71,7 +73,7 @@ export class ArticlesController {
       authorId,
       categoryId,
       categorySlug: resolvedSlug,
-      categorySlugs,
+      categorySlugs: resolvedCategorySlugs,
       tagSlugs,
       contentType,
       sortBy: sortBy || (sort === 'popular' ? 'most_liked' : sort === 'trending' ? 'trending' : 'latest'),
