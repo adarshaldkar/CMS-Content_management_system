@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CheckSquare,
+  Clock,
   Database,
   FolderTree,
   Globe,
@@ -53,6 +54,7 @@ export const AdminLayout: React.FC = () => {
 
   const navItems = [
     { label: 'Review Queue', to: '/admin/review', icon: CheckSquare },
+    { label: 'Publishing Slots', to: '/admin/slots', icon: Clock },
     { label: 'User Directory', to: '/admin/users', icon: Users },
     { label: 'Categories', to: '/admin/categories', icon: FolderTree },
     { label: 'Tags', to: '/admin/tags', icon: Tag },

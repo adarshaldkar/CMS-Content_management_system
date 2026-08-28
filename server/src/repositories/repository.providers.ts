@@ -41,6 +41,10 @@ import {
   FOLLOW_REPOSITORY,
   type IFollowRepository,
 } from './interfaces/follow.repository.interface';
+import {
+  PUBLISHING_SLOT_REPOSITORY,
+  type IPublishingSlotRepository,
+} from './interfaces/publishing-slot.repository.interface';
 
 // PostgreSQL Repositories
 import { PostgresArticleRepository } from './postgres/postgres-article.repository';
@@ -53,6 +57,7 @@ import { PostgresMediaRepository } from './postgres/postgres-media.repository';
 import { PostgresBookmarkRepository } from './postgres/postgres-bookmark.repository';
 import { PostgresLikeRepository } from './postgres/postgres-like.repository';
 import { PostgresFollowRepository } from './postgres/postgres-follow.repository';
+import { PostgresPublishingSlotRepository } from './postgres/postgres-publishing-slot.repository';
 
 // MongoDB Repositories
 import { MongoArticleRepository } from './mongo/mongo-article.repository';
@@ -266,6 +271,14 @@ export const followRepositoryProvider: FactoryProvider<IFollowRepository> = {
   },
 };
 
+export const publishingSlotRepositoryProvider: FactoryProvider<IPublishingSlotRepository> = {
+  provide: PUBLISHING_SLOT_REPOSITORY,
+  inject: [ConfigService, PostgresPublishingSlotRepository],
+  useFactory: (_config: ConfigService<EnvConfig, true>, postgresRepo: PostgresPublishingSlotRepository): IPublishingSlotRepository => {
+    return postgresRepo;
+  },
+};
+
 export const ALL_DATABASE_REPOSITORIES = [
   // PostgreSQL
   PostgresUserRepository,
@@ -278,6 +291,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   PostgresRevisionRepository,
   PostgresSessionRepository,
   PostgresAuditLogRepository,
+  PostgresPublishingSlotRepository,
 
   // MongoDB
   MongoUserRepository,

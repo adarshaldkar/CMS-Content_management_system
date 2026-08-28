@@ -32,6 +32,7 @@ import { MediaLibraryPage } from './pages/admin/MediaLibraryPage';
 import { CommentsModerationPage } from './pages/admin/CommentsModerationPage';
 import { AuditLogExplorerPage } from './pages/admin/AuditLogExplorerPage';
 import { DatabaseSwitcherPage } from './pages/admin/DatabaseSwitcherPage';
+import { PublishingSlotsManagerPage } from './pages/admin/PublishingSlotsManagerPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ScrollToTop } from './components/common/ScrollToTop';
 
@@ -98,6 +99,7 @@ export default function App() {
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<EditorialReviewPage />} />
             <Route path="/admin/review" element={<EditorialReviewPage />} />
+            <Route path="/admin/slots" element={<PublishingSlotsManagerPage />} />
             <Route path="/admin/users" element={<UserManagementPage />} />
             <Route path="/admin/categories" element={<TaxonomyManagerPage />} />
             <Route path="/admin/tags" element={<TaxonomyManagerPage />} />

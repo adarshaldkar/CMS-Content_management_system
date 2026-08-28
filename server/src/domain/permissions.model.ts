@@ -66,11 +66,15 @@ export enum Permission {
   DATABASE_VIEW_STATUS = 'database.view_status',
   DATABASE_SWITCH = 'database.switch',
   SYSTEM_SETTINGS_UPDATE = 'system.settings.update',
+  SLOT_MANAGE = 'slot.manage',
+  SLOT_READ = 'slot.read',
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   [UserRole.SUPER_ADMIN]: Object.values(Permission),
   [UserRole.ADMIN]: [
+    Permission.SLOT_MANAGE,
+    Permission.SLOT_READ,
     Permission.ARTICLE_READ_PUBLISHED,
     Permission.ARTICLE_READ_ANY,
     Permission.ARTICLE_CREATE,
@@ -118,6 +122,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.SYSTEM_SETTINGS_UPDATE,
   ],
   [UserRole.EDITOR]: [
+    Permission.SLOT_READ,
     Permission.ARTICLE_READ_PUBLISHED,
     Permission.ARTICLE_READ_ANY,
     Permission.ARTICLE_CREATE,

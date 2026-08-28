@@ -32,6 +32,7 @@ import {
   sanitizeArticleContent,
 } from '../../common/utils/sanitizer.util';
 import { OwnershipHelper } from '../../common/guards/ownership.guard';
+import { PublishingSlotsService } from '../publishing-slots/publishing-slots.service';
 
 @Injectable()
 export class WorkflowService {
@@ -41,6 +42,7 @@ export class WorkflowService {
     @Inject(REVISION_REPOSITORY)
     private readonly revisionRepo: IRevisionRepository,
     private readonly auditService: AuditService,
+    private readonly slotsService: PublishingSlotsService,
   ) {}
 
   private slugify(text: string): string {
@@ -219,15 +221,32 @@ export class WorkflowService {
     // Validate Transition Rules & Invariants
     this.validateTransition(article, targetStatus, user, transitionDto);
 
+    let finalTargetStatus = targetStatus;
     const updatePayload: UpdateArticleDto = {
       status: targetStatus,
       version: article.version + 1,
     };
 
-    if (targetStatus === ContentStatus.PUBLISHED) {
+    // If author submits for review, check if they have automated VIP Publishing Slot clearance
+    if (targetStatus === ContentStatus.PENDING_REVIEW) {
+      try {
+        const clearance = await this.slotsService.getAuthorClearance(article.authorId);
+        if (clearance.hasSlot && clearance.slot && clearance.assignment?.autoPublishEnabled && clearance.slot.isActive) {
+          const scheduledDate = clearance.nextEstimatedPublishAt ? new Date(clearance.nextEstimatedPublishAt) : new Date(Date.now() + 3600000);
+          finalTargetStatus = ContentStatus.SCHEDULED;
+          updatePayload.status = ContentStatus.SCHEDULED;
+          updatePayload.scheduledAt = scheduledDate;
+          updatePayload.publishingSlotId = clearance.slot.id;
+        }
+      } catch {
+        // Fallback to standard review queue
+      }
+    }
+
+    if (finalTargetStatus === ContentStatus.PUBLISHED) {
       updatePayload.publishedAt = new Date();
       updatePayload.scheduledAt = null;
-    } else if (targetStatus === ContentStatus.SCHEDULED) {
+    } else if (finalTargetStatus === ContentStatus.SCHEDULED && targetStatus === ContentStatus.SCHEDULED) {
       if (!transitionDto.scheduledAt) {
         throw new BadRequestException('A scheduled date is required to schedule an article.');
       }
@@ -236,7 +255,7 @@ export class WorkflowService {
         throw new BadRequestException('Scheduled date must be in the future.');
       }
       updatePayload.scheduledAt = scheduledDate;
-    } else if (targetStatus === ContentStatus.REJECTED) {
+    } else if (finalTargetStatus === ContentStatus.REJECTED) {
       if (!transitionDto.reviewNote || transitionDto.reviewNote.trim().length === 0) {
         throw new BadRequestException('A review feedback note is required when rejecting an article.');
       }
@@ -248,10 +267,11 @@ export class WorkflowService {
       throw new NotFoundException('Failed to update article status.');
     }
 
-    // Record revision on submit or restore
+    // Record revision on submit, schedule, or restore
     if (
-      targetStatus === ContentStatus.PENDING_REVIEW ||
-      targetStatus === ContentStatus.DRAFT
+      finalTargetStatus === ContentStatus.PENDING_REVIEW ||
+      finalTargetStatus === ContentStatus.SCHEDULED ||
+      finalTargetStatus === ContentStatus.DRAFT
     ) {
       await this.revisionRepo.create({
         articleId: updated.id,
@@ -260,7 +280,7 @@ export class WorkflowService {
         description: updated.description,
         content: updated.content,
         authorId: user.id,
-        changeSummary: `State transitioned from ${currentStatus} to ${targetStatus}`,
+        changeSummary: `State transitioned from ${currentStatus} to ${finalTargetStatus}${updatePayload.publishingSlotId ? ' (Auto-Enqueued into Publishing Slot)' : ''}`,
       });
     }
 
@@ -271,7 +291,9 @@ export class WorkflowService {
       result: 'SUCCESS',
       metadata: {
         from: currentStatus,
-        to: targetStatus,
+        to: finalTargetStatus,
+        publishingSlotId: updatePayload.publishingSlotId || null,
+        scheduledAt: updatePayload.scheduledAt || null,
         reviewNote: transitionDto.reviewNote,
       },
     });

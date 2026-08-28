@@ -31,6 +31,8 @@ export interface Article {
   reviewNote: string | null;
   scheduledAt: Date | null;
   publishedAt: Date | null;
+  publishingSlotId?: string | null;
+  autoDispatched?: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -62,6 +64,7 @@ export interface WorkflowTransitionDto {
   targetStatus: ContentStatus;
   reviewNote?: string | null;
   scheduledAt?: string | null;
+  publishingSlotId?: string | null;
   changeSummary?: string | null;
   expectedVersion?: number;
 }
@@ -79,6 +82,8 @@ export interface CreateArticleDto {
   seoTitle?: string | null;
   seoDescription?: string | null;
   scheduledAt?: Date | null;
+  publishingSlotId?: string | null;
+  autoDispatched?: boolean;
   reviewNote?: string | null;
   wordCount?: number;
   readingTimeMinutes?: number;
@@ -99,6 +104,8 @@ export interface UpdateArticleDto {
   seoDescription?: string | null;
   scheduledAt?: Date | null;
   publishedAt?: Date | null;
+  publishingSlotId?: string | null;
+  autoDispatched?: boolean;
   reviewNote?: string | null;
   wordCount?: number;
   readingTimeMinutes?: number;

@@ -17,6 +17,7 @@ import {
   updateArticle,
   transitionArticleWorkflow,
 } from '../api/articles.api';
+import { publishingSlotsApi, type AuthorClearanceInfo } from '../api/publishing-slots.api';
 import { RichTextEditor } from '../components/editor/RichTextEditor';
 import { WorkflowActionBar } from '../components/editor/WorkflowActionBar';
 import { MediaPickerModal } from '../components/editor/MediaPickerModal';
@@ -29,6 +30,7 @@ export const ArticleEditorPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [slotClearance, setSlotClearance] = useState<AuthorClearanceInfo | null>(null);
   const [article, setArticle] = useState<Partial<Article>>({
     title: '',
     slug: '',
@@ -54,10 +56,16 @@ export const ArticleEditorPage: React.FC = () => {
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
 
   useEffect(() => {
-    // Fetch categories
+    // Fetch categories and author slot clearance in parallel
     apiClient.get<Category[] | { items: Category[] }>('/categories').then((res) => {
       const data = Array.isArray(res.data) ? res.data : res.data?.items || [];
       setCategories(data);
+    }).catch(() => {});
+
+    publishingSlotsApi.getMyClearance().then((clearance) => {
+      if (clearance?.hasSlot) {
+        setSlotClearance(clearance);
+      }
     }).catch(() => {});
 
     if (id) {
@@ -301,6 +309,30 @@ export const ArticleEditorPage: React.FC = () => {
             loading={saving}
             onTransition={handleWorkflowTransition}
           />
+
+          {/* VIP Publishing Slot Clearance Alert */}
+          {slotClearance?.hasSlot && slotClearance.slot && (
+            <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-900 text-white p-4 rounded-xl shadow-xs border border-purple-500/30 flex items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-purple-500/20 text-purple-300 rounded-lg shrink-0">
+                  <Sparkles size={18} className="text-amber-300 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold tracking-wider text-purple-100 uppercase">
+                      VIP Auto-Publishing Clearance Active
+                    </h4>
+                    <span className="px-2 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/30 rounded-full text-[10px] font-mono font-bold">
+                      {slotClearance.slot.dispatchTime.slice(0, 5)} {slotClearance.slot.timezone}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-purple-200/80 mt-0.5">
+                    Submitting this story will automatically enqueue it in the <strong>{slotClearance.slot.name}</strong> to go live automatically without manual review delays!
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Title Input */}
           <div>

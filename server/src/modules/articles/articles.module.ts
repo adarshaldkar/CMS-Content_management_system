@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { PublishingSlotsModule } from '../publishing-slots/publishing-slots.module';
 import {
   ArticleSchema,
   ArticleSchemaClass,
@@ -30,6 +31,7 @@ import { AuditModule } from '../audit/audit.module';
 @Module({
   imports: [
     AuditModule,
+    forwardRef(() => PublishingSlotsModule),
     MongooseModule.forFeature([
       { name: ArticleSchemaClass.name, schema: ArticleSchema },
       { name: RevisionSchemaClass.name, schema: RevisionSchema },
