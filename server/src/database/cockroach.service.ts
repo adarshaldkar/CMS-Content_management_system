@@ -149,6 +149,30 @@ export class CockroachDbService implements OnModuleDestroy {
               metadata jsonb,
               created_at timestamptz NOT NULL DEFAULT now()
             );
+
+            CREATE TABLE IF NOT EXISTS cms_publishing_slots (
+              id text PRIMARY KEY,
+              name text NOT NULL,
+              slug text UNIQUE NOT NULL,
+              dispatch_time text NOT NULL,
+              timezone text NOT NULL DEFAULT 'UTC',
+              days_active text NOT NULL DEFAULT 'ALL',
+              max_articles_per_slot int NOT NULL DEFAULT 5,
+              stagger_minutes int NOT NULL DEFAULT 5,
+              is_active boolean NOT NULL DEFAULT true,
+              created_at timestamptz NOT NULL DEFAULT now(),
+              updated_at timestamptz NOT NULL DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS cms_author_slot_assignments (
+              id text PRIMARY KEY,
+              author_id text UNIQUE NOT NULL,
+              slot_id text NOT NULL,
+              auto_publish_enabled boolean NOT NULL DEFAULT true,
+              daily_quota int NOT NULL DEFAULT 2,
+              assigned_by text,
+              created_at timestamptz NOT NULL DEFAULT now()
+            );
           `);
 
           this.logger.log('CockroachDB DDL Schema verified successfully.');

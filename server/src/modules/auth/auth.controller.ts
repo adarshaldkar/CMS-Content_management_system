@@ -48,7 +48,11 @@ export class AuthController {
   }
 
   private isCookieSecure(): boolean {
-    return this.config.get('COOKIE_SECURE', { infer: true }) ?? false;
+    const nodeEnv = this.config.get('NODE_ENV', { infer: true });
+    return (
+      nodeEnv === 'production' ||
+      this.config.get('COOKIE_SECURE', { infer: true }) === true
+    );
   }
 
   private extractRefreshToken(req: Request): string | undefined {
@@ -58,7 +62,7 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @Throttle({ 'auth-sensitive': { limit: 500, ttl: 60000 } })
+  @Throttle({ 'auth-sensitive': { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Register a new user account' })
   async register(
     @Body() dto: RegisterDto,
@@ -85,7 +89,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ 'auth-sensitive': { limit: 500, ttl: 60000 } })
+  @Throttle({ 'auth-sensitive': { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Log in with email and password' })
   async login(
     @Body() dto: LoginDto,
@@ -113,7 +117,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ 'auth-relaxed': { limit: 500, ttl: 60000 } })
+  @Throttle({ 'auth-relaxed': { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: 'Rotate refresh token and issue new session' })
   async refresh(
     @Req() req: Request,
@@ -145,7 +149,7 @@ export class AuthController {
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ 'auth-relaxed': { limit: 500, ttl: 60000 } })
+  @Throttle({ 'auth-relaxed': { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: 'Log out current session' })
   async logout(
     @Req() req: Request,

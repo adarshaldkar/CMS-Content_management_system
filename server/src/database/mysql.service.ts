@@ -168,6 +168,35 @@ export class MySqlService implements OnModuleDestroy {
             );
           `);
 
+          await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS cms_publishing_slots (
+              id VARCHAR(36) PRIMARY KEY,
+              name VARCHAR(255) NOT NULL,
+              slug VARCHAR(255) UNIQUE NOT NULL,
+              dispatch_time VARCHAR(20) NOT NULL,
+              timezone VARCHAR(50) NOT NULL DEFAULT 'UTC',
+              days_active VARCHAR(50) NOT NULL DEFAULT 'ALL',
+              max_articles_per_slot INT NOT NULL DEFAULT 5,
+              stagger_minutes INT NOT NULL DEFAULT 5,
+              is_active BOOLEAN NOT NULL DEFAULT TRUE,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            );
+          `);
+
+          await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS cms_author_slot_assignments (
+              id VARCHAR(36) PRIMARY KEY,
+              author_id VARCHAR(36) UNIQUE NOT NULL,
+              slot_id VARCHAR(36) NOT NULL,
+              auto_publish_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+              daily_quota INT NOT NULL DEFAULT 2,
+              assigned_by VARCHAR(36),
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              INDEX idx_mysql_assignment_slot (slot_id)
+            );
+          `);
+
           this.logger.log('MySQL DDL Schema verified successfully.');
         } catch (err: any) {
           this.logger.warn(`MySQL Schema verification failed: ${err.message}`);

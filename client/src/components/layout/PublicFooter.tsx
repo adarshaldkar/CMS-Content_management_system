@@ -1,6 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../common/BrandLogo';
+import reactLogo from '../../assets/react.svg';
+import viteLogo from '../../assets/vite.svg';
+
+const SOCIAL_LINKS = [
+  { label: 'GitHub', href: 'https://github.com', symbol: 'github-icon' },
+  { label: 'Bluesky', href: 'https://bsky.app', symbol: 'bluesky-icon' },
+  { label: 'X', href: 'https://x.com', symbol: 'x-icon' },
+  { label: 'Discord', href: 'https://discord.com', symbol: 'discord-icon' },
+];
 
 export const PublicFooter: React.FC = () => {
   return (
@@ -77,12 +86,41 @@ export const PublicFooter: React.FC = () => {
 
           <div>
             <h4 className="text-xs font-mono uppercase tracking-wider text-ink-primary font-semibold mb-3">
+              Follow The Gazette
+            </h4>
+            <div className="flex items-center gap-3 mb-6">
+              {SOCIAL_LINKS.map((s) => (
+                <a
+                  key={s.symbol}
+                  href={s.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={s.label}
+                  className="flex items-center justify-center w-9 h-9 border border-border-subtle bg-canvas-paper text-ink-secondary hover:text-accent-crimson hover:border-accent-crimson/40 transition-colors"
+                  style={{ borderRadius: 2 }}
+                >
+                  <svg className="w-4 h-4" aria-hidden="true">
+                    <use href={`/icons.svg#${s.symbol}`} />
+                  </svg>
+                </a>
+              ))}
+            </div>
+
+            <h4 className="text-xs font-mono uppercase tracking-wider text-ink-primary font-semibold mb-3">
               Standards & Architecture
             </h4>
             <p className="text-xs text-ink-secondary leading-relaxed">
               Engineered with zero-buffer seamless database switching, strict CSRF validation, and Argon2id session security.
             </p>
-            <div className="mt-4 text-[11px] font-mono text-ink-secondary">
+            <div className="mt-4 flex items-center gap-2 text-[11px] font-mono text-ink-secondary">
+              Built with
+              <img src={reactLogo} alt="React" className="w-4 h-4" />
+              React
+              <span aria-hidden="true">+</span>
+              <img src={viteLogo} alt="Vite" className="w-4 h-4" />
+              Vite
+            </div>
+            <div className="mt-2 text-[11px] font-mono text-ink-secondary">
               © {new Date().getFullYear()} The Gazette Publishing Group.
             </div>
           </div>

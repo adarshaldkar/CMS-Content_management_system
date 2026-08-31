@@ -8,12 +8,22 @@ import type {
   ContentStatus,
 } from '../../domain/models';
 import type { IArticleRepository } from '../interfaces/article.repository.interface';
+import type { SupportedDbName } from '../repository-proxy';
+import type { IRuntimeSwitchableRepository } from '../repository-proxy';
 import type { MariaDbService } from '../../database/mariadb.service';
 import type { MySqlService } from '../../database/mysql.service';
 import type { CockroachDbService } from '../../database/cockroach.service';
 import type { ClickHouseService } from '../../database/clickhouse.service';
+import {
+  activeEngine,
+  mongoStoreOf,
+  postgresStoreOf,
+  selectActiveReadRepo,
+  shouldReplicateToMongo,
+  shouldReplicateToPostgres,
+} from './db-router.util';
 
-export class SeamlessArticleRepository implements IArticleRepository {
+export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSwitchableRepository {
   private readonly logger = new Logger(SeamlessArticleRepository.name);
 
   constructor(
@@ -25,7 +35,18 @@ export class SeamlessArticleRepository implements IArticleRepository {
     private readonly mysql?: MySqlService,
     private readonly cockroach?: CockroachDbService,
     private readonly clickhouse?: ClickHouseService,
+    private readonly mariadbRepo?: IArticleRepository,
+    private readonly mysqlRepo?: IArticleRepository,
+    private readonly cockroachRepo?: IArticleRepository,
   ) {}
+
+  __switchActive(target: SupportedDbName): void {
+    process.env.ACTIVE_DATABASE = target;
+  }
+
+  __activeDb(): SupportedDbName {
+    return activeEngine();
+  }
 
   public get activeDbName(): string {
     return this.primaryName;
@@ -35,45 +56,61 @@ export class SeamlessArticleRepository implements IArticleRepository {
     return this.secondaryName;
   }
 
-  private get activeRepo(): IArticleRepository {
-    const active = process.env.ACTIVE_DATABASE || this.primaryName;
-    if (active === 'mongodb') {
-      return this.primaryName === 'mongodb' ? this.primaryRepo : this.secondaryRepo;
-    }
-    return this.primaryName === 'postgres' ? this.primaryRepo : this.secondaryRepo;
+  private get postgresStore(): IArticleRepository {
+    return postgresStoreOf(this.primaryName, this.primaryRepo, this.secondaryRepo);
   }
 
-  private get peerRepo(): IArticleRepository {
-    const active = process.env.ACTIVE_DATABASE || this.primaryName;
-    if (active === 'mongodb') {
-      return this.primaryName === 'mongodb' ? this.secondaryRepo : this.primaryRepo;
-    }
-    return this.primaryName === 'postgres' ? this.secondaryRepo : this.primaryRepo;
+  private get mongoStore(): IArticleRepository {
+    return mongoStoreOf(this.primaryName, this.primaryRepo, this.secondaryRepo);
+  }
+
+  private get activeRepo(): IArticleRepository {
+    return selectActiveReadRepo(
+      this.primaryName,
+      this.primaryRepo,
+      this.secondaryRepo,
+      this.mariadbRepo,
+      this.mysqlRepo,
+      this.cockroachRepo,
+    );
+  }
+
+  private get peerStores(): IArticleRepository[] {
+    const targets: IArticleRepository[] = [];
+    if (shouldReplicateToMongo()) targets.push(this.mongoStore);
+    if (shouldReplicateToPostgres()) targets.push(this.postgresStore);
+    return targets;
+  }
+
+  private get jitReadPeer(): IArticleRepository {
+    return activeEngine() === 'mongodb' ? this.postgresStore : this.mongoStore;
   }
 
   private async replicateToAll(article: Article): Promise<void> {
     const tasks: Promise<any>[] = [];
 
-    // 1. Peer Mongo/Postgres
-    tasks.push(
-      this.peerRepo.create({
-        title: article.title,
-        slug: article.slug,
-        description: article.description,
-        content: article.content,
-        authorId: article.authorId,
-        categoryId: article.categoryId,
-        tagIds: article.tagIds || [],
-        coverImage: article.coverImage,
-        status: article.status,
-        wordCount: article.wordCount,
-        readingTimeMinutes: article.readingTimeMinutes,
-        seoTitle: article.seoTitle,
-        seoDescription: article.seoDescription,
-        reviewNote: article.reviewNote,
-        scheduledAt: article.scheduledAt,
-      }).catch((e) => this.logger.debug(`Peer article sync note: ${e.message}`)),
-    );
+    // 1. Other main store(s) — Postgres and/or Mongo depending on active engine
+    for (const store of this.peerStores) {
+      tasks.push(
+        store.create({
+          title: article.title,
+          slug: article.slug,
+          description: article.description,
+          content: article.content,
+          authorId: article.authorId,
+          categoryId: article.categoryId,
+          tagIds: article.tagIds || [],
+          coverImage: article.coverImage,
+          status: article.status,
+          wordCount: article.wordCount,
+          readingTimeMinutes: article.readingTimeMinutes,
+          seoTitle: article.seoTitle,
+          seoDescription: article.seoDescription,
+          reviewNote: article.reviewNote,
+          scheduledAt: article.scheduledAt,
+        }).catch((e) => this.logger.debug(`Peer article sync note: ${e.message}`)),
+      );
+    }
 
     // 2. MariaDB
     if (this.mariadb) {
@@ -194,7 +231,7 @@ export class SeamlessArticleRepository implements IArticleRepository {
     if (article) return article;
 
     try {
-      const peerArticle = await this.peerRepo.findById(id);
+      const peerArticle = await this.jitReadPeer.findById(id);
       if (peerArticle) {
         this.logger.log(`[Seamless Sync] JIT replicating article "${peerArticle.title}" by ID`);
         const replicated = await this.activeRepo.create({
@@ -229,7 +266,7 @@ export class SeamlessArticleRepository implements IArticleRepository {
     if (article) return article;
 
     try {
-      const peerArticle = await this.peerRepo.findBySlug(slug);
+      const peerArticle = await this.jitReadPeer.findBySlug(slug);
       if (peerArticle) {
         this.logger.log(`[Seamless Sync] JIT replicating article "${peerArticle.title}" by slug`);
         const replicated = await this.activeRepo.create({

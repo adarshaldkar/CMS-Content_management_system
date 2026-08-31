@@ -5,6 +5,11 @@ import type { ISessionRepository } from './interfaces/session.repository.interfa
 import type { IAuditLogRepository } from './interfaces/audit-log.repository.interface';
 import type { IRevisionRepository } from './interfaces/revision.repository.interface';
 import type { IMediaRepository } from './interfaces/media.repository.interface';
+import type { ICommentRepository } from './interfaces/comment.repository.interface';
+import type { IBookmarkRepository } from './interfaces/bookmark.repository.interface';
+import type { ILikeRepository } from './interfaces/like.repository.interface';
+import type { IFollowRepository } from './interfaces/follow.repository.interface';
+import type { IPublishingSlotRepository } from './interfaces/publishing-slot.repository.interface';
 
 export type SupportedDbName =
   | 'postgres'
@@ -28,7 +33,12 @@ type AnyRepository =
   | ISessionRepository
   | IAuditLogRepository
   | IRevisionRepository
-  | IMediaRepository;
+  | IMediaRepository
+  | ICommentRepository
+  | IBookmarkRepository
+  | ILikeRepository
+  | IFollowRepository
+  | IPublishingSlotRepository;
 
 /**
  * RepositoryProxy<TRepo>
@@ -117,4 +127,30 @@ export const REPO_METHODS_BY_TYPE: Record<string, string[]> = {
   audit: ['create', 'findRecent'],
   revision: ['create', 'findByArticleId', 'findById'],
   media: ['create', 'findById', 'findMany', 'delete'],
+  comment: ['findById', 'findMany', 'create', 'update', 'softDelete', 'countByArticle'],
+  bookmark: ['findByUser', 'findOne', 'create', 'delete', 'countByArticle'],
+  like: ['findOne', 'create', 'delete', 'countByArticle'],
+  follow: [
+    'findOne',
+    'findMany',
+    'create',
+    'delete',
+    'countFollowers',
+    'countFollowing',
+  ],
+  publishingSlot: [
+    'findAllSlots',
+    'findSlotById',
+    'findSlotBySlug',
+    'createSlot',
+    'updateSlot',
+    'deleteSlot',
+    'findAllAssignments',
+    'findAssignmentByAuthorId',
+    'assignAuthorToSlot',
+    'revokeAuthorAssignment',
+    'getAuthorClearance',
+    'getQueuedArticlesCount',
+    'getUpcomingScheduledArticles',
+  ],
 };

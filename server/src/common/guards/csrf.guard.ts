@@ -30,26 +30,41 @@ export class CsrfGuard implements CanActivate {
       );
     }
 
-    // 2. Validate Origin / Referer against CORS allowlist
-    const origin = request.headers['origin'] || request.headers['referer'];
+    // 2. Validate Origin / Referer against the CORS allowlist (exact match)
+    const rawOrigin = request.headers['origin'];
+    const rawReferer = request.headers['referer'];
+
+    let originSource: string | undefined;
+    if (typeof rawOrigin === 'string' && rawOrigin.length > 0) {
+      originSource = rawOrigin;
+    } else if (typeof rawReferer === 'string' && rawReferer.length > 0) {
+      try {
+        originSource = new URL(rawReferer).origin;
+      } catch {
+        originSource = undefined;
+      }
+    }
+
+    if (!originSource) {
+      throw new ForbiddenException(
+        'CSRF Protection: Missing Origin/Referer header.',
+      );
+    }
+
     const clientUrl = this.config.get('CLIENT_URL', { infer: true }) || 'http://localhost:5173';
 
-    if (origin && typeof origin === 'string') {
-      const allowedOrigins = [
-        clientUrl.toLowerCase(),
-        'http://localhost:5173',
-        'http://localhost:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:3000',
-      ];
+    const allowedOrigins = [
+      clientUrl,
+      'http://localhost:5173',
+      'http://localhost:3001',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3001',
+    ].map((origin) => origin.toLowerCase().replace(/\/+$/, ''));
 
-      const isAllowed = allowedOrigins.some((allowed) =>
-        origin.toLowerCase().startsWith(allowed),
-      );
+    const normalizedOrigin = originSource.toLowerCase().replace(/\/+$/, '');
 
-      if (!isAllowed) {
-        throw new ForbiddenException('CSRF Protection: Untrusted request origin.');
-      }
+    if (!allowedOrigins.includes(normalizedOrigin)) {
+      throw new ForbiddenException('CSRF Protection: Untrusted request origin.');
     }
 
     return true;

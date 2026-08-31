@@ -1,26 +1,98 @@
 import { Logger } from '@nestjs/common';
 import type { ArticleRevision, CreateRevisionDto } from '../../domain/models';
 import type { IRevisionRepository } from '../interfaces/revision.repository.interface';
+import type { SupportedDbName, IRuntimeSwitchableRepository } from '../repository-proxy';
+import {
+  activeEngine,
+  mongoStoreOf,
+  postgresStoreOf,
+  selectActiveReadRepo,
+  shouldReplicateToMongo,
+  shouldReplicateToPostgres,
+} from './db-router.util';
 
 /**
  * SeamlessRevisionRepository
  *
- * Wraps active and peer revision repositories.
+ * Wraps primary/secondary revision repositories plus optional per-engine replicas.
  * On revision history lookup on the active DB, if missing, pulls revision snapshots
- * from the peer DB into the active DB.
+ * from the JIT peer store into the active DB. Writes fan out to the main store(s).
  */
-export class SeamlessRevisionRepository implements IRevisionRepository {
+export class SeamlessRevisionRepository implements IRevisionRepository, IRuntimeSwitchableRepository {
   private readonly logger = new Logger(SeamlessRevisionRepository.name);
 
   constructor(
-    private readonly activeRepo: IRevisionRepository,
-    private readonly peerRepo: IRevisionRepository,
-    private readonly activeDbName: string,
-    private readonly peerDbName: string,
+    private readonly primaryRepo: IRevisionRepository,
+    private readonly secondaryRepo: IRevisionRepository,
+    public readonly primaryName: string,
+    public readonly secondaryName: string,
+    private readonly mariadbRepo?: IRevisionRepository,
+    private readonly mysqlRepo?: IRevisionRepository,
+    private readonly cockroachRepo?: IRevisionRepository,
   ) {}
 
+  __switchActive(target: SupportedDbName): void {
+    process.env.ACTIVE_DATABASE = target;
+  }
+
+  __activeDb(): SupportedDbName {
+    return activeEngine();
+  }
+
+  public get activeDbName(): string {
+    return this.primaryName;
+  }
+
+  public get peerDbName(): string {
+    return this.secondaryName;
+  }
+
+  private get postgresStore(): IRevisionRepository {
+    return postgresStoreOf(this.primaryName, this.primaryRepo, this.secondaryRepo);
+  }
+
+  private get mongoStore(): IRevisionRepository {
+    return mongoStoreOf(this.primaryName, this.primaryRepo, this.secondaryRepo);
+  }
+
+  private get activeRepo(): IRevisionRepository {
+    return selectActiveReadRepo(
+      this.primaryName,
+      this.primaryRepo,
+      this.secondaryRepo,
+      this.mariadbRepo,
+      this.mysqlRepo,
+      this.cockroachRepo,
+    );
+  }
+
+  private get peerStores(): IRevisionRepository[] {
+    const targets: IRevisionRepository[] = [];
+    if (shouldReplicateToMongo()) targets.push(this.mongoStore);
+    if (shouldReplicateToPostgres()) targets.push(this.postgresStore);
+    return targets;
+  }
+
+  private get jitReadPeer(): IRevisionRepository {
+    return activeEngine() === 'mongodb' ? this.postgresStore : this.mongoStore;
+  }
+
   async create(data: CreateRevisionDto): Promise<ArticleRevision> {
-    return this.activeRepo.create(data);
+    const revision = await this.activeRepo.create(data);
+    for (const store of this.peerStores) {
+      store
+        .create({
+          articleId: revision.articleId,
+          version: revision.version,
+          title: revision.title,
+          description: revision.description,
+          content: revision.content,
+          authorId: revision.authorId,
+          changeSummary: revision.changeSummary,
+        })
+        .catch((e) => this.logger.debug(`Peer revision sync note: ${e.message}`));
+    }
+    return revision;
   }
 
   async findByArticleId(articleId: string): Promise<ArticleRevision[]> {
@@ -28,7 +100,7 @@ export class SeamlessRevisionRepository implements IRevisionRepository {
     if (revisions.length > 0) return revisions;
 
     try {
-      const peerRevisions = await this.peerRepo.findByArticleId(articleId);
+      const peerRevisions = await this.jitReadPeer.findByArticleId(articleId);
       if (peerRevisions.length > 0) {
         this.logger.log(
           `[Seamless Sync] JIT replicating ${peerRevisions.length} revisions for article ${articleId} from ${this.peerDbName} to ${this.activeDbName}`,
@@ -60,7 +132,7 @@ export class SeamlessRevisionRepository implements IRevisionRepository {
     if (revision) return revision;
 
     try {
-      const peerRevision = await this.peerRepo.findById(id);
+      const peerRevision = await this.jitReadPeer.findById(id);
       if (peerRevision) {
         this.logger.log(
           `[Seamless Sync] JIT replicating revision v${peerRevision.version} for article ${peerRevision.articleId} from ${this.peerDbName} to ${this.activeDbName}`,

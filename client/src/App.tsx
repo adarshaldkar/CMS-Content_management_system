@@ -36,6 +36,10 @@ import { PublishingSlotsManagerPage } from './pages/admin/PublishingSlotsManager
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ScrollToTop } from './components/common/ScrollToTop';
 
+// Legacy phase pages (kept linked — they remain fully functional)
+import { AdminPanelPage } from './pages/AdminPanelPage';
+import { UserPanelPage } from './pages/UserPanelPage';
+
 import { useAuthStore } from './stores/authStore';
 
 export default function App() {
@@ -85,11 +89,13 @@ export default function App() {
           <Route element={<UserLayout />}>
             <Route path="/dashboard" element={<UserDashboardPage />} />
             <Route path="/stories" element={<StoriesManagerPage />} />
+            <Route path="/workspace" element={<StoriesManagerPage />} />
             <Route path="/library" element={<UserLibraryPage />} />
             <Route path="/history" element={<UserLibraryPage />} />
             <Route path="/network" element={<UserDashboardPage />} />
             <Route path="/profile" element={<UserProfilePage />} />
             <Route path="/settings" element={<UserSettingsPage />} />
+            <Route path="/user" element={<UserDashboardPage />} />
             <Route path="/user/*" element={<UserDashboardPage />} />
           </Route>
         </Route>
@@ -109,6 +115,7 @@ export default function App() {
             <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
             <Route path="/admin/*" element={<EditorialReviewPage />} />
           </Route>
+          <Route path="/admin/panel" element={<AdminPanelPage />} />
         </Route>
 
         {/* 7. Dedicated 404 Catch-All Route */}

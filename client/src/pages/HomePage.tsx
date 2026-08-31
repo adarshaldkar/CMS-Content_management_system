@@ -5,6 +5,7 @@ import { Clock, TrendingUp, ArrowRight, Send, BookOpen, Flame } from 'lucide-rea
 import { apiClient } from '../api/client';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Skeleton, ArticleCardSkeleton } from '../components/common/SkeletonLoader';
+import heroMasthead from '../assets/hero.png';
 import type { Article, PaginatedResult } from '../types';
 
 /* ─── helpers ─────────────────────────────────────────────────────── */
@@ -277,9 +278,15 @@ export const HomePage: React.FC = () => {
                     onError={() => setHeroImgErr(true)}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center p-8">
-                    <span className="font-serif text-2xl text-white/80 text-center leading-snug">
+) : (
+                  <div className="relative w-full h-full flex items-center justify-center p-8 overflow-hidden">
+                    <img
+                      src={heroMasthead}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover opacity-30 grayscale"
+                    />
+                    <span className="relative font-serif text-2xl text-white/90 text-center leading-snug">
                       {cleanTitle(hero.title)}
                     </span>
                   </div>

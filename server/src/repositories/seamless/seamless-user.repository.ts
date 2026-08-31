@@ -7,12 +7,21 @@ import type {
   UserQueryFilters,
 } from '../../domain/models';
 import type { IUserRepository } from '../interfaces/user.repository.interface';
+import type { SupportedDbName, IRuntimeSwitchableRepository } from '../repository-proxy';
 import type { MariaDbService } from '../../database/mariadb.service';
 import type { MySqlService } from '../../database/mysql.service';
 import type { CockroachDbService } from '../../database/cockroach.service';
 import type { ClickHouseService } from '../../database/clickhouse.service';
+import {
+  activeEngine,
+  mongoStoreOf,
+  postgresStoreOf,
+  selectActiveReadRepo,
+  shouldReplicateToMongo,
+  shouldReplicateToPostgres,
+} from './db-router.util';
 
-export class SeamlessUserRepository implements IUserRepository {
+export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchableRepository {
   private readonly logger = new Logger(SeamlessUserRepository.name);
 
   constructor(
@@ -24,7 +33,18 @@ export class SeamlessUserRepository implements IUserRepository {
     private readonly mysql?: MySqlService,
     private readonly cockroach?: CockroachDbService,
     private readonly clickhouse?: ClickHouseService,
+    private readonly mariadbRepo?: IUserRepository,
+    private readonly mysqlRepo?: IUserRepository,
+    private readonly cockroachRepo?: IUserRepository,
   ) {}
+
+  __switchActive(target: SupportedDbName): void {
+    process.env.ACTIVE_DATABASE = target;
+  }
+
+  __activeDb(): SupportedDbName {
+    return activeEngine();
+  }
 
   public get activeDbName(): string {
     return this.primaryName;
@@ -34,38 +54,54 @@ export class SeamlessUserRepository implements IUserRepository {
     return this.secondaryName;
   }
 
-  private get activeRepo(): IUserRepository {
-    const active = process.env.ACTIVE_DATABASE || this.primaryName;
-    if (active === 'mongodb') {
-      return this.primaryName === 'mongodb' ? this.primaryRepo : this.secondaryRepo;
-    }
-    return this.primaryName === 'postgres' ? this.primaryRepo : this.secondaryRepo;
+  private get postgresStore(): IUserRepository {
+    return postgresStoreOf(this.primaryName, this.primaryRepo, this.secondaryRepo);
   }
 
-  private get peerRepo(): IUserRepository {
-    const active = process.env.ACTIVE_DATABASE || this.primaryName;
-    if (active === 'mongodb') {
-      return this.primaryName === 'mongodb' ? this.secondaryRepo : this.primaryRepo;
-    }
-    return this.primaryName === 'postgres' ? this.secondaryRepo : this.primaryRepo;
+  private get mongoStore(): IUserRepository {
+    return mongoStoreOf(this.primaryName, this.primaryRepo, this.secondaryRepo);
+  }
+
+  private get activeRepo(): IUserRepository {
+    return selectActiveReadRepo(
+      this.primaryName,
+      this.primaryRepo,
+      this.secondaryRepo,
+      this.mariadbRepo,
+      this.mysqlRepo,
+      this.cockroachRepo,
+    );
+  }
+
+  private get peerStores(): IUserRepository[] {
+    const targets: IUserRepository[] = [];
+    if (shouldReplicateToMongo()) targets.push(this.mongoStore);
+    if (shouldReplicateToPostgres()) targets.push(this.postgresStore);
+    return targets;
+  }
+
+  private get jitReadPeer(): IUserRepository {
+    return activeEngine() === 'mongodb' ? this.postgresStore : this.mongoStore;
   }
 
   private async replicateToAll(user: User): Promise<void> {
     const tasks: Promise<any>[] = [];
 
-    // 1. Peer Mongo/Postgres
-    tasks.push(
-      this.peerRepo.create({
-        email: user.email,
-        name: user.name,
-        passwordHash: user.passwordHash || '',
-        bio: user.bio,
-        avatarUrl: user.avatarUrl,
-        preferredTopics: user.preferredTopics || [],
-        role: user.role,
-        isActive: user.isActive,
-      }).catch((e) => this.logger.debug(`Peer user sync note: ${e.message}`)),
-    );
+    // 1. Other main store(s) — Postgres and/or Mongo depending on active engine
+    for (const store of this.peerStores) {
+      tasks.push(
+        store.create({
+          email: user.email,
+          name: user.name,
+          passwordHash: user.passwordHash || '',
+          bio: user.bio,
+          avatarUrl: user.avatarUrl,
+          preferredTopics: user.preferredTopics || [],
+          role: user.role,
+          isActive: user.isActive,
+        }).catch((e) => this.logger.debug(`Peer user sync note: ${e.message}`)),
+      );
+    }
 
     // 2. MariaDB
     if (this.mariadb) {
@@ -163,7 +199,7 @@ export class SeamlessUserRepository implements IUserRepository {
     if (user) return user;
 
     try {
-      const peerUser = await this.peerRepo.findById(id);
+      const peerUser = await this.jitReadPeer.findById(id);
       if (peerUser) {
         this.logger.log(`[Seamless Sync] JIT replicating user ${peerUser.email} by ID`);
         const replicated = await this.activeRepo.create({
@@ -191,7 +227,7 @@ export class SeamlessUserRepository implements IUserRepository {
     if (user) return user;
 
     try {
-      const peerUser = await this.peerRepo.findByEmail(email);
+      const peerUser = await this.jitReadPeer.findByEmail(email);
       if (peerUser) {
         this.logger.log(`[Seamless Sync] JIT replicating user ${peerUser.email} on login`);
         const replicated = await this.activeRepo.create({

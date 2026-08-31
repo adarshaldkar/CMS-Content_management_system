@@ -40,7 +40,7 @@ export const UserLayout: React.FC = () => {
       title: 'YOUR DESK',
       items: [
         { label: 'Overview', to: '/dashboard', icon: LayoutDashboard },
-        { label: 'Stories & Drafts', to: '/stories', icon: Edit3 },
+        { label: 'Manuscripts & Stories', to: '/stories', icon: Edit3 },
       ],
     },
     {

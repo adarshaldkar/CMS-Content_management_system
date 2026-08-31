@@ -61,6 +61,7 @@ export const AdminLayout: React.FC = () => {
     { label: 'Media Assets', to: '/admin/media', icon: ImageIcon },
     { label: 'Comments Moderation', to: '/admin/comments', icon: MessageSquare },
     { label: 'Audit Trail', to: '/admin/audit', icon: ScrollText },
+    { label: 'Control Panel', to: '/admin/panel', icon: LayoutDashboard },
   ];
 
   const activeDb = (dbStatus?.activeDatabase || health?.activeDatabase || 'postgres').toUpperCase();

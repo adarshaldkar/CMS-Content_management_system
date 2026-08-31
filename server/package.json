@@ -95,7 +95,7 @@
       "<rootDir>/../../node_modules"
     ],
     "moduleNameMapper": {
-      "^reflect-metadata$": "<rootDir>/../node_modules/reflect-metadata"
+      "^reflect-metadata$": "<rootDir>/../../node_modules/reflect-metadata"
     },
     "transform": {
       "^.+\\.(t|j)sx?$": "ts-jest"

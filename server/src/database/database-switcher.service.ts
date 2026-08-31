@@ -14,6 +14,7 @@ import { ClickHouseService } from './clickhouse.service';
 import { MultiDatabaseMeshService, type DatabaseEngine, type DatabaseHealthInfo } from './multi-database-mesh.service';
 import { AuditService } from '../modules/audit/audit.service';
 import { RepositoryRegistryService } from '../repositories/repository-registry.service';
+import { ALL_DATABASE_REPOSITORIES } from '../repositories/repository.providers';
 import { AuditEventType, type AuthUser } from '../domain/models';
 
 export interface DatabaseHealthStatus {
@@ -22,8 +23,34 @@ export interface DatabaseHealthStatus {
   databases: DatabaseHealthInfo[];
   postgres: { status: 'healthy' | 'unhealthy'; latencyMs: number };
   mongodb: { status: 'healthy' | 'unhealthy'; latencyMs: number };
+  registeredRepositories: {
+    total: number;
+    byEngine: Record<string, number>;
+  };
   sanitizedEvents: Array<{ id: string; timestamp: string; message: string }>;
 }
+
+function engineCoverageOf(repositories: Array<{ name: string }>): Record<string, number> {
+  const buckets: Record<string, number> = {};
+  for (const repo of repositories) {
+    const engine = repo.name.split(/(?=[A-Z])/)[0].replace(/Repository$/, '');
+    const key = engine.startsWith('MariaDb')
+      ? 'mariadb'
+      : engine.startsWith('MySql')
+        ? 'mysql'
+        : engine.startsWith('Cockroach')
+          ? 'cockroach'
+          : engine.startsWith('ClickHouse')
+            ? 'clickhouse'
+            : engine.startsWith('Mongo')
+              ? 'mongodb'
+              : engine.toLowerCase();
+    buckets[key] = (buckets[key] ?? 0) + 1;
+  }
+  return buckets;
+}
+
+const REPOSITORY_ENGINE_COVERAGE = engineCoverageOf(ALL_DATABASE_REPOSITORIES);
 
 export type SwitchState =
   | 'IDLE'
@@ -68,6 +95,10 @@ export class DatabaseSwitcherService {
         status: mongoInfo?.status === 'healthy' ? 'healthy' : 'unhealthy',
         latencyMs: mongoInfo?.latencyMs || 0,
       },
+      registeredRepositories: {
+        total: ALL_DATABASE_REPOSITORIES.length,
+        byEngine: REPOSITORY_ENGINE_COVERAGE,
+      },
       sanitizedEvents: [
         {
           id: 'evt-1',
@@ -108,6 +139,22 @@ export class DatabaseSwitcherService {
       };
     }
 
+    if (targetDb === 'clickhouse') {
+      throw new BadRequestException(
+        'ClickHouse is an analytics-only engine and cannot be set as the active application database.',
+      );
+    }
+
+    // Pre-flight: never activate an offline engine — the mesh would otherwise
+    // silently degrade every read/write through Postgres/Mongo fallbacks.
+    const meshStatus = await this.mesh.getMeshStatus();
+    const targetInfo = meshStatus.databases.find((d) => d.engine === targetDb);
+    if (!targetInfo || targetInfo.status === 'offline') {
+      throw new BadRequestException(
+        `Target database '${targetDb}' is offline (${targetInfo?.error || 'unreachable'}) and cannot be activated.`,
+      );
+    }
+
     this.switchLock = true;
     this.logger.log(`[DB Switcher] Mutex acquired. Initiating switch: ${currentDb} -> ${targetDb}`);
 
@@ -121,8 +168,6 @@ export class DatabaseSwitcherService {
         await this.mysql.pool.query('SELECT 1');
       } else if (targetDb === 'cockroach') {
         await this.cockroach.pool.query('SELECT 1');
-      } else if (targetDb === 'clickhouse') {
-        await this.clickhouse.isHealthy();
       } else if (targetDb === 'mongodb') {
         if (this.mongoConnection.readyState !== 1) {
           try {
@@ -134,12 +179,13 @@ export class DatabaseSwitcherService {
         }
       }
 
-      // Step 2: Atomic pointer swap and repository proxy rebind
+      // Step 2: Atomic pointer swap and repository proxy rebind.
+      // Every registered seamless coordinator exposes __switchActive, so the
+      // registry can atomically re-point all of them (Postgres, Mongo and the
+      // SQL engine replicas) at the newly chosen active engine.
       process.env.ACTIVE_DATABASE = targetDb;
       this.mesh.setActiveEngine(targetDb);
-      if (targetDb === 'postgres' || targetDb === 'mongodb') {
-        this.repositoryRegistry.switchAllTo(targetDb);
-      }
+      this.repositoryRegistry.switchAllTo(targetDb);
       this.logger.log(`[DB Switcher] Active database pointer atomically switched to: ${targetDb}`);
 
       // Step 3: Audit trail
@@ -162,9 +208,7 @@ export class DatabaseSwitcherService {
       // Revert
       process.env.ACTIVE_DATABASE = currentDb;
       this.mesh.setActiveEngine(currentDb as any);
-      if (currentDb === 'postgres' || currentDb === 'mongodb') {
-        this.repositoryRegistry.switchAllTo(currentDb as any);
-      }
+      this.repositoryRegistry.switchAllTo(currentDb as any);
       throw new InternalServerErrorException(`Database switch failed: ${err.message}`);
     } finally {
       this.switchLock = false;

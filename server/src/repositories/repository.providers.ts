@@ -30,6 +30,10 @@ import {
   type IMediaRepository,
 } from './interfaces/media.repository.interface';
 import {
+  COMMENT_REPOSITORY,
+  type ICommentRepository,
+} from './interfaces/comment.repository.interface';
+import {
   BOOKMARK_REPOSITORY,
   type IBookmarkRepository,
 } from './interfaces/bookmark.repository.interface';
@@ -54,6 +58,7 @@ import { PostgresSessionRepository } from './postgres/postgres-session.repositor
 import { PostgresAuditLogRepository } from './postgres/postgres-audit-log.repository';
 import { PostgresRevisionRepository } from './postgres/postgres-revision.repository';
 import { PostgresMediaRepository } from './postgres/postgres-media.repository';
+import { PostgresCommentRepository } from './postgres/postgres-comment.repository';
 import { PostgresBookmarkRepository } from './postgres/postgres-bookmark.repository';
 import { PostgresLikeRepository } from './postgres/postgres-like.repository';
 import { PostgresFollowRepository } from './postgres/postgres-follow.repository';
@@ -67,6 +72,11 @@ import { MongoSessionRepository } from './mongo/mongo-session.repository';
 import { MongoAuditLogRepository } from './mongo/mongo-audit-log.repository';
 import { MongoRevisionRepository } from './mongo/mongo-revision.repository';
 import { MongoMediaRepository } from './mongo/mongo-media.repository';
+import { MongoCommentRepository } from './mongo/mongo-comment.repository';
+import { MongoBookmarkRepository } from './mongo/mongo-bookmark.repository';
+import { MongoLikeRepository } from './mongo/mongo-like.repository';
+import { MongoFollowRepository } from './mongo/mongo-follow.repository';
+import { MongoPublishingSlotRepository } from './mongo/mongo-publishing-slot.repository';
 
 // MariaDB Repositories
 import { MariaDbUserRepository } from './mariadb/mariadb-user.repository';
@@ -121,6 +131,20 @@ import { SeamlessArticleRepository } from './seamless/seamless-article.repositor
 import { SeamlessCategoryRepository } from './seamless/seamless-category.repository';
 import { SeamlessMediaRepository } from './seamless/seamless-media.repository';
 import { SeamlessRevisionRepository } from './seamless/seamless-revision.repository';
+import { SeamlessCommentRepository } from './seamless/seamless-comment.repository';
+import { SeamlessBookmarkRepository } from './seamless/seamless-bookmark.repository';
+import { SeamlessLikeRepository } from './seamless/seamless-like.repository';
+import { SeamlessFollowRepository } from './seamless/seamless-follow.repository';
+import { SeamlessPublishingSlotRepository } from './seamless/seamless-publishing-slot.repository';
+
+// Runtime-Switchable Registry
+import { RepositoryRegistryService } from './repository-registry.service';
+
+type EngineRepoMap = {
+  mariadb?: any;
+  mysql?: any;
+  cockroach?: any;
+};
 
 export const articleRepositoryProvider: FactoryProvider<IArticleRepository> = {
   provide: ARTICLE_REPOSITORY,
@@ -132,6 +156,7 @@ export const articleRepositoryProvider: FactoryProvider<IArticleRepository> = {
     MySqlService,
     CockroachDbService,
     ClickHouseService,
+    RepositoryRegistryService,
   ],
   useFactory: (
     config: ConfigService<EnvConfig, true>,
@@ -141,11 +166,45 @@ export const articleRepositoryProvider: FactoryProvider<IArticleRepository> = {
     mysql: MySqlService,
     cockroach: CockroachDbService,
     clickhouse: ClickHouseService,
+    registry: RepositoryRegistryService,
   ): IArticleRepository => {
     const active = config.get('ACTIVE_DATABASE', { infer: true });
-    return active === 'mongodb'
-      ? new SeamlessArticleRepository(mongoRepo, postgresRepo, 'mongodb', 'postgres', mariadb, mysql, cockroach, clickhouse)
-      : new SeamlessArticleRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb', mariadb, mysql, cockroach, clickhouse);
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbArticleRepository(mariadb),
+      mysql: new MySqlArticleRepository(mysql),
+      cockroach: new CockroachArticleRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessArticleRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            mariadb,
+            mysql,
+            cockroach,
+            clickhouse,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessArticleRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            mariadb,
+            mysql,
+            cockroach,
+            clickhouse,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
@@ -159,6 +218,7 @@ export const userRepositoryProvider: FactoryProvider<IUserRepository> = {
     MySqlService,
     CockroachDbService,
     ClickHouseService,
+    RepositoryRegistryService,
   ],
   useFactory: (
     config: ConfigService<EnvConfig, true>,
@@ -168,26 +228,97 @@ export const userRepositoryProvider: FactoryProvider<IUserRepository> = {
     mysql: MySqlService,
     cockroach: CockroachDbService,
     clickhouse: ClickHouseService,
+    registry: RepositoryRegistryService,
   ): IUserRepository => {
     const active = config.get('ACTIVE_DATABASE', { infer: true });
-    return active === 'mongodb'
-      ? new SeamlessUserRepository(mongoRepo, postgresRepo, 'mongodb', 'postgres', mariadb, mysql, cockroach, clickhouse)
-      : new SeamlessUserRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb', mariadb, mysql, cockroach, clickhouse);
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbUserRepository(mariadb),
+      mysql: new MySqlUserRepository(mysql),
+      cockroach: new CockroachUserRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessUserRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            mariadb,
+            mysql,
+            cockroach,
+            clickhouse,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessUserRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            mariadb,
+            mysql,
+            cockroach,
+            clickhouse,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
 export const categoryRepositoryProvider: FactoryProvider<ICategoryRepository> = {
   provide: CATEGORY_REPOSITORY,
-  inject: [ConfigService, PostgresCategoryRepository, MongoCategoryRepository],
+  inject: [
+    ConfigService,
+    PostgresCategoryRepository,
+    MongoCategoryRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
   useFactory: (
     config: ConfigService<EnvConfig, true>,
     postgresRepo: PostgresCategoryRepository,
     mongoRepo: MongoCategoryRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
   ): ICategoryRepository => {
     const active = config.get('ACTIVE_DATABASE', { infer: true });
-    return active === 'mongodb'
-      ? new SeamlessCategoryRepository(mongoRepo, postgresRepo, 'mongodb', 'postgres')
-      : new SeamlessCategoryRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb');
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbCategoryRepository(mariadb),
+      mysql: new MySqlCategoryRepository(mysql),
+      cockroach: new CockroachCategoryRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessCategoryRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessCategoryRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
@@ -219,63 +350,368 @@ export const auditLogRepositoryProvider: FactoryProvider<IAuditLogRepository> = 
 
 export const revisionRepositoryProvider: FactoryProvider<IRevisionRepository> = {
   provide: REVISION_REPOSITORY,
-  inject: [ConfigService, PostgresRevisionRepository, MongoRevisionRepository],
+  inject: [
+    ConfigService,
+    PostgresRevisionRepository,
+    MongoRevisionRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
   useFactory: (
     config: ConfigService<EnvConfig, true>,
     postgresRepo: PostgresRevisionRepository,
     mongoRepo: MongoRevisionRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
   ): IRevisionRepository => {
     const active = config.get('ACTIVE_DATABASE', { infer: true });
-    return active === 'mongodb'
-      ? new SeamlessRevisionRepository(mongoRepo, postgresRepo, 'mongodb', 'postgres')
-      : new SeamlessRevisionRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb');
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbRevisionRepository(mariadb),
+      mysql: new MySqlRevisionRepository(mysql),
+      cockroach: new CockroachRevisionRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessRevisionRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessRevisionRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
 export const mediaRepositoryProvider: FactoryProvider<IMediaRepository> = {
   provide: MEDIA_REPOSITORY,
-  inject: [ConfigService, PostgresMediaRepository, MongoMediaRepository],
+  inject: [
+    ConfigService,
+    PostgresMediaRepository,
+    MongoMediaRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
   useFactory: (
     config: ConfigService<EnvConfig, true>,
     postgresRepo: PostgresMediaRepository,
     mongoRepo: MongoMediaRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
   ): IMediaRepository => {
     const active = config.get('ACTIVE_DATABASE', { infer: true });
-    return active === 'mongodb'
-      ? new SeamlessMediaRepository(mongoRepo, postgresRepo, 'mongodb', 'postgres')
-      : new SeamlessMediaRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb');
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbMediaRepository(mariadb),
+      mysql: new MySqlMediaRepository(mysql),
+      cockroach: new CockroachMediaRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessMediaRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessMediaRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
+  },
+};
+
+export const commentRepositoryProvider: FactoryProvider<ICommentRepository> = {
+  provide: COMMENT_REPOSITORY,
+  inject: [
+    ConfigService,
+    PostgresCommentRepository,
+    MongoCommentRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresCommentRepository,
+    mongoRepo: MongoCommentRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
+  ): ICommentRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true });
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbCommentRepository(mariadb),
+      mysql: new MySqlCommentRepository(mysql),
+      cockroach: new CockroachCommentRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessCommentRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessCommentRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
 export const bookmarkRepositoryProvider: FactoryProvider<IBookmarkRepository> = {
   provide: BOOKMARK_REPOSITORY,
-  inject: [ConfigService, PostgresBookmarkRepository],
-  useFactory: (_config: ConfigService<EnvConfig, true>, postgresRepo: PostgresBookmarkRepository): IBookmarkRepository => {
-    return postgresRepo;
+  inject: [
+    ConfigService,
+    PostgresBookmarkRepository,
+    MongoBookmarkRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresBookmarkRepository,
+    mongoRepo: MongoBookmarkRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
+  ): IBookmarkRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true });
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbBookmarkRepository(mariadb),
+      mysql: new MySqlBookmarkRepository(mysql),
+      cockroach: new CockroachBookmarkRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessBookmarkRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessBookmarkRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
 export const likeRepositoryProvider: FactoryProvider<ILikeRepository> = {
   provide: LIKE_REPOSITORY,
-  inject: [ConfigService, PostgresLikeRepository],
-  useFactory: (_config: ConfigService<EnvConfig, true>, postgresRepo: PostgresLikeRepository): ILikeRepository => {
-    return postgresRepo;
+  inject: [
+    ConfigService,
+    PostgresLikeRepository,
+    MongoLikeRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresLikeRepository,
+    mongoRepo: MongoLikeRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
+  ): ILikeRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true });
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbLikeRepository(mariadb),
+      mysql: new MySqlLikeRepository(mysql),
+      cockroach: new CockroachLikeRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessLikeRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessLikeRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
 export const followRepositoryProvider: FactoryProvider<IFollowRepository> = {
   provide: FOLLOW_REPOSITORY,
-  inject: [ConfigService, PostgresFollowRepository],
-  useFactory: (_config: ConfigService<EnvConfig, true>, postgresRepo: PostgresFollowRepository): IFollowRepository => {
-    return postgresRepo;
+  inject: [
+    ConfigService,
+    PostgresFollowRepository,
+    MongoFollowRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresFollowRepository,
+    mongoRepo: MongoFollowRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
+  ): IFollowRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true });
+    const engineRepos: EngineRepoMap = {
+      mariadb: new MariaDbFollowRepository(mariadb),
+      mysql: new MySqlFollowRepository(mysql),
+      cockroach: new CockroachFollowRepository(cockroach),
+    };
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessFollowRepository(
+            mongoRepo,
+            postgresRepo,
+            'mongodb',
+            'postgres',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          )
+        : new SeamlessFollowRepository(
+            postgresRepo,
+            mongoRepo,
+            'postgres',
+            'mongodb',
+            mariadb,
+            mysql,
+            cockroach,
+            engineRepos.mariadb,
+            engineRepos.mysql,
+            engineRepos.cockroach,
+          );
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
 export const publishingSlotRepositoryProvider: FactoryProvider<IPublishingSlotRepository> = {
   provide: PUBLISHING_SLOT_REPOSITORY,
-  inject: [ConfigService, PostgresPublishingSlotRepository],
-  useFactory: (_config: ConfigService<EnvConfig, true>, postgresRepo: PostgresPublishingSlotRepository): IPublishingSlotRepository => {
-    return postgresRepo;
+  inject: [
+    ConfigService,
+    PostgresPublishingSlotRepository,
+    MongoPublishingSlotRepository,
+    MariaDbService,
+    MySqlService,
+    CockroachDbService,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresPublishingSlotRepository,
+    mongoRepo: MongoPublishingSlotRepository,
+    mariadb: MariaDbService,
+    mysql: MySqlService,
+    cockroach: CockroachDbService,
+    registry: RepositoryRegistryService,
+  ): IPublishingSlotRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true });
+    const seamless =
+      active === 'mongodb'
+        ? new SeamlessPublishingSlotRepository(mongoRepo, postgresRepo, 'mongodb', 'postgres', mariadb, mysql, cockroach)
+        : new SeamlessPublishingSlotRepository(postgresRepo, mongoRepo, 'postgres', 'mongodb', mariadb, mysql, cockroach);
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
   },
 };
 
@@ -301,6 +737,11 @@ export const ALL_DATABASE_REPOSITORIES = [
   MongoRevisionRepository,
   MongoSessionRepository,
   MongoAuditLogRepository,
+  MongoCommentRepository,
+  MongoBookmarkRepository,
+  MongoLikeRepository,
+  MongoFollowRepository,
+  MongoPublishingSlotRepository,
 
   // MariaDB
   MariaDbUserRepository,

@@ -21,6 +21,35 @@ async function bootstrap() {
   const nodeEnv = config.get('NODE_ENV', { infer: true });
 
   // Serve static uploaded assets
+  // Trust proxy headers only in production (so rate limiting, CSRF origin checks
+  // and audit IP logging see real client addresses behind a reverse proxy)
+  (app.getHttpAdapter().getInstance() as express.Express).set(
+    'trust proxy',
+    nodeEnv === 'production' ? 1 : false,
+  );
+
+  // Security heads-up: flag connection strings that embed plain-text credentials.
+  // Production should inject secrets via environment variables / a vault.
+  const embeddedCredentialCheck = (url?: string): boolean =>
+    typeof url === 'string' && /\/\/[^:\/@]+:[^@\/]+@/.test(url);
+
+  const urlsWithCredentials = [
+    config.get('DATABASE_URL', { infer: true }),
+    config.get('MONGO_URI', { infer: true }),
+    config.get('MARIADB_URL', { infer: true }),
+    config.get('MYSQL_URL', { infer: true }),
+    config.get('COCKROACH_URL', { infer: true }),
+    config.get('CLICKHOUSE_URL', { infer: true }),
+  ].filter((url): url is string => embeddedCredentialCheck(url));
+
+  if (urlsWithCredentials.length > 0) {
+    console.warn(
+      `[Security] ${urlsWithCredentials.length} connection string(s) embed plain-text credentials in the .env file. ` +
+        'These are only safe for local development — rotate any credentials shared outside this machine ' +
+        'and switch to environment-variable/secret-manager injection in production.',
+    );
+  }
+
   const uploadDir = path.resolve(process.cwd(), 'uploads');
   app.use('/uploads', express.static(uploadDir));
 

@@ -291,6 +291,18 @@ export const DatabaseSwitcherPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <div className="p-4 bg-white border border-border-subtle flex items-center gap-3" style={{ borderRadius: 2 }}>
+          <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+            <Database size={18} />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">Repository Implementations</div>
+            <div className="text-xs font-bold font-mono text-ink-primary">
+              {dbStatus?.registeredRepositories?.total ?? 0} across {Object.keys(dbStatus?.registeredRepositories?.byEngine ?? {}).length} engines
+            </div>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (

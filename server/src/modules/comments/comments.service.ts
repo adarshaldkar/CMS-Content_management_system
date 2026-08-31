@@ -8,14 +8,41 @@ import {
 import { COMMENT_REPOSITORY, type ICommentRepository } from '../../repositories/interfaces/comment.repository.interface';
 import { AuditService } from '../audit/audit.service';
 import { AuditEventType, type AuthUser, CommentStatus, type CreateCommentDto, type UpdateCommentDto } from '../../domain/models';
+import sanitizeHtml from 'sanitize-html';
 
-// Simple allow-list HTML sanitiser (strips all tags except safe inline ones)
+// Allow-list HTML sanitiser (reuses sanitize-html like article content)
 function sanitizeCommentBody(raw: string): string {
-  return raw
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<(?!\/?(strong|em|b|i|code|a)[^>]*>)[^>]+>/gi, '')
-    .trim();
+  if (!raw || typeof raw !== 'string') {
+    return '';
+  }
+  return sanitizeHtml(raw, {
+    allowedTags: ['strong', 'em', 'b', 'i', 'code', 'a', 'p', 'br'],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel', 'title'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+    allowProtocolRelative: false,
+    transformTags: {
+      a: (tagName, attribs) => {
+        const href = (attribs.href || '').trim().toLowerCase();
+        if (
+          href.startsWith('javascript:') ||
+          href.startsWith('vbscript:') ||
+          href.startsWith('data:')
+        ) {
+          delete attribs.href;
+        }
+        const isExternal = href.startsWith('http://') || href.startsWith('https://');
+        if (isExternal) {
+          attribs.rel = attribs.rel
+            ? `${attribs.rel} noopener noreferrer`.trim()
+            : 'noopener noreferrer';
+          attribs.target = attribs.target || '_blank';
+        }
+        return { tagName, attribs };
+      },
+    },
+  }).trim();
 }
 
 @Injectable()
