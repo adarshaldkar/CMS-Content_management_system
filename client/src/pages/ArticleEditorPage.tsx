@@ -10,7 +10,9 @@ import {
   Loader2,
   Sparkles,
   ExternalLink,
+  User,
 } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 import {
   getArticleById,
   createArticle,
@@ -28,6 +30,12 @@ import type { Article, ArticleStatus, Category } from '../types';
 export const ArticleEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, hasRole } = useAuthStore();
+  const isAdminOrSuperAdmin =
+    hasRole('admin') ||
+    hasRole('super_admin') ||
+    user?.role?.toUpperCase() === 'ADMIN' ||
+    user?.role?.toUpperCase() === 'SUPER_ADMIN';
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [slotClearance, setSlotClearance] = useState<AuthorClearanceInfo | null>(null);
@@ -45,6 +53,7 @@ export const ArticleEditorPage: React.FC = () => {
     seoTitle: '',
     seoDescription: '',
     reviewNote: null,
+    showAuthorName: true,
   });
 
   const [loading, setLoading] = useState(false);
@@ -140,7 +149,11 @@ export const ArticleEditorPage: React.FC = () => {
           changeSummary: 'Manual draft save',
         });
         setArticle(updated);
-        setSuccessMessage('Draft saved successfully.');
+        setSuccessMessage(
+          article.status === 'published'
+            ? 'Story changes saved and updated successfully.'
+            : 'Draft saved successfully.'
+        );
         return updated;
       } else {
         const created = await createArticle(article);
@@ -266,7 +279,15 @@ export const ArticleEditorPage: React.FC = () => {
             style={{ borderRadius: 2 }}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            <span>Save Draft</span>
+            <span>
+              {saving
+                ? 'Saving…'
+                : article.status === 'published'
+                  ? 'Save Changes'
+                  : article.status === 'pending_review'
+                    ? 'Update Submission'
+                    : 'Save Draft'}
+            </span>
           </button>
         </div>
       </header>
@@ -437,6 +458,33 @@ export const ArticleEditorPage: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Author Byline Visibility (Admin Control) */}
+          <div className="bg-white border border-border-subtle p-5 space-y-3" style={{ borderRadius: 2 }}>
+            <label className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" /> Author Byline
+            </label>
+            <div className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                id="showAuthorName"
+                checked={article.showAuthorName !== false}
+                disabled={!isAdminOrSuperAdmin}
+                onChange={(e) => setArticle((prev) => ({ ...prev, showAuthorName: e.target.checked }))}
+                className="mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <div>
+                <label htmlFor="showAuthorName" className="text-xs font-semibold text-ink-primary cursor-pointer select-none">
+                  Display Author Name
+                </label>
+                <p className="text-[10px] text-ink-secondary mt-0.5 leading-relaxed">
+                  {isAdminOrSuperAdmin
+                    ? "If turned off, this story publishes under 'Editorial Staff' instead of the author's name."
+                    : "Only administrators can configure this story's public byline visibility."}
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Editorial Section / Category */}

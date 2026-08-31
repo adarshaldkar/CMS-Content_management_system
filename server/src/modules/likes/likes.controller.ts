@@ -30,4 +30,14 @@ export class LikesController {
     const count = await this.likesService.getLikeCount(articleId);
     return { articleId, likesCount: count };
   }
+
+  @Get(':articleId/like/status')
+  @ApiOperation({ summary: 'Get whether the current user has liked an article' })
+  async getLikeStatus(
+    @Param('articleId') articleId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const liked = await this.likesService.isLiked(user.id, articleId);
+    return { liked };
+  }
 }

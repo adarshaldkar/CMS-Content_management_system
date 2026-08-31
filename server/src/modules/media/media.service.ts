@@ -86,7 +86,7 @@ export class MediaService {
 
     await this.auditService.log({
       actorId: user.id,
-      action: AuditEventType.ARTICLE_CREATED, // or asset upload
+      action: AuditEventType.MEDIA_UPLOADED,
       resource: `Media:${media.id}`,
       result: 'SUCCESS',
       metadata: {

@@ -8,16 +8,24 @@ import {
   FileText,
   History,
   Sparkles,
+  User,
   XCircle,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Skeleton } from '../../components/common/SkeletonLoader';
+import { useAuthStore } from '../../stores/authStore';
 import type { Article, ArticleRevision, PaginatedResult } from '../../types';
 
 export const EditorialReviewPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'pending_review' | 'changes_requested' | 'approved' | 'scheduled'>('pending_review');
+  const { user, hasRole } = useAuthStore();
+  const isAdminOrSuperAdmin =
+    hasRole('admin') ||
+    hasRole('super_admin') ||
+    user?.role?.toUpperCase() === 'ADMIN' ||
+    user?.role?.toUpperCase() === 'SUPER_ADMIN';
+  const [activeTab, setActiveTab] = useState<'pending_review' | 'changes_requested' | 'approved' | 'scheduled' | 'published'>('pending_review');
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -33,6 +41,7 @@ export const EditorialReviewPage: React.FC = () => {
         changes_requested: 'rejected',
         approved: 'approved',
         scheduled: 'scheduled',
+        published: 'published',
       };
       const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
         params: { status: statusMap[activeTab], limit: 30 },
@@ -83,6 +92,24 @@ export const EditorialReviewPage: React.FC = () => {
     },
   });
 
+  const bylineMutation = useMutation({
+    mutationFn: async ({ articleId, show }: { articleId: string; show: boolean }) => {
+      const { data } = await apiClient.patch(`/articles/${articleId}`, { showAuthorName: show });
+      return data as Article;
+    },
+    onSuccess: (updated, vars) => {
+      queryClient.setQueryData<PaginatedResult<Article>>(['editorialReviewQueue', activeTab], (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.map((a) => (a.id === vars.articleId ? { ...a, showAuthorName: vars.show } : a)),
+            }
+          : old,
+      );
+      setSelectedArticle((prev) => (prev ? { ...prev, showAuthorName: vars.show } : prev));
+    },
+  });
+
   const articles = articlesData?.items || [];
 
   return (
@@ -103,12 +130,13 @@ export const EditorialReviewPage: React.FC = () => {
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center border-b border-border-subtle overflow-x-auto">
+        <div className="flex items-center border-b border-border-subtle flex-wrap">
           {[
             { id: 'pending_review', label: 'Pending Review', count: articles.length },
             { id: 'changes_requested', label: 'Changes Requested' },
             { id: 'approved', label: 'Approved' },
             { id: 'scheduled', label: 'Scheduled' },
+            { id: 'published', label: 'Published' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -134,76 +162,137 @@ export const EditorialReviewPage: React.FC = () => {
       </div>
 
       {/* Main Review Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Manuscripts Queue List (5 cols) */}
-        <div className="lg:col-span-5 space-y-3">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-secondary font-semibold">
-            Submissions ({articles.length})
-          </p>
-
-          {isLoading ? (
-            <div className="space-y-3 p-2">
-              <div className="p-4 bg-white border border-border-subtle space-y-2">
-                <Skeleton className="w-20 h-3" />
-                <Skeleton className="w-full h-5" />
-                <Skeleton className="w-3/4 h-3.5" />
-              </div>
-              <div className="p-4 bg-white border border-border-subtle space-y-2">
-                <Skeleton className="w-20 h-3" />
-                <Skeleton className="w-full h-5" />
-                <Skeleton className="w-3/4 h-3.5" />
-              </div>
-              <div className="p-4 bg-white border border-border-subtle space-y-2">
-                <Skeleton className="w-20 h-3" />
-                <Skeleton className="w-full h-5" />
-                <Skeleton className="w-3/4 h-3.5" />
-              </div>
-            </div>
-          ) : articles.length > 0 ? (
-            <div className="divide-y divide-border-subtle bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
-              {articles.map((article) => (
-                <div
-                  key={article.id}
-                  onClick={() => setSelectedArticle(article)}
-                  className={`p-4 transition-colors cursor-pointer space-y-1.5 ${
-                    selectedArticle?.id === article.id
-                      ? 'bg-slate-50 border-l-2 border-accent-crimson'
-                      : 'hover:bg-slate-50/60 border-l-2 border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-mono">
-                    <span className="text-accent-crimson font-semibold uppercase tracking-wider">
-                      {article.categorySlug || 'Dispatch'}
-                    </span>
-                    <span className="text-ink-secondary">v{article.version}</span>
-                  </div>
-
-                  <h3 className="text-sm font-editorial font-semibold text-ink-primary leading-snug line-clamp-2">
-                    {article.title}
-                  </h3>
-
-                  {article.description && (
-                    <p className="text-xs text-ink-secondary line-clamp-2">{article.description}</p>
-                  )}
-
-                  <div className="flex items-center justify-between text-[10px] font-mono text-ink-secondary pt-2">
-                    <span>{article.readingTimeMinutes || 3} min read</span>
-                    <span>{new Date(article.updatedAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-10 text-center bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
-              <CheckCircle2 size={20} className="mx-auto text-emerald-600 mb-2" />
-              <p className="text-xs font-semibold text-ink-primary">Queue is clear</p>
-              <p className="text-xs text-ink-secondary mt-1 font-editorial italic">No manuscripts in this status.</p>
-            </div>
-          )}
+      <div className="space-y-4">
+        {/* Manuscripts Table */}
+        <div className="bg-white border border-border-subtle" style={{ borderRadius: 2 }}>
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-canvas-paper border-b border-border-subtle font-mono uppercase text-[10px] tracking-wider text-ink-secondary">
+              <tr>
+                <th className="px-4 py-2.5 font-semibold">Title</th>
+                <th className="px-4 py-2.5 font-semibold">Category</th>
+                <th className="px-4 py-2.5 font-semibold">Author</th>
+                <th className="px-4 py-2.5 font-semibold">Status</th>
+                <th className="px-4 py-2.5 font-semibold">Published</th>
+                <th className="px-4 py-2.5 font-semibold">Byline</th>
+                <th className="px-4 py-2.5 font-semibold">Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8">
+                    <div className="space-y-3">
+                      <Skeleton className="w-full h-4" />
+                      <Skeleton className="w-3/4 h-4" />
+                      <Skeleton className="w-5/6 h-4" />
+                    </div>
+                  </td>
+                </tr>
+              ) : articles.length > 0 ? (
+                articles.map((article) => {
+                  const isPublished = article.status === 'published' && Boolean(article.publishedAt);
+                  return (
+                    <tr
+                      key={article.id}
+                      onClick={() => setSelectedArticle(article)}
+                      className={`cursor-pointer transition-colors ${
+                        selectedArticle?.id === article.id
+                          ? 'bg-slate-50'
+                          : 'hover:bg-slate-50/60'
+                      } border-b border-border-subtle last:border-b-0`}
+                    >
+                      <td className="px-4 py-3 align-top">
+                        <p className="text-sm font-editorial font-semibold text-ink-primary leading-snug line-clamp-1">
+                          {article.title || <span className="italic text-ink-secondary">Untitled</span>}
+                        </p>
+                        {article.description && (
+                          <p className="text-xs text-ink-secondary line-clamp-1 mt-0.5">{article.description}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-mono text-accent-crimson uppercase tracking-wider whitespace-nowrap">
+                        {article.categorySlug || 'Dispatch'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-secondary whitespace-nowrap">
+                        {article.authorName || 'Editorial Staff'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 border ${
+                            article.status === 'published'
+                              ? 'text-emerald-700 border-emerald-300 bg-emerald-50'
+                              : article.status === 'approved'
+                              ? 'text-sky-700 border-sky-300 bg-sky-50'
+                              : article.status === 'scheduled'
+                              ? 'text-violet-700 border-violet-300 bg-violet-50'
+                              : article.status === 'rejected'
+                              ? 'text-rose-700 border-rose-300 bg-rose-50'
+                              : 'text-amber-700 border-amber-300 bg-amber-50'
+                          }`}
+                          style={{ borderRadius: 2 }}
+                        >
+                          {article.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-mono tabular-nums whitespace-nowrap">
+                        {isPublished ? (
+                          <span className="text-emerald-700 font-semibold">
+                            {new Date(article.publishedAt as string).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-ink-secondary/50">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {isAdminOrSuperAdmin ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              bylineMutation.mutate({
+                                articleId: article.id,
+                                show: article.showAuthorName === false,
+                              });
+                            }}
+                            disabled={bylineMutation.isPending}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-semibold border transition-colors ${
+                              article.showAuthorName === false
+                                ? 'text-ink-secondary border-border-subtle hover:text-ink-primary'
+                                : 'text-accent-crimson border-accent-crimson/40 hover:bg-accent-crimson hover:text-white'
+                            }`}
+                            style={{ borderRadius: 2 }}
+                          >
+                            {article.showAuthorName === false ? 'Off' : 'On'}
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-mono text-ink-secondary/50">
+                            {article.showAuthorName === false ? 'Off' : 'On'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-mono text-ink-secondary tabular-nums whitespace-nowrap">
+                        v{article.version}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center">
+                    <CheckCircle2 size={20} className="mx-auto text-emerald-600 mb-2" />
+                    <p className="text-xs font-semibold text-ink-primary">Queue is clear</p>
+                    <p className="text-xs text-ink-secondary mt-1 font-editorial italic">No manuscripts in this status.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Inspection & Manuscript Detail (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        {/* Inspection & Manuscript Detail */}
+        <div className="space-y-4">
           {selectedArticle ? (
             <div className="bg-white border border-border-subtle p-6 space-y-6" style={{ borderRadius: 2 }}>
               {/* Inspection Header */}
@@ -277,6 +366,48 @@ export const EditorialReviewPage: React.FC = () => {
                   <Calendar size={13} />
                   <span>Schedule</span>
                 </button>
+              </div>
+
+              {/* Author Byline Visibility (Admin Control) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-canvas-paper border border-border-subtle p-3" style={{ borderRadius: 2 }}>
+                <div className="flex items-center gap-2.5">
+                  <User size={14} className="text-accent-crimson" />
+                  <div>
+                    <p className="text-xs font-semibold text-ink-primary">
+                      Author Byline — {selectedArticle.authorName || 'Editorial Staff'}
+                    </p>
+                    <p className="text-[10px] text-ink-secondary mt-0.5">
+                      {selectedArticle.showAuthorName === false
+                        ? 'This story publishes under "Editorial Staff".'
+                        : 'This story displays the author\'s name publicly.'}
+                    </p>
+                  </div>
+                </div>
+                {isAdminOrSuperAdmin ? (
+                  <button
+                    onClick={() =>
+                      bylineMutation.mutate({
+                        articleId: selectedArticle.id,
+                        show: selectedArticle.showAuthorName === false,
+                      })
+                    }
+                    disabled={bylineMutation.isPending}
+                    title="Toggle whether this author's name shows publicly"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                      selectedArticle.showAuthorName === false
+                        ? 'text-ink-secondary border-border-subtle hover:text-ink-primary'
+                        : 'text-accent-crimson border-accent-crimson/40 hover:bg-accent-crimson hover:text-white'
+                    }`}
+                    style={{ borderRadius: 2 }}
+                  >
+                    {selectedArticle.showAuthorName === false ? <span>Show Author Name</span> : <User size={11} />}
+                    <span>{selectedArticle.showAuthorName === false ? 'Byline: Off' : 'Byline: On'}</span>
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-mono text-ink-secondary">
+                    Only administrators can configure byline visibility
+                  </span>
+                )}
               </div>
 
               {/* Revision Snapshot & Content Body */}

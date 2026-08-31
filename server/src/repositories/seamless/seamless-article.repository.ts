@@ -112,7 +112,30 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
       );
     }
 
-    // 2. MariaDB
+    await this.replicateRawEngines(article);
+  }
+
+  /**
+   * Upsert-semantics replication for an updated article. Applies the mutation to
+   * the peer store's `update` (mutating an existing document) rather than the
+   * `create`-based `replicateToAll`, which would throw on duplicate keys.
+   */
+  private async replicateUpdateToAll(id: string, data: UpdateArticleDto): Promise<void> {
+    const tasks: Promise<any>[] = [];
+
+    for (const store of this.peerStores) {
+      tasks.push(
+        store.update(id, data).catch((e) => this.logger.debug(`Peer article update sync note: ${e.message}`)),
+      );
+    }
+
+    await this.replicateRawEngines(data as Article);
+  }
+
+  private async replicateRawEngines(article: Article): Promise<void> {
+    const tasks: Promise<any>[] = [];
+
+    // MariaDB
     if (this.mariadb) {
       tasks.push(
         this.mariadb.pool.query(
@@ -141,7 +164,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
       );
     }
 
-    // 3. MySQL
+    // MySQL
     if (this.mysql) {
       tasks.push(
         this.mysql.pool.query(
@@ -170,7 +193,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
       );
     }
 
-    // 4. CockroachDB
+    // CockroachDB
     if (this.cockroach) {
       tasks.push(
         this.cockroach.pool.query(
@@ -199,7 +222,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
       );
     }
 
-    // 5. ClickHouse
+    // ClickHouse
     if (this.clickhouse) {
       tasks.push(
         this.clickhouse.client.insert({
@@ -308,7 +331,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
 
   async update(id: string, data: UpdateArticleDto): Promise<Article> {
     const article = await this.activeRepo.update(id, data);
-    this.replicateToAll(article).catch((e) => this.logger.warn(`Multi-DB Article update sync failed: ${e.message}`));
+    this.replicateUpdateToAll(id, data).catch((e) => this.logger.warn(`Multi-DB Article update sync failed: ${e.message}`));
     return article;
   }
 
@@ -317,7 +340,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
     if (note) {
       await this.activeRepo.update(id, { reviewNote: note }).catch(() => {});
     }
-    this.replicateToAll(article).catch((e) => this.logger.warn(`Multi-DB Article status sync failed: ${e.message}`));
+    this.replicateUpdateToAll(id, { status }).catch((e) => this.logger.warn(`Multi-DB Article status sync failed: ${e.message}`));
     return article;
   }
 

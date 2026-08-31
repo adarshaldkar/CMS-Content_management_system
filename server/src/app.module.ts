@@ -36,37 +36,7 @@ import { PublishingSlotsModule } from './modules/publishing-slots/publishing-slo
       {
         name: 'default',
         ttl: 60000,
-        limit: 300, // Standard API reading operations
-      },
-      {
-        name: 'auth-sensitive',
-        ttl: 60000,
-        limit: 10, // Login, registration, password reset
-      },
-      {
-        name: 'auth-relaxed',
-        ttl: 60000,
-        limit: 60, // Refresh tokens
-      },
-      {
-        name: 'admin-critical',
-        ttl: 60000,
-        limit: 10, // Database switching, role changes, account bans
-      },
-      {
-        name: 'admin-standard',
-        ttl: 60000,
-        limit: 60, // Admin review and user directory listing
-      },
-      {
-        name: 'user-mutation',
-        ttl: 60000,
-        limit: 30, // Comments, likes, bookmarks anti-spam
-      },
-      {
-        name: 'media-upload',
-        ttl: 60000,
-        limit: 15, // Media file uploads anti-DoS
+        limit: 1000, // Standard API reading and browsing operations
       },
     ]),
   ],

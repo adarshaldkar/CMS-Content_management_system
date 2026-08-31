@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Edit3, ExternalLink, Plus } from 'lucide-react';
+import { ArrowRight, Edit3, ExternalLink, Plus, User } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { apiClient } from '../../api/client';
 import { Skeleton } from '../../components/common/SkeletonLoader';
@@ -31,7 +31,12 @@ const TABS = [
 export const StoriesManagerPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuthStore();
+  const { user, hasRole } = useAuthStore();
+  const isAdminOrSuperAdmin =
+    hasRole('admin') ||
+    hasRole('super_admin') ||
+    user?.role?.toUpperCase() === 'ADMIN' ||
+    user?.role?.toUpperCase() === 'SUPER_ADMIN';
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -39,7 +44,7 @@ export const StoriesManagerPage: React.FC = () => {
     queryKey: ['authorStories', user?.id],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
-        params: { limit: 100 },
+        params: { authorId: user?.id, limit: 100 },
       });
       return data;
     },
@@ -55,6 +60,27 @@ export const StoriesManagerPage: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['authorStories'] });
+    },
+  });
+
+  const toggleBylineMutation = useMutation({
+    mutationFn: async ({ articleId, show }: { articleId: string; show: boolean }) => {
+      await apiClient.patch(`/articles/${articleId}`, { showAuthorName: show });
+      return show;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.setQueryData<PaginatedResult<Article>>(
+        ['authorStories', user?.id],
+        (old) =>
+          old
+            ? {
+                ...old,
+                items: old.items.map((a) =>
+                  a.id === vars.articleId ? { ...a, showAuthorName: vars.show } : a,
+                ),
+              }
+            : old,
+      );
     },
   });
 
@@ -182,6 +208,9 @@ export const StoriesManagerPage: React.FC = () => {
               label: article.status,
               dot: 'bg-slate-300',
             };
+            const isOwner = article.authorId === user?.id;
+            const canEdit = isOwner || isAdminOrSuperAdmin;
+
             return (
               <div
                 key={article.id}
@@ -241,31 +270,61 @@ export const StoriesManagerPage: React.FC = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  {article.status === 'draft' && (
+                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  {article.status === 'draft' && isOwner && (
                     <button
                       onClick={() => submitForReviewMutation.mutate(article.id)}
                       disabled={submitForReviewMutation.isPending}
-                      className="px-3 py-1.5 text-xs font-medium text-accent-crimson border border-accent-crimson hover:bg-accent-crimson hover:text-white transition-colors"
+                      className="px-3 py-1 text-xs font-medium text-accent-crimson border border-accent-crimson hover:bg-accent-crimson hover:text-white transition-colors"
                       style={{ borderRadius: 2 }}
                     >
                       Submit
                     </button>
                   )}
-                  <Link
-                    to={`/write/${article.id}`}
-                    className="p-2 text-ink-secondary hover:text-ink-primary transition-colors"
-                    title="Edit"
-                  >
-                    <Edit3 size={14} />
-                  </Link>
+                  {isAdminOrSuperAdmin && (
+                    <button
+                      onClick={() =>
+                        toggleBylineMutation.mutate({
+                          articleId: article.id,
+                          show: article.showAuthorName === false,
+                        })
+                      }
+                      disabled={toggleBylineMutation.isPending}
+                      title={
+                        article.showAuthorName === false
+                          ? 'Show Author Name'
+                          : 'Hide Author Name (publish as Editorial Staff)'
+                      }
+                      className={`px-2.5 py-1 text-xs flex items-center gap-1 border transition-colors ${
+                        article.showAuthorName === false
+                          ? 'text-ink-secondary border-border-subtle hover:text-ink-primary'
+                          : 'text-accent-crimson border-accent-crimson/40 hover:bg-accent-crimson hover:text-white'
+                      }`}
+                      style={{ borderRadius: 2 }}
+                    >
+                      <User size={11} />
+                      <span>{article.showAuthorName === false ? 'Byline: Off' : 'Byline: On'}</span>
+                    </button>
+                  )}
+                  {canEdit && (
+                    <Link
+                      to={`/write/${article.id}`}
+                      className="p-1.5 text-ink-secondary hover:text-ink-primary border border-border-subtle hover:bg-slate-100 transition-colors"
+                      title={isOwner ? 'Edit Your Story' : 'Edit Manuscript (Admin)'}
+                      style={{ borderRadius: 2 }}
+                    >
+                      <Edit3 size={13} />
+                    </Link>
+                  )}
                   {article.status === 'published' && article.slug && (
                     <Link
                       to={`/articles/${article.slug}`}
-                      className="p-2 text-ink-secondary hover:text-ink-primary transition-colors"
-                      title="View published"
+                      className="px-2.5 py-1 text-xs text-ink-secondary hover:text-ink-primary flex items-center gap-1 border border-border-subtle hover:bg-slate-50 transition-colors"
+                      title="View Live Published Story"
+                      style={{ borderRadius: 2 }}
                     >
-                      <ExternalLink size={14} />
+                      <span>View</span>
+                      <ExternalLink size={12} />
                     </Link>
                   )}
                 </div>

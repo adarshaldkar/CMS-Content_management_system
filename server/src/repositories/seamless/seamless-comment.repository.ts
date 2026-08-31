@@ -107,7 +107,31 @@ export class SeamlessCommentRepository implements ICommentRepository, IRuntimeSw
       );
     }
 
-    // 2. MariaDB
+    await this.replicateRawEngines(comment);
+  }
+
+  /**
+   * Upsert-semantics replication for an updated comment. Mutates an existing
+   * document via the peer store's `update`, rather than `replicateToAll`'s
+   * `create` (which would throw on duplicate keys for an existing comment).
+   */
+  private async replicateUpdateToAll(id: string, dto: UpdateCommentDto): Promise<void> {
+    const tasks: Promise<any>[] = [];
+
+    for (const store of this.peerStores) {
+      tasks.push(
+        store.update(id, dto).catch((e) => this.logger.debug(`Peer comment update sync note: ${e.message}`)),
+      );
+    }
+
+    await this.replicateRawEngines(dto as Comment);
+  }
+
+  private async replicateRawEngines(comment: Comment): Promise<void> {
+    const tasks: Promise<any>[] = [];
+    const sqlStatus = comment.status.toUpperCase();
+
+    // MariaDB
     if (this.mariadb) {
       tasks.push(
         this.mariadb.pool
@@ -131,7 +155,7 @@ export class SeamlessCommentRepository implements ICommentRepository, IRuntimeSw
       );
     }
 
-    // 3. MySQL
+    // MySQL
     if (this.mysql) {
       tasks.push(
         this.mysql.pool
@@ -155,7 +179,7 @@ export class SeamlessCommentRepository implements ICommentRepository, IRuntimeSw
       );
     }
 
-    // 4. CockroachDB
+    // CockroachDB
     if (this.cockroach) {
       tasks.push(
         this.cockroach.pool
@@ -224,7 +248,7 @@ export class SeamlessCommentRepository implements ICommentRepository, IRuntimeSw
 
   async update(id: string, dto: UpdateCommentDto): Promise<Comment> {
     const comment = await this.activeRepo.update(id, dto);
-    this.replicateToAll(comment).catch((e) =>
+    this.replicateUpdateToAll(id, dto).catch((e) =>
       this.logger.warn(`Multi-DB Comment update sync failed: ${e.message}`),
     );
     return comment;

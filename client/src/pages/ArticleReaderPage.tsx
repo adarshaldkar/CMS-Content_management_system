@@ -97,6 +97,38 @@ export const ArticleReaderPage: React.FC = () => {
     enabled: Boolean(article?.id),
   });
 
+  // 3b. Load the current user's engagement state once, so liked/bookmarked/following
+  // buttons reflect reality on first render (not only after a toggle).
+  useQuery({
+    queryKey: ['articleLikeStatus', article?.id],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ liked: boolean }>(`/articles/${article?.id}/like/status`);
+      setHasLiked(data.liked);
+      return data;
+    },
+    enabled: isAuthenticated && Boolean(article?.id),
+  });
+
+  useQuery({
+    queryKey: ['articleBookmarkStatus', article?.id],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ bookmarked: boolean }>(`/articles/${article?.id}/bookmark/status`);
+      setHasBookmarked(data.bookmarked);
+      return data;
+    },
+    enabled: isAuthenticated && Boolean(article?.id),
+  });
+
+  useQuery({
+    queryKey: ['authorFollowStatus', article?.authorId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ following: boolean }>(`/users/${article?.authorId}/follow/status`);
+      setIsFollowingAuthor(data.following);
+      return data;
+    },
+    enabled: isAuthenticated && Boolean(article?.authorId),
+  });
+
   // 4. Like Mutation
   const toggleLikeMutation = useMutation({
     mutationFn: async () => {
@@ -482,7 +514,7 @@ export const ArticleReaderPage: React.FC = () => {
             >
               <span>Edit Your Story</span>
             </Link>
-          ) : (
+          ) : article.showAuthorName !== false ? (
             <button
               onClick={handleFollowToggle}
               disabled={toggleFollowMutation.isPending}
@@ -505,7 +537,7 @@ export const ArticleReaderPage: React.FC = () => {
                 </>
               )}
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* 6. Comments Section */}

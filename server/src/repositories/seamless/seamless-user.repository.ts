@@ -103,7 +103,32 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
       );
     }
 
-    // 2. MariaDB
+    // 1b. Raw SQL engines + analytics (upsert semantics for existing rows)
+    await this.replicateRawEngines(user);
+  }
+
+  /**
+   * Upsert-semantics replication for an updated user. Unlike `replicateToAll`
+   * (which inserts via the peer store's `create` — failing on duplicate keys for
+   * an already-existing user), updates propagate through the peer store's
+   * `update` call so an existing document is actually mutated.
+   */
+  private async replicateUpdateToAll(id: string, data: UpdateUserDto): Promise<void> {
+    const tasks: Promise<any>[] = [];
+
+    for (const store of this.peerStores) {
+      tasks.push(
+        store.update(id, data).catch((e) => this.logger.debug(`Peer user update sync note: ${e.message}`)),
+      );
+    }
+
+    await this.replicateRawEngines(data as User);
+  }
+
+  private async replicateRawEngines(user: User): Promise<void> {
+    const tasks: Promise<any>[] = [];
+
+    // MariaDB
     if (this.mariadb) {
       tasks.push(
         this.mariadb.pool.query(
@@ -125,7 +150,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
       );
     }
 
-    // 3. MySQL
+    // MySQL
     if (this.mysql) {
       tasks.push(
         this.mysql.pool.query(
@@ -147,7 +172,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
       );
     }
 
-    // 4. CockroachDB
+    // CockroachDB
     if (this.cockroach) {
       tasks.push(
         this.cockroach.pool.query(
@@ -169,7 +194,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
       );
     }
 
-    // 5. ClickHouse
+    // ClickHouse
     if (this.clickhouse) {
       tasks.push(
         this.clickhouse.client.insert({
@@ -262,7 +287,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
 
   async update(id: string, data: UpdateUserDto): Promise<User> {
     const user = await this.activeRepo.update(id, data);
-    this.replicateToAll(user).catch((e) => this.logger.warn(`Multi-DB User update sync failed: ${e.message}`));
+    this.replicateUpdateToAll(id, data).catch((e) => this.logger.warn(`Multi-DB User update sync failed: ${e.message}`));
     return user;
   }
 

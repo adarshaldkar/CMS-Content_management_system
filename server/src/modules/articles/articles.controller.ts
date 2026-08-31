@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ArticleService } from './article.service';
 import { WorkflowService } from './workflow.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -41,6 +42,7 @@ export class ArticlesController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
   @Get()
   @ApiOperation({ summary: 'List public published articles or filter by query' })
   async list(
@@ -63,7 +65,7 @@ export class ArticlesController {
   ): Promise<PaginatedResult<Article>> {
     const resolvedSlug = categorySlug || category;
     const resolvedCategorySlugs = categorySlugs || (resolvedSlug ? [resolvedSlug] : undefined);
-    const resolvedStatus = status || ContentStatus.PUBLISHED;
+    const resolvedStatus = status ? status : authorId ? undefined : ContentStatus.PUBLISHED;
 
     return this.articleService.findMany({
       page: Math.max(1, parseInt(page, 10) || 1),

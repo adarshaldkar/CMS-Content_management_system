@@ -17,6 +17,9 @@ export interface Article {
   description: string;
   content: string;
   authorId: string;
+  authorName?: string | null;
+  authorAvatar?: string | null;
+  showAuthorName?: boolean;
   categoryId: string | null;
   categorySlug?: string | null;
   author?: { id: string; name: string; avatarUrl?: string | null };
@@ -71,10 +74,11 @@ export interface WorkflowTransitionDto {
 
 export interface CreateArticleDto {
   title: string;
-  slug: string;
-  description: string;
-  content: string;
+  slug?: string;
+  description?: string;
+  content?: string;
   authorId: string;
+  showAuthorName?: boolean;
   categoryId?: string | null;
   tagIds?: string[];
   coverImage?: string | null;
@@ -94,6 +98,8 @@ export interface UpdateArticleDto {
   slug?: string;
   description?: string;
   content?: string;
+  authorId?: string;
+  showAuthorName?: boolean;
   categoryId?: string | null;
   tagIds?: string[];
   coverImage?: string | null;

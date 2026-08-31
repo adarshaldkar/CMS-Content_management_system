@@ -130,10 +130,18 @@ export class CommentsService {
   async hideComment(commentId: string, moderationNote: string, actor: AuthUser) {
     const comment = await this.commentRepo.findById(commentId);
     if (!comment) throw new NotFoundException('Comment not found.');
-    return this.commentRepo.update(commentId, {
+    const updated = await this.commentRepo.update(commentId, {
       status: CommentStatus.HIDDEN,
       moderationNote,
     });
+    await this.auditService.log({
+      actorId: actor.id,
+      action: AuditEventType.COMMENT_HIDDEN,
+      resource: `Comment:${commentId}`,
+      result: 'SUCCESS',
+      metadata: { ownerId: comment.authorId, moderationNote },
+    });
+    return updated;
   }
 
   async countComments(articleId: string): Promise<number> {
@@ -150,7 +158,7 @@ export class CommentsService {
     return this.commentRepo.findMany({
       page: filters.page,
       limit: filters.limit,
-      ...(filters.flagged ? { flagged: true } : {}),
+      ...(filters.flagged ? { status: CommentStatus.REPORTED } : {}),
       ...(filters.hidden ? { status: CommentStatus.HIDDEN } : {}),
       ...(filters.articleId ? { articleId: filters.articleId } : {}),
     });

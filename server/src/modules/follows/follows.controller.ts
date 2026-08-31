@@ -29,6 +29,21 @@ export class FollowsController {
     return this.followsService.unfollowUser(userId, user);
   }
 
+  @Get('users/:userId/follow/status')
+  @ApiOperation({ summary: 'Get whether the current user follows a target user' })
+  @RequirePermissions(Permission.FOLLOW_READ)
+  async getFollowStatus(
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const following = await this.followsService.isFollowing(
+      user.id,
+      FollowTargetType.USER,
+      userId,
+    );
+    return { following };
+  }
+
   @Public()
   @Get('users/:userId/followers')
   @ApiOperation({ summary: 'Get followers of a user' })

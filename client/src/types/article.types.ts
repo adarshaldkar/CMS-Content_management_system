@@ -16,6 +16,8 @@ export interface Article {
   authorId: string;
   authorName?: string;
   authorAvatar?: string | null;
+  showAuthorName?: boolean;
+  author?: { id: string; name: string; avatarUrl?: string | null };
   categoryId: string | null;
   categoryName?: string;
   categorySlug?: string;

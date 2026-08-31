@@ -41,6 +41,23 @@ export class BookmarksService {
     }
   }
 
+  async removeBookmark(articleId: string, actor: AuthUser): Promise<{ bookmarked: boolean; bookmarksCount: number }> {
+    const existing = await this.bookmarkRepo.findOne(actor.id, articleId);
+    const removed = existing ? await this.bookmarkRepo.delete(actor.id, articleId) : false;
+
+    if (removed || !!existing) {
+      await this.auditService.log({
+        actorId: actor.id,
+        action: AuditEventType.BOOKMARK_DELETED,
+        resource: `Article:${articleId}`,
+        result: 'SUCCESS',
+      });
+    }
+
+    const count = existing ? await this.bookmarkRepo.countByArticle(articleId) : 0;
+    return { bookmarked: false, bookmarksCount: count };
+  }
+
   async isBookmarked(userId: string, articleId: string): Promise<boolean> {
     const bookmark = await this.bookmarkRepo.findOne(userId, articleId);
     return !!bookmark;

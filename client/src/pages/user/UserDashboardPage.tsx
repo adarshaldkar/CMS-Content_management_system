@@ -23,7 +23,7 @@ export const UserDashboardPage: React.FC = () => {
     queryKey: ['authorArticles', user?.id],
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
-        params: { limit: 50 },
+        params: { authorId: user?.id, limit: 50 },
       });
       return data;
     },

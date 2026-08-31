@@ -28,6 +28,17 @@ export class BookmarksController {
     );
   }
 
+  @Get('articles/:articleId/bookmark/status')
+  @ApiOperation({ summary: 'Get whether the current user has bookmarked an article' })
+  @RequirePermissions(Permission.BOOKMARK_READ)
+  async getBookmarkStatus(
+    @Param('articleId') articleId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const bookmarked = await this.bookmarksService.isBookmarked(user.id, articleId);
+    return { bookmarked };
+  }
+
   @Post('articles/:articleId/bookmark')
   @ApiOperation({ summary: 'Toggle bookmark on an article (add if absent, remove if present)' })
   @RequirePermissions(Permission.BOOKMARK_CREATE)
@@ -45,6 +56,6 @@ export class BookmarksController {
     @Param('articleId') articleId: string,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.bookmarksService.toggleBookmark(articleId, user);
+    return this.bookmarksService.removeBookmark(articleId, user);
   }
 }

@@ -36,6 +36,7 @@ interface ArticleRow extends QueryResultRow {
   category_slug?: string | null;
   author_name?: string | null;
   author_avatar?: string | null;
+  show_author_name?: boolean;
 }
 
 interface CountRow extends QueryResultRow {
@@ -84,6 +85,7 @@ export class PostgresArticleRepository implements IArticleRepository {
         ALTER TABLE articles ADD COLUMN IF NOT EXISTS reading_time_minutes int NOT NULL DEFAULT 1;
         ALTER TABLE articles ADD COLUMN IF NOT EXISTS review_note text;
         ALTER TABLE articles ADD COLUMN IF NOT EXISTS scheduled_at timestamptz;
+        ALTER TABLE articles ADD COLUMN IF NOT EXISTS show_author_name boolean NOT NULL DEFAULT true;
 
         CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status);
         CREATE INDEX IF NOT EXISTS idx_articles_author_id ON articles(author_id);
@@ -99,6 +101,7 @@ export class PostgresArticleRepository implements IArticleRepository {
 
   private toDomain(row: ArticleRow): Article {
     const tagIds = Array.isArray(row.tag_ids) ? row.tag_ids : [];
+    const showAuthorName = row.show_author_name !== false;
     return {
       id: row.id,
       title: row.title,
@@ -106,15 +109,22 @@ export class PostgresArticleRepository implements IArticleRepository {
       description: row.description,
       content: row.content,
       authorId: row.author_id,
+      authorName: showAuthorName ? (row.author_name || undefined) : 'Editorial Staff',
+      authorAvatar: showAuthorName ? (row.author_avatar || null) : null,
+      showAuthorName,
       categoryId: row.category_id,
       categorySlug: row.category_slug || undefined,
-      author: row.author_name
+      author: showAuthorName && row.author_name
         ? {
             id: row.author_id,
             name: row.author_name,
             avatarUrl: row.author_avatar || null,
           }
-        : undefined,
+        : {
+            id: row.author_id,
+            name: 'Editorial Staff',
+            avatarUrl: null,
+          },
       tagIds: tagIds.map(String),
       coverImage: row.cover_image,
       status: row.status as ContentStatus,
@@ -266,16 +276,39 @@ export class PostgresArticleRepository implements IArticleRepository {
     }
 
     if (filters.search) {
-      values.push(`%${filters.search}%`);
-      clauses.push(
-        `(a.title ILIKE $${values.length} OR a.description ILIKE $${values.length})`,
+      const searchRaw = filters.search.trim();
+      const searchTerms = searchRaw.split(/\s+/).filter(Boolean);
+      const searchClauses: string[] = [];
+
+      // 1. Direct phrase match across title, description, content body, author name, category name
+      values.push(`%${searchRaw}%`);
+      const fullPhraseIdx = values.length;
+      searchClauses.push(
+        `(a.title ILIKE $${fullPhraseIdx} OR a.description ILIKE $${fullPhraseIdx} OR a.content ILIKE $${fullPhraseIdx} OR u.name ILIKE $${fullPhraseIdx} OR c.name ILIKE $${fullPhraseIdx})`,
       );
+
+      // 2. Multi-word individual token matching
+      const keywords = searchTerms.filter((term) => term.length >= 2);
+      if (keywords.length > 0) {
+        const keywordClauses = keywords.map((term) => {
+          values.push(`%${term}%`);
+          const termIdx = values.length;
+          return `(a.title ILIKE $${termIdx} OR a.description ILIKE $${termIdx} OR a.content ILIKE $${termIdx} OR u.name ILIKE $${termIdx} OR c.name ILIKE $${termIdx})`;
+        });
+        searchClauses.push(`(${keywordClauses.join(' OR ')})`);
+      }
+
+      clauses.push(`(${searchClauses.join(' OR ')})`);
     }
 
     const where = `WHERE ${clauses.join(' AND ')}`;
 
     const countRes = await this.postgres.pool.query<CountRow>(
-      `SELECT count(*)::int AS total FROM articles a ${where}`,
+      `SELECT count(*)::int AS total 
+       FROM articles a 
+       LEFT JOIN categories c ON a.category_id::text = c.id::text 
+       LEFT JOIN cms_users u ON a.author_id::text = u.id::text 
+       ${where}`,
       values,
     );
     const total = countRes.rows[0]?.total ?? 0;
@@ -317,10 +350,10 @@ export class PostgresArticleRepository implements IArticleRepository {
     const result = await this.postgres.pool.query<ArticleRow>(
       `
       INSERT INTO articles (
-        title, slug, description, content, author_id, category_id,
+        title, slug, description, content, author_id, show_author_name, category_id,
         tag_ids, cover_image, status, version, word_count, reading_time_minutes,
         seo_title, seo_description, review_note, scheduled_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
       `,
       [
@@ -329,6 +362,7 @@ export class PostgresArticleRepository implements IArticleRepository {
         data.description || '',
         data.content || '',
         data.authorId,
+        data.showAuthorName ?? true,
         data.categoryId ?? null,
         JSON.stringify(data.tagIds ?? []),
         data.coverImage ?? null,
@@ -366,6 +400,10 @@ export class PostgresArticleRepository implements IArticleRepository {
     if (data.content !== undefined) {
       values.push(data.content);
       fields.push(`content = $${values.length}`);
+    }
+    if (data.showAuthorName !== undefined) {
+      values.push(data.showAuthorName);
+      fields.push(`show_author_name = $${values.length}`);
     }
     if (data.categoryId !== undefined) {
       values.push(data.categoryId);
