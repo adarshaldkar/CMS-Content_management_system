@@ -112,10 +112,10 @@ export default function App() {
             <Route path="/admin/media" element={<MediaLibraryPage />} />
             <Route path="/admin/comments" element={<CommentsModerationPage />} />
             <Route path="/admin/audit" element={<AuditLogExplorerPage />} />
+            <Route path="/admin/panel" element={<AdminPanelPage />} />
             <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
             <Route path="/admin/*" element={<EditorialReviewPage />} />
           </Route>
-          <Route path="/admin/panel" element={<AdminPanelPage />} />
         </Route>
 
         {/* 7. Dedicated 404 Catch-All Route */}
