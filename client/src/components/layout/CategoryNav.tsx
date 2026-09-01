@@ -35,7 +35,11 @@ export const CategoryNav: React.FC = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  const categories: Category[] = data || [];
+  const categories: Category[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.items)
+    ? (data as any).items
+    : [];
 
   // Close mega-menu on outside click or Escape key
   useEffect(() => {
