@@ -87,6 +87,7 @@ const StripCard: React.FC<{ article: Article }> = ({ article }) => {
           <img
             src={article.coverImage}
             alt={cleanTitle(article.title)}
+            loading="lazy"
             onError={() => setImgErr(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
@@ -119,6 +120,7 @@ const FeedRow: React.FC<{ article: Article }> = ({ article }) => {
           <img
             src={article.coverImage}
             alt={cleanTitle(article.title)}
+            loading="lazy"
             onError={() => setImgErr(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
