@@ -91,12 +91,15 @@ export const PublicHeader: React.FC = () => {
                     onClick={() => setDropdownOpen(!dropdownOpen)}
                     className="flex items-center gap-2 p-1.5 rounded-full hover:bg-slate-100 transition-colors focus:outline-none"
                   >
-                    <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-medium uppercase font-mono">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-medium uppercase font-mono overflow-hidden">
                       {user.avatarUrl ? (
                         <img
                           src={user.avatarUrl}
                           alt={user.name}
                           className="w-full h-full rounded-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
                         />
                       ) : (
                         user.name.charAt(0)

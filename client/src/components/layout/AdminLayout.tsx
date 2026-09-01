@@ -53,15 +53,16 @@ export const AdminLayout: React.FC = () => {
   };
 
   const navItems = [
+    { label: 'Overview Dashboard', to: '/admin', icon: LayoutDashboard },
     { label: 'Review Queue', to: '/admin/review', icon: CheckSquare },
+    { label: 'Database Mesh Switcher', to: '/admin/database', icon: Database },
     { label: 'Publishing Slots', to: '/admin/slots', icon: Clock },
     { label: 'User Directory', to: '/admin/users', icon: Users },
     { label: 'Categories', to: '/admin/categories', icon: FolderTree },
     { label: 'Tags', to: '/admin/tags', icon: Tag },
     { label: 'Media Assets', to: '/admin/media', icon: ImageIcon },
     { label: 'Comments Moderation', to: '/admin/comments', icon: MessageSquare },
-    { label: 'Audit Trail', to: '/admin/audit', icon: ScrollText },
-    { label: 'Control Panel', to: '/admin/panel', icon: LayoutDashboard },
+    { label: 'Security Audit Trail', to: '/admin/audit', icon: ScrollText },
   ];
 
   const activeDb = (dbStatus?.activeDatabase || health?.activeDatabase || 'postgres').toUpperCase();

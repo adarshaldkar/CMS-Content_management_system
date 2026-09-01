@@ -191,7 +191,8 @@ export class AuthController {
   @Get('me')
   @ApiOperation({ summary: 'Get profile and permissions of authenticated user' })
   async me(@CurrentUser() user: AuthUser): Promise<{ user: AuthUser }> {
-    return { user };
+    const freshUser = await this.authService.getCurrentUser(user.id);
+    return { user: freshUser };
   }
 
   @UseGuards(JwtAuthGuard)

@@ -56,8 +56,8 @@ export class UpdateProfileDto {
   bio?: string;
 
   @IsOptional()
-  @IsUrl({ require_protocol: true }, { message: 'Avatar URL must be a valid URL.' })
-  @MaxLength(2048)
+  @IsString()
+  @MaxLength(500000)
   avatarUrl?: string;
 
   @IsOptional()

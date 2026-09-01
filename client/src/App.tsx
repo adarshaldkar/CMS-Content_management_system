@@ -103,7 +103,10 @@ export default function App() {
         {/* 6. Admin Governance Suite (Role Protected) */}
         <Route element={<AdminRoute />}>
           <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<EditorialReviewPage />} />
+            <Route path="/admin" element={<AdminPanelPage />} />
+            <Route path="/admin/overview" element={<AdminPanelPage />} />
+            <Route path="/admin/dashboard" element={<AdminPanelPage />} />
+            <Route path="/admin/panel" element={<AdminPanelPage />} />
             <Route path="/admin/review" element={<EditorialReviewPage />} />
             <Route path="/admin/slots" element={<PublishingSlotsManagerPage />} />
             <Route path="/admin/users" element={<UserManagementPage />} />
@@ -112,9 +115,8 @@ export default function App() {
             <Route path="/admin/media" element={<MediaLibraryPage />} />
             <Route path="/admin/comments" element={<CommentsModerationPage />} />
             <Route path="/admin/audit" element={<AuditLogExplorerPage />} />
-            <Route path="/admin/panel" element={<AdminPanelPage />} />
             <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
-            <Route path="/admin/*" element={<EditorialReviewPage />} />
+            <Route path="/admin/*" element={<AdminPanelPage />} />
           </Route>
         </Route>
 

@@ -379,7 +379,7 @@ export class AuthService {
     const updated = await this.userRepo.update(userId, {
       name: dto.name ?? user.name,
       bio: dto.bio !== undefined ? dto.bio : user.bio,
-      avatarUrl: dto.avatarUrl !== undefined ? dto.avatarUrl : user.avatarUrl,
+      avatarUrl: dto.avatarUrl !== undefined ? (dto.avatarUrl === '' ? null : dto.avatarUrl) : user.avatarUrl,
       preferredTopics: dto.preferredTopics !== undefined ? dto.preferredTopics : user.preferredTopics,
     });
 

@@ -15,13 +15,13 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 }) => {
   const isDark = variant === 'dark';
 
-  const sizeClasses = {
+  const sizeClasses: Record<string, string> = {
     sm: 'text-xl',
     md: 'text-2xl',
     lg: 'text-3xl',
   };
 
-  const iconSizes = {
+  const iconSizes: Record<string, number> = {
     sm: 18,
     md: 22,
     lg: 26,
@@ -36,11 +36,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             : 'bg-canvas-paper text-ink-primary group-hover:bg-slate-200'
         }`}
       >
-        <Feather size={iconSizes[size]} className="transform group-hover:rotate-6 transition-transform" />
+        <Feather size={iconSizes[size] || 22} className="transform group-hover:rotate-6 transition-transform" />
       </div>
       <div className="flex flex-col">
         <span
-          className={`font-editorial font-bold tracking-tight leading-none ${sizeClasses[size]} ${
+          className={`font-editorial font-bold tracking-tight leading-none ${sizeClasses[size] || 'text-2xl'} ${
             isDark ? 'text-ink-primary group-hover:text-accent-crimson' : 'text-canvas-paper'
           } transition-colors`}
         >

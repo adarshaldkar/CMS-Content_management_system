@@ -45,6 +45,7 @@ test-results/
 
 # Uploads (runtime)
 uploads/
+server/uploads/
 
 # Docker volumes (local)
 postgres_data/

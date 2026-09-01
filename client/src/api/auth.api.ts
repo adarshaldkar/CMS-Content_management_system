@@ -40,8 +40,8 @@ export const authApi = {
   },
 
   async updateProfile(dto: UpdateProfileDto): Promise<User> {
-    const { data } = await apiClient.patch<User>('/auth/me', dto);
-    return data;
+    const { data } = await apiClient.patch<{ user?: User } | User>('/auth/me', dto);
+    return (data as { user?: User }).user || (data as User);
   },
 
   async changePassword(dto: ChangePasswordDto): Promise<{ message: string }> {

@@ -113,16 +113,16 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
    * an already-existing user), updates propagate through the peer store's
    * `update` call so an existing document is actually mutated.
    */
-  private async replicateUpdateToAll(id: string, data: UpdateUserDto): Promise<void> {
+  private async replicateUpdateToAll(user: User, data: UpdateUserDto): Promise<void> {
     const tasks: Promise<any>[] = [];
 
     for (const store of this.peerStores) {
       tasks.push(
-        store.update(id, data).catch((e) => this.logger.debug(`Peer user update sync note: ${e.message}`)),
+        store.update(user.id, data).catch((e) => this.logger.debug(`Peer user update sync note: ${e.message}`)),
       );
     }
 
-    await this.replicateRawEngines(data as User);
+    await this.replicateRawEngines(user);
   }
 
   private async replicateRawEngines(user: User): Promise<void> {
@@ -287,7 +287,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
 
   async update(id: string, data: UpdateUserDto): Promise<User> {
     const user = await this.activeRepo.update(id, data);
-    this.replicateUpdateToAll(id, data).catch((e) => this.logger.warn(`Multi-DB User update sync failed: ${e.message}`));
+    this.replicateUpdateToAll(user, data).catch((e) => this.logger.warn(`Multi-DB User update sync failed: ${e.message}`));
     return user;
   }
 

@@ -16,6 +16,10 @@ const CAT_LABELS: Record<string, { title: string; tagline: string }> = {
     title: 'Artificial Intelligence',
     tagline: 'Machine learning, autonomous reasoning, and the frontier of intelligent computing.',
   },
+  'artificial-intelligence': {
+    title: 'Artificial Intelligence',
+    tagline: 'Machine learning, autonomous reasoning, and the frontier of intelligent computing.',
+  },
   cybersecurity: {
     title: 'Cybersecurity',
     tagline: 'Threat intelligence, defense protocols, and cryptography in practice.',
@@ -32,13 +36,61 @@ const CAT_LABELS: Record<string, { title: string; tagline: string }> = {
     title: 'Media & Society',
     tagline: 'How information networks shape discourse, sociology, and modern culture.',
   },
+  'media-society': {
+    title: 'Media & Society',
+    tagline: 'How information networks shape discourse, sociology, and modern culture.',
+  },
   science: {
     title: 'Science',
     tagline: 'Empirical discovery, mathematical methods, and natural phenomena.',
   },
+  governance: {
+    title: 'Governance',
+    tagline: 'Regulatory dynamics, platform ethics, and technological policy.',
+  },
   'policy-governance': {
     title: 'Governance',
     tagline: 'Regulatory dynamics, platform ethics, and technological policy.',
+  },
+  news: {
+    title: 'News & Wire',
+    tagline: 'Global reporting, live despatches, and current affairs.',
+  },
+  sports: {
+    title: 'Sports & Competition',
+    tagline: 'Analysis, live coverage, and athletic features.',
+  },
+  money: {
+    title: 'Financial Markets',
+    tagline: 'Capital flows, macroeconomic trends, and market analysis.',
+  },
+  lifestyle: {
+    title: 'Culture & Living',
+    tagline: 'Perspectives on modern lifestyle, craft, and culture.',
+  },
+  entertainment: {
+    title: 'Arts & Entertainment',
+    tagline: 'Film, music, literature, and visual culture.',
+  },
+  'health-fitness': {
+    title: 'Health & Wellness',
+    tagline: 'Medical research, fitness science, and longevity.',
+  },
+  'food-drink': {
+    title: 'Gastronomy',
+    tagline: 'Culinary traditions, food science, and regional cuisine.',
+  },
+  travel: {
+    title: 'Travel & Dispatches',
+    tagline: 'Exploration, field reporting, and destination analysis.',
+  },
+  autos: {
+    title: 'Automotive & Transit',
+    tagline: 'Engineering, transit networks, and mobility systems.',
+  },
+  video: {
+    title: 'Video & Media',
+    tagline: 'Visual journalism, interviews, and broadcast features.',
   },
 };
 
@@ -182,7 +234,13 @@ const FeedRow: React.FC<{ article: Article; index: number }> = ({ article, index
 
 /* ─── Main CategoryArchivePage ─── */
 export const CategoryArchivePage: React.FC = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: rawSlug } = useParams<{ slug: string }>();
+  const slug = rawSlug
+    ? decodeURIComponent(rawSlug)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+    : '';
 
   const { data: articlesData, isLoading } = useQuery({
     queryKey: ['categoryArchive', slug],
