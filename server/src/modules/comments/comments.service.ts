@@ -4,10 +4,13 @@ import {
   Injectable,
   NotFoundException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { COMMENT_REPOSITORY, type ICommentRepository } from '../../repositories/interfaces/comment.repository.interface';
+import { ARTICLE_REPOSITORY, type IArticleRepository } from '../../repositories/interfaces/article.repository.interface';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
-import { AuditEventType, type AuthUser, CommentStatus, type CreateCommentDto, type UpdateCommentDto } from '../../domain/models';
+import { AuditEventType, type AuthUser, CommentStatus, type CreateCommentDto, NotificationType, type UpdateCommentDto } from '../../domain/models';
 import sanitizeHtml from 'sanitize-html';
 
 // Allow-list HTML sanitiser (reuses sanitize-html like article content)
@@ -47,10 +50,15 @@ function sanitizeCommentBody(raw: string): string {
 
 @Injectable()
 export class CommentsService {
+  private readonly logger = new Logger(CommentsService.name);
+
   constructor(
     @Inject(COMMENT_REPOSITORY)
     private readonly commentRepo: ICommentRepository,
+    @Inject(ARTICLE_REPOSITORY)
+    private readonly articleRepo: IArticleRepository,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getComments(articleId: string, page = 1, limit = 20) {
@@ -87,7 +95,57 @@ export class CommentsService {
       metadata: { articleId },
     });
 
+    // Asynchronously dispatch in-app notification
+    this.dispatchCommentNotification(comment, articleId, dto.parentId, actor).catch((err) => {
+      this.logger.warn(`Failed to dispatch comment notification: ${err.message}`);
+    });
+
     return comment;
+  }
+
+  private async dispatchCommentNotification(
+    comment: any,
+    articleId: string,
+    parentId?: string | null,
+    actor?: AuthUser,
+  ): Promise<void> {
+    const article = await this.articleRepo.findById(articleId);
+    if (!article || !actor) return;
+
+    if (parentId) {
+      // Threaded reply: notify parent comment author
+      const parentComment = await this.commentRepo.findById(parentId);
+      if (parentComment && parentComment.authorId !== actor.id) {
+        await this.notificationsService.notify({
+          userId: parentComment.authorId,
+          actorId: actor.id,
+          actorName: actor.name || actor.email || 'A Reader',
+          actorAvatar: actor.avatarUrl || null,
+          type: NotificationType.COMMENT_REPLY,
+          title: 'New Reply to Your Comment',
+          message: `${actor.name || 'A reader'} replied to your comment on "${article.title}".`,
+          resourceType: 'comment',
+          resourceId: comment.id,
+          resourceSlug: article.slug,
+        });
+      }
+    } else {
+      // Top-level comment: notify article author
+      if (article.authorId && article.authorId !== actor.id) {
+        await this.notificationsService.notify({
+          userId: article.authorId,
+          actorId: actor.id,
+          actorName: actor.name || actor.email || 'A Reader',
+          actorAvatar: actor.avatarUrl || null,
+          type: NotificationType.COMMENT_RECEIVED,
+          title: 'New Discussion on Your Story',
+          message: `${actor.name || 'A reader'} commented on "${article.title}".`,
+          resourceType: 'comment',
+          resourceId: comment.id,
+          resourceSlug: article.slug,
+        });
+      }
+    }
   }
 
   async updateComment(commentId: string, dto: UpdateCommentDto, actor: AuthUser) {

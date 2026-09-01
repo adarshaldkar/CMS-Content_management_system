@@ -16,6 +16,7 @@ import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
 import { LikesModule } from './modules/likes/likes.module';
 import { FollowsModule } from './modules/follows/follows.module';
 import { PublishingSlotsModule } from './modules/publishing-slots/publishing-slots.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PublishingSlotsModule } from './modules/publishing-slots/publishing-slo
     LikesModule,
     FollowsModule,
     PublishingSlotsModule,
+    NotificationsModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

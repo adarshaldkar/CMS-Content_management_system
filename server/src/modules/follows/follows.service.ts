@@ -1,14 +1,18 @@
-import { Injectable, Inject, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { FOLLOW_REPOSITORY, type IFollowRepository } from '../../repositories/interfaces/follow.repository.interface';
 import { AuditService } from '../audit/audit.service';
-import { AuditEventType, FollowTargetType, type AuthUser } from '../../domain/models';
+import { NotificationsService } from '../notifications/notifications.service';
+import { AuditEventType, FollowTargetType, NotificationType, type AuthUser } from '../../domain/models';
 
 @Injectable()
 export class FollowsService {
+  private readonly logger = new Logger(FollowsService.name);
+
   constructor(
     @Inject(FOLLOW_REPOSITORY)
     private readonly followRepo: IFollowRepository,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async followUser(targetUserId: string, actor: AuthUser) {
@@ -32,6 +36,28 @@ export class FollowsService {
       result: 'SUCCESS',
     });
     const updatedCount = await this.followRepo.countFollowers(FollowTargetType.USER, targetUserId);
+
+    // Asynchronously dispatch grouped new-follower notification
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const groupKey = `group:${targetUserId}:NEW_FOLLOWER:author:${dateKey}`;
+    this.notificationsService
+      .notify({
+        userId: targetUserId,
+        actorId: actor.id,
+        actorName: actor.name || actor.email || 'A Reader',
+        actorAvatar: actor.avatarUrl || null,
+        type: NotificationType.NEW_FOLLOWER,
+        title: 'New Dispatch Follower',
+        message: `${actor.name || 'A reader'} started following your editorial dispatches.`,
+        resourceType: 'user',
+        resourceId: actor.id,
+        resourceSlug: actor.id,
+        groupKey,
+      })
+      .catch((err) => {
+        this.logger.warn(`Failed to dispatch follow notification: ${err.message}`);
+      });
+
     return { following: true, followersCount: updatedCount };
   }
 

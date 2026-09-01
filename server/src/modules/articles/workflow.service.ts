@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -33,9 +34,13 @@ import {
 } from '../../common/utils/sanitizer.util';
 import { OwnershipHelper } from '../../common/guards/ownership.guard';
 import { PublishingSlotsService } from '../publishing-slots/publishing-slots.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../domain/models';
 
 @Injectable()
 export class WorkflowService {
+  private readonly logger = new Logger(WorkflowService.name);
+
   constructor(
     @Inject(ARTICLE_REPOSITORY)
     private readonly articleRepo: IArticleRepository,
@@ -43,6 +48,7 @@ export class WorkflowService {
     private readonly revisionRepo: IRevisionRepository,
     private readonly auditService: AuditService,
     private readonly slotsService: PublishingSlotsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private slugify(text: string): string {
@@ -297,6 +303,49 @@ export class WorkflowService {
         reviewNote: transitionDto.reviewNote,
       },
     });
+
+    // Dispatch in-app notification to author
+    if (updated.authorId && updated.authorId !== user.id) {
+      let notifType: NotificationType | null = null;
+      let title = '';
+      let message = '';
+
+      if (finalTargetStatus === ContentStatus.PUBLISHED) {
+        notifType = NotificationType.ARTICLE_PUBLISHED;
+        title = 'Story Published';
+        message = `Your manuscript "${updated.title}" has been approved and published to the Front Page.`;
+      } else if (finalTargetStatus === ContentStatus.REJECTED) {
+        notifType = NotificationType.ARTICLE_REJECTED;
+        title = 'Editorial Decision';
+        message = `The editorial desk requested revisions on "${updated.title}": ${transitionDto.reviewNote || 'Please review feedback.'}`;
+      } else if (finalTargetStatus === ContentStatus.APPROVED) {
+        notifType = NotificationType.ARTICLE_FEEDBACK;
+        title = 'Editorial Approval';
+        message = `Your manuscript "${updated.title}" was approved by the editorial desk.`;
+      } else if (finalTargetStatus === ContentStatus.SCHEDULED) {
+        notifType = NotificationType.ARTICLE_SCHEDULED;
+        title = 'Story Scheduled';
+        message = `Your manuscript "${updated.title}" has been scheduled for publication.`;
+      }
+
+      if (notifType) {
+        this.notificationsService
+          .notify({
+            userId: updated.authorId,
+            actorId: user.id,
+            actorName: user.name || user.email || 'Editorial Desk',
+            type: notifType,
+            title,
+            message,
+            resourceType: 'article',
+            resourceId: updated.id,
+            resourceSlug: updated.slug,
+          })
+          .catch((err) => {
+            this.logger.warn(`Failed to dispatch workflow notification: ${err.message}`);
+          });
+      }
+    }
 
     return updated;
   }

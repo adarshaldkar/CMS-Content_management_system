@@ -12,10 +12,12 @@ import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
 import { PostgresService } from '../../database/postgres.service';
 import { AuditModule } from '../audit/audit.module';
+import { ArticlesModule } from '../articles/articles.module';
 
 @Module({
   imports: [
     AuditModule,
+    ArticlesModule,
     MongooseModule.forFeature([
       { name: CommentSchemaClass.name, schema: CommentSchema },
     ]),

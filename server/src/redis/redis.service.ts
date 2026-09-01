@@ -248,18 +248,24 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     }
   }
 
-  async subscribe(channel: string, callback: (message: string) => void): Promise<void> {
-    if (!this.subscriberClient) return;
+  async subscribe(channel: string, callback: (message: string) => void): Promise<() => void> {
+    if (!this.subscriberClient) return () => {};
 
     try {
       await this.subscriberClient.subscribe(channel);
-      this.subscriberClient.on('message', (chan, msg) => {
+      const listener = (chan: string, msg: string) => {
         if (chan === channel) {
           callback(msg);
         }
-      });
+      };
+      this.subscriberClient.on('message', listener);
+      return () => {
+        this.subscriberClient?.off('message', listener);
+        this.subscriberClient?.unsubscribe(channel).catch(() => {});
+      };
     } catch (err: any) {
       this.logger.warn(`Redis subscribe failed on channel ${channel}: ${err.message}`);
+      return () => {};
     }
   }
 

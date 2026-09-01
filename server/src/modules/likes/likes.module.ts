@@ -9,10 +9,12 @@ import { LikesController } from './likes.controller';
 import { LikesService } from './likes.service';
 import { PostgresService } from '../../database/postgres.service';
 import { AuditModule } from '../audit/audit.module';
+import { ArticlesModule } from '../articles/articles.module';
 
 @Module({
   imports: [
     AuditModule,
+    ArticlesModule,
     MongooseModule.forFeature([
       { name: LikeSchemaClass.name, schema: LikeSchema },
     ]),

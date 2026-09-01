@@ -49,6 +49,11 @@ import {
   PUBLISHING_SLOT_REPOSITORY,
   type IPublishingSlotRepository,
 } from './interfaces/publishing-slot.repository.interface';
+import {
+  NOTIFICATION_REPOSITORY,
+  type INotificationRepository,
+} from './interfaces/notification.repository.interface';
+import type { SupportedDbName } from './repository-proxy';
 
 // PostgreSQL Repositories
 import { PostgresArticleRepository } from './postgres/postgres-article.repository';
@@ -63,6 +68,7 @@ import { PostgresBookmarkRepository } from './postgres/postgres-bookmark.reposit
 import { PostgresLikeRepository } from './postgres/postgres-like.repository';
 import { PostgresFollowRepository } from './postgres/postgres-follow.repository';
 import { PostgresPublishingSlotRepository } from './postgres/postgres-publishing-slot.repository';
+import { PostgresNotificationRepository } from './postgres/postgres-notification.repository';
 
 // MongoDB Repositories
 import { MongoArticleRepository } from './mongo/mongo-article.repository';
@@ -77,6 +83,8 @@ import { MongoBookmarkRepository } from './mongo/mongo-bookmark.repository';
 import { MongoLikeRepository } from './mongo/mongo-like.repository';
 import { MongoFollowRepository } from './mongo/mongo-follow.repository';
 import { MongoPublishingSlotRepository } from './mongo/mongo-publishing-slot.repository';
+import { MongoNotificationRepository } from './mongo/mongo-notification.repository';
+import { SeamlessNotificationRepository } from './seamless/seamless-notification.repository';
 
 // MariaDB Repositories
 import { MariaDbUserRepository } from './mariadb/mariadb-user.repository';
@@ -715,6 +723,28 @@ export const publishingSlotRepositoryProvider: FactoryProvider<IPublishingSlotRe
   },
 };
 
+export const notificationRepositoryProvider: FactoryProvider<INotificationRepository> = {
+  provide: NOTIFICATION_REPOSITORY,
+  inject: [
+    ConfigService,
+    PostgresNotificationRepository,
+    MongoNotificationRepository,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresNotificationRepository,
+    mongoRepo: MongoNotificationRepository,
+    registry: RepositoryRegistryService,
+  ): INotificationRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true }) || 'postgres';
+    const seamless = new SeamlessNotificationRepository(postgresRepo, mongoRepo, active as SupportedDbName);
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
+  },
+};
+
 export const ALL_DATABASE_REPOSITORIES = [
   // PostgreSQL
   PostgresUserRepository,
@@ -728,6 +758,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   PostgresSessionRepository,
   PostgresAuditLogRepository,
   PostgresPublishingSlotRepository,
+  PostgresNotificationRepository,
 
   // MongoDB
   MongoUserRepository,
@@ -742,6 +773,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   MongoLikeRepository,
   MongoFollowRepository,
   MongoPublishingSlotRepository,
+  MongoNotificationRepository,
 
   // MariaDB
   MariaDbUserRepository,

@@ -175,6 +175,28 @@ export const HomePage: React.FC = () => {
     },
   });
 
+  const { data: categoriesData } = useQuery({
+    queryKey: ['publicCategories'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PaginatedResult<any>>('/categories', {
+        params: { status: 'active', limit: 12 },
+      });
+      return data;
+    },
+  });
+
+  const rawCats = categoriesData?.items || [];
+  const exploreCategories = rawCats.length > 0
+    ? rawCats.map((c: any) => ({ name: c.name, slug: c.slug }))
+    : [
+        { name: 'Technology', slug: 'technology' },
+        { name: 'AI', slug: 'ai' },
+        { name: 'Cybersecurity', slug: 'cybersecurity' },
+        { name: 'Science', slug: 'science' },
+        { name: 'Media & Society', slug: 'media-culture' },
+        { name: 'Governance', slug: 'policy-governance' },
+      ];
+
   const articles = latestData?.items ?? [];
   const trending = trendingData?.items ?? articles.slice(0, 5);
   const hero  = articles[0];
@@ -217,28 +239,6 @@ export const HomePage: React.FC = () => {
       </div>
     );
   }
-
-  const { data: categoriesData } = useQuery({
-    queryKey: ['publicCategories'],
-    queryFn: async () => {
-      const { data } = await apiClient.get<PaginatedResult<any>>('/categories', {
-        params: { status: 'active', limit: 12 },
-      });
-      return data;
-    },
-  });
-
-  const rawCats = categoriesData?.items || [];
-  const exploreCategories = rawCats.length > 0
-    ? rawCats.map((c: any) => ({ name: c.name, slug: c.slug }))
-    : [
-        { name: 'Technology', slug: 'technology' },
-        { name: 'AI', slug: 'ai' },
-        { name: 'Cybersecurity', slug: 'cybersecurity' },
-        { name: 'Science', slug: 'science' },
-        { name: 'Media & Society', slug: 'media-culture' },
-        { name: 'Governance', slug: 'policy-governance' },
-      ];
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">

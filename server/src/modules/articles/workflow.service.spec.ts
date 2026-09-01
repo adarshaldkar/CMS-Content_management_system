@@ -16,6 +16,7 @@ import {
 } from '../../repositories/interfaces/revision.repository.interface';
 import { AuditService } from '../audit/audit.service';
 import { PublishingSlotsService } from '../publishing-slots/publishing-slots.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   ContentStatus,
   Permission,
@@ -106,6 +107,12 @@ describe('WorkflowService (Publishing State Machine, Revisions & Concurrency)', 
         { provide: REVISION_REPOSITORY, useValue: mockRevisionRepo },
         { provide: AuditService, useValue: mockAuditService },
         { provide: PublishingSlotsService, useValue: mockPublishingSlotsService },
+        {
+          provide: NotificationsService,
+          useValue: {
+            notify: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 

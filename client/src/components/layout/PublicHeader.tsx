@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
+  Bell,
   Bookmark,
   ChevronDown,
   Compass,
@@ -16,13 +18,25 @@ import {
 import { BrandLogo } from '../common/BrandLogo';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../api/auth.api';
+import { notificationsApi } from '../../api/notifications.api';
+import { NotificationDrawer } from '../notifications/NotificationDrawer';
 
 export const PublicHeader: React.FC = () => {
   const { user, isAuthenticated, clearAuth, hasRole } = useAuthStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Real-time unread notification count query
+  const { data: unreadData } = useQuery({
+    queryKey: ['notificationsUnreadCount'],
+    queryFn: () => notificationsApi.getUnreadCount(),
+    enabled: Boolean(isAuthenticated),
+    refetchInterval: 10000,
+  });
+  const unreadCount = unreadData?.unreadCount ?? 0;
 
   const handleLogout = async () => {
     try {
@@ -84,6 +98,20 @@ export const PublicHeader: React.FC = () => {
                   <Edit3 size={14} />
                   <span>Write</span>
                 </Link>
+
+                {/* Notification Bell Button */}
+                <button
+                  onClick={() => setDrawerOpen(true)}
+                  className="relative p-2 rounded-full hover:bg-slate-100 text-ink-secondary hover:text-ink-primary transition-colors focus:outline-none"
+                  title="Notification Desk"
+                >
+                  <Bell size={18} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-accent-crimson text-white text-[9px] font-bold rounded-full flex items-center justify-center font-mono ring-2 ring-white animate-pulse">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
 
                 {/* User Dropdown */}
                 <div className="relative">
@@ -235,6 +263,13 @@ export const PublicHeader: React.FC = () => {
           </form>
         </div>
       )}
+
+      {/* Real-Time Notification Center Drawer */}
+      <NotificationDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        unreadCount={unreadCount}
+      />
     </header>
   );
 };
