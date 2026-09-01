@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CheckSquare,
+  ChevronRight,
   Clock,
   Database,
   FolderTree,
@@ -13,6 +14,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  PenTool,
   ScrollText,
   Shield,
   Tag,
@@ -105,6 +107,14 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Quick Switch to Author Desk on Mobile */}
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-ink-primary hover:bg-slate-800 text-white rounded text-[11px] font-semibold transition-colors"
+          >
+            <PenTool size={12} />
+            <span>Author Desk</span>
+          </Link>
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 border text-[10px] font-mono font-medium uppercase ${badgeStyle.bg}`}
             style={{ borderRadius: 2 }}
@@ -202,6 +212,24 @@ export const AdminLayout: React.FC = () => {
               </NavLink>
             </>
           )}
+
+          {/* Switch to Author Desk Section */}
+          <div className="pt-5 mt-2 border-t border-border-subtle space-y-1">
+            <div className="px-3 pb-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
+              AUTHOR WORKSPACE
+            </div>
+            <Link
+              to="/dashboard"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors group"
+            >
+              <div className="flex items-center gap-2.5">
+                <PenTool size={15} className="text-accent-crimson group-hover:scale-110 transition-transform" />
+                <span className="font-semibold">Author Desk</span>
+              </div>
+              <ChevronRight size={13} className="text-ink-secondary group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
         </nav>
 
         {/* Admin Footer / User Profile */}
@@ -263,7 +291,17 @@ export const AdminLayout: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-4 text-ink-secondary">
+          <div className="flex items-center gap-3 text-ink-secondary">
+            {/* Quick Switch to Author Desk on Desktop Bar */}
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-ink-primary hover:bg-slate-800 text-white rounded text-[11px] font-sans font-medium transition-colors shadow-xs"
+              title="Switch to Author Workspace"
+            >
+              <PenTool size={12} />
+              <span>Author Desk</span>
+            </Link>
+
             <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px]">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>TLS 1.3 · CSRF ACTIVE</span>
@@ -274,7 +312,7 @@ export const AdminLayout: React.FC = () => {
               title="Lock administrative session"
             >
               <LogOut size={11} />
-              <span className="hidden sm:inline">LOCK SESSION</span>
+              <span className="hidden sm:inline">LOCK</span>
             </button>
           </div>
         </header>
