@@ -73,6 +73,29 @@ export const ArticleReaderPage: React.FC = () => {
     enabled: Boolean(slug),
   });
 
+  // Track dynamic reading history
+  useEffect(() => {
+    if (article?.id && article?.title && article?.slug) {
+      try {
+        const existing = JSON.parse(localStorage.getItem('gazette_reading_history') || '[]');
+        const filtered = existing.filter((item: any) => item.id !== article.id);
+        const updated = [
+          {
+            id: article.id,
+            slug: article.slug,
+            title: article.title,
+            description: article.description,
+            categorySlug: article.categorySlug,
+            readingTimeMinutes: article.readingTimeMinutes || 3,
+            readAt: new Date().toISOString(),
+          },
+          ...filtered,
+        ].slice(0, 50);
+        localStorage.setItem('gazette_reading_history', JSON.stringify(updated));
+      } catch {}
+    }
+  }, [article?.id, article?.title, article?.slug, article?.description, article?.categorySlug, article?.readingTimeMinutes]);
+
   // 2. Fetch Likes Count from real backend
   const { data: likesData } = useQuery({
     queryKey: ['articleLikes', article?.id],

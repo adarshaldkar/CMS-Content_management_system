@@ -6,6 +6,7 @@ dist/
 build/
 coverage/
 *.tsbuildinfo
+*.zip
 
 # Environment (never commit secrets)
 .env
@@ -26,19 +27,9 @@ Thumbs.db
 !.vscode/extensions.json
 
 # Documentation & internal specifications
-docs/
+# (tracked in repository)
 
-# Tests & test scripts
-test/
-tests/
-server/test/
-scripts/
-*.spec.ts
-*.spec.tsx
-*.test.ts
-*.test.tsx
-*.e2e-spec.ts
-jest*.json
+# Test output (source tests are intentionally tracked)
 .cache/
 .playwright/
 test-results/

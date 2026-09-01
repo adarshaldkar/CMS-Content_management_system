@@ -254,12 +254,30 @@ export const UserProfilePage: React.FC = () => {
     },
   });
 
+  // 7b. Fetch Follower IDs
+  const { data: followerIdsData } = useQuery({
+    queryKey: ['myFollowerIds', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { items: [] };
+      const { data } = await apiClient.get<PaginatedResult<any>>(`/users/${user.id}/followers`);
+      return data;
+    },
+    enabled: Boolean(user?.id),
+  });
+
   const followingItems = Array.isArray(followingIdsData?.items)
     ? followingIdsData.items
     : Array.isArray(followingIdsData)
     ? (followingIdsData as any[])
     : [];
   const followingIds = new Set(followingItems.map((f: any) => f.targetId || f.id || f));
+
+  const followerItems = Array.isArray(followerIdsData?.items)
+    ? followerIdsData.items
+    : Array.isArray(followerIdsData)
+    ? (followerIdsData as any[])
+    : [];
+  const followerIds = new Set(followerItems.map((f: any) => f.followerId || f.userId || f.id || f));
 
   const followedTopicsArray = Array.isArray(followedTopicsData)
     ? followedTopicsData
@@ -271,7 +289,7 @@ export const UserProfilePage: React.FC = () => {
   const allOtherUsers = (allUsersData?.items || []).filter((u) => u.id !== user?.id);
 
   const followingUsers = allOtherUsers.filter((u) => followingIds.has(u.id));
-  const followerUsers = allOtherUsers.slice(0, Math.max(3, statsData?.followersCount || 3));
+  const followerUsers = allOtherUsers.filter((u) => followerIds.has(u.id));
   const comments = userCommentsData || [];
   const publishedStories = publishedStoriesData?.items || [];
   const draftStories = draftStoriesData?.items || [];

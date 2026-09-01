@@ -15,6 +15,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
+  // Enable graceful shutdown lifecycle hooks (SIGTERM, SIGINT) to drain pools and workers cleanly
+  app.enableShutdownHooks();
+
   const config = app.get<ConfigService<EnvConfig, true>>(ConfigService);
   const port = config.get('PORT', { infer: true });
   const clientUrl = config.get('CLIENT_URL', { infer: true });

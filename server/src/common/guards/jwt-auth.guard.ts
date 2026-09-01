@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import * as jwt from 'jsonwebtoken';
 import type { Request } from 'express';
 import type { EnvConfig } from '../../config/env.schema';
@@ -17,15 +18,17 @@ import {
   type AuthUser,
   type JwtAccessPayload,
 } from '../../domain/models';
+import { USER_REPOSITORY, type IUserRepository } from '../../repositories/interfaces/user.repository.interface';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly config: ConfigService<EnvConfig, true>,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -52,24 +55,39 @@ export class JwtAuthGuard implements CanActivate {
         audience: 'cms-client',
       }) as JwtAccessPayload;
 
-      if (decoded.type !== 'access') {
-        throw new UnauthorizedException('Invalid token type.');
+      if (decoded.type !== 'access' || !decoded.sub || !decoded.jti || !decoded.role) {
+        throw new UnauthorizedException('Invalid access token.');
       }
 
-      const permissions = ROLE_PERMISSIONS[decoded.role] ?? [];
+      // Authorization state is resolved server-side on every protected request.
+      // This makes account suspension/deactivation and role changes effective
+      // immediately instead of waiting for an already-issued access token to expire.
+      const userRepo = this.moduleRef.get<IUserRepository>(USER_REPOSITORY, { strict: false });
+      const currentUser = await userRepo.findById(decoded.sub);
+      if (!currentUser || !currentUser.isActive) {
+        throw new UnauthorizedException('Session expired or account is inactive.');
+      }
+
+      const permissions = ROLE_PERMISSIONS[currentUser.role] ?? [];
 
       const authUser: AuthUser = {
-        id: decoded.sub,
-        email: decoded.email,
-        name: decoded.name,
-        role: decoded.role,
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        bio: currentUser.bio,
+        avatarUrl: currentUser.avatarUrl,
+        preferredTopics: currentUser.preferredTopics ?? [],
+        role: currentUser.role,
         permissions,
-        isActive: true,
+        isActive: currentUser.isActive,
       };
 
       (request as any).user = authUser;
       return true;
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
       throw new UnauthorizedException('Session expired or invalid token.');
     }
   }

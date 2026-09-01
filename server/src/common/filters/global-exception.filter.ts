@@ -37,13 +37,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
-      const res = exception.getResponse();
-      if (typeof res === 'string') {
-        message = res;
-      } else if (typeof res === 'object' && res !== null) {
-        const obj = res as Record<string, unknown>;
-        message = (obj['message'] as string) || exception.message;
-        errorName = (obj['error'] as string) || exception.name;
+      // Never echo exception text for server-side failures. Internal service and
+      // database errors can be wrapped in HttpException by mistake, so 5xx is
+      // always sanitized regardless of exception class.
+      if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        message = 'An unexpected internal error occurred.';
+        errorName = 'Internal Server Error';
+      } else {
+        const res = exception.getResponse();
+        if (typeof res === 'string') {
+          message = res;
+        } else if (typeof res === 'object' && res !== null) {
+          const obj = res as Record<string, unknown>;
+          message = Array.isArray(obj['message'])
+            ? 'Request validation failed.'
+            : (obj['message'] as string) || exception.message;
+          errorName = (obj['error'] as string) || exception.name;
+        }
       }
     } else {
       // Unhandled / Database / Native errors

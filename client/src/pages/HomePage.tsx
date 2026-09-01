@@ -153,6 +153,7 @@ const FeedRow: React.FC<{ article: Article }> = ({ article }) => {
 export const HomePage: React.FC = () => {
   const [heroImgErr, setHeroImgErr] = useState(false);
   const [email, setEmail] = useState('');
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const { data: latestData, isLoading } = useQuery({
     queryKey: ['homeLatest'],
@@ -217,14 +218,27 @@ export const HomePage: React.FC = () => {
     );
   }
 
-  const EXPLORE_CATS = [
-    { name: 'Technology', slug: 'technology' },
-    { name: 'AI', slug: 'ai' },
-    { name: 'Cybersecurity', slug: 'cybersecurity' },
-    { name: 'Science', slug: 'science' },
-    { name: 'Media & Society', slug: 'media-culture' },
-    { name: 'Governance', slug: 'policy-governance' },
-  ];
+  const { data: categoriesData } = useQuery({
+    queryKey: ['publicCategories'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PaginatedResult<any>>('/categories', {
+        params: { status: 'active', limit: 12 },
+      });
+      return data;
+    },
+  });
+
+  const rawCats = categoriesData?.items || [];
+  const exploreCategories = rawCats.length > 0
+    ? rawCats.map((c: any) => ({ name: c.name, slug: c.slug }))
+    : [
+        { name: 'Technology', slug: 'technology' },
+        { name: 'AI', slug: 'ai' },
+        { name: 'Cybersecurity', slug: 'cybersecurity' },
+        { name: 'Science', slug: 'science' },
+        { name: 'Media & Society', slug: 'media-culture' },
+        { name: 'Governance', slug: 'policy-governance' },
+      ];
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
@@ -383,30 +397,49 @@ export const HomePage: React.FC = () => {
             <p className="text-[12px] text-ink-secondary leading-relaxed mb-4">
               Sharp analysis delivered every Tuesday morning. No noise, just the stories that matter.
             </p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                alert("You're subscribed to the Morning Dispatch. Welcome!");
-                setEmail('');
-              }}
-              className="space-y-2"
-            >
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="w-full px-3 py-2 text-[12px] border border-border-subtle bg-white text-ink-primary placeholder-slate-400 focus:outline-none focus:border-ink-primary transition-colors"
-              />
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 py-2 bg-ink-primary hover:bg-slate-800 text-white text-[12px] font-semibold tracking-wide transition-colors"
+            {isSubscribed ? (
+              <div className="bg-emerald-50 border border-emerald-200 p-4 text-center space-y-1.5 animate-fade-in">
+                <div className="flex items-center justify-center gap-1.5 text-emerald-800 font-serif font-bold text-sm">
+                  <span>Subscribed to Morning Dispatch</span>
+                </div>
+                <p className="text-[11px] font-mono text-emerald-700">
+                  Daily briefings will be dispatched to <span className="font-semibold">{email || 'your inbox'}</span>.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setIsSubscribed(false); setEmail(''); }}
+                  className="text-[10px] font-mono text-emerald-800 underline hover:text-emerald-950 mt-1 block mx-auto"
+                >
+                  Change email
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (email.trim()) {
+                    setIsSubscribed(true);
+                  }
+                }}
+                className="space-y-2"
               >
-                <Send size={12} />
-                Subscribe to Dispatch
-              </button>
-            </form>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full px-3 py-2 text-[12px] border border-border-subtle bg-white text-ink-primary placeholder-slate-400 focus:outline-none focus:border-ink-primary transition-colors"
+                />
+                <button
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-ink-primary hover:bg-slate-800 text-white text-[12px] font-semibold tracking-wide transition-colors"
+                >
+                  <Send size={12} />
+                  Subscribe to Dispatch
+                </button>
+              </form>
+            )}
           </div>
 
           {/* Also Trending */}
@@ -432,7 +465,7 @@ export const HomePage: React.FC = () => {
               Explore Sections
             </span>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              {EXPLORE_CATS.map((cat) => (
+              {exploreCategories.map((cat) => (
                 <Link
                   key={cat.slug}
                   to={`/category/${cat.slug}`}

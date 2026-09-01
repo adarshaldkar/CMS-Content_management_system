@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, X } from 'lucide-react';
+import { Bookmark, History, Trash2, X, ArrowRight, Clock } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { apiClient } from '../../api/client';
 import { ArticleCardSkeleton } from '../../components/common/SkeletonLoader';
@@ -22,6 +22,16 @@ interface BookmarksResponse {
   totalPages: number;
 }
 
+interface ReadingHistoryItem {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string;
+  categorySlug?: string;
+  readingTimeMinutes?: number;
+  readAt: string;
+}
+
 const TABS = [
   { id: 'bookmarks', label: 'Saved Articles' },
   { id: 'history', label: 'Reading History' },
@@ -31,6 +41,20 @@ export const UserLibraryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'bookmarks' | 'history'>('bookmarks');
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+
+  // Dynamic Reading History State
+  const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('gazette_reading_history') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const clearHistory = () => {
+    localStorage.removeItem('gazette_reading_history');
+    setReadingHistory([]);
+  };
 
   // ── Real bookmarks from API ──────────────────────────────────────────────────
   const { data: bookmarksData, isLoading: isLoadingBookmarks } = useQuery({
@@ -111,6 +135,11 @@ export const UserLibraryPage: React.FC = () => {
               {tab.id === 'bookmarks' && bookmarks.length > 0 && (
                 <span className="font-mono text-[10px] tabular-nums text-ink-secondary">
                   {bookmarks.length}
+                </span>
+              )}
+              {tab.id === 'history' && readingHistory.length > 0 && (
+                <span className="font-mono text-[10px] tabular-nums text-ink-secondary">
+                  {readingHistory.length}
                 </span>
               )}
             </button>
@@ -228,13 +257,88 @@ export const UserLibraryPage: React.FC = () => {
 
       {/* ── Reading History tab ──────────────────────────────────────────────── */}
       {activeTab === 'history' && (
-        <div className="py-16">
-          <p className="font-editorial text-lg text-ink-secondary">
-            Reading history coming soon.
-          </p>
-          <p className="mt-1 text-sm text-ink-secondary">
-            Articles you've read will appear here automatically.
-          </p>
+        <div>
+          {readingHistory.length === 0 ? (
+            <div className="py-16">
+              <History size={20} className="text-ink-secondary mb-4" strokeWidth={1.5} />
+              <p className="font-editorial text-lg text-ink-secondary">
+                No reading history recorded yet.
+              </p>
+              <p className="mt-1 text-sm text-ink-secondary">
+                Articles you read on The Gazette will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between py-3 border-b border-border-subtle">
+                <span className="font-mono text-[11px] text-ink-secondary uppercase tracking-wider">
+                  Recently Read Articles ({readingHistory.length})
+                </span>
+                <button
+                  onClick={clearHistory}
+                  className="flex items-center gap-1.5 font-mono text-xs text-red-600 hover:text-red-700 transition-colors py-1 px-2 hover:bg-red-50 rounded"
+                >
+                  <Trash2 size={12} />
+                  Clear History
+                </button>
+              </div>
+
+              <div className="divide-y divide-border-subtle">
+                {readingHistory.map((item) => {
+                  const readDate = new Date(item.readAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+
+                  return (
+                    <div key={item.id} className="py-5 group flex items-start gap-4 justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-accent-crimson font-semibold">
+                            {item.categorySlug ? item.categorySlug.replace(/-/g, ' ') : 'Dispatch'}
+                          </span>
+                          {item.readingTimeMinutes && item.readingTimeMinutes > 0 && (
+                            <>
+                              <span className="font-mono text-[10px] text-border-subtle">·</span>
+                              <span className="font-mono text-[10px] text-ink-secondary flex items-center gap-1">
+                                <Clock size={10} />
+                                {item.readingTimeMinutes} min read
+                              </span>
+                            </>
+                          )}
+                          <span className="font-mono text-[10px] text-border-subtle">·</span>
+                          <span className="font-mono text-[10px] text-ink-secondary">
+                            Viewed {readDate}
+                          </span>
+                        </div>
+                        <Link to={`/articles/${item.slug}`}>
+                          <h3 className="font-editorial text-base font-semibold text-ink-primary leading-snug hover:text-accent-crimson transition-colors">
+                            {item.title}
+                          </h3>
+                        </Link>
+                        {item.description && (
+                          <p className="mt-0.5 text-sm text-ink-secondary line-clamp-1">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex-shrink-0 pt-1">
+                        <Link
+                          to={`/articles/${item.slug}`}
+                          className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary transition-colors font-mono"
+                        >
+                          Read again <ArrowRight size={11} />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

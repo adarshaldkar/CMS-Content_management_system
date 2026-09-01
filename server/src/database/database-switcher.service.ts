@@ -204,12 +204,12 @@ export class DatabaseSwitcherService {
         state: 'SUCCESS',
       };
     } catch (err: any) {
-      this.logger.error(`[DB Switcher] Switch failed: ${err.message}`);
+      this.logger.error(`[DB Switcher] Switch failed: ${err.message}`, err.stack);
       // Revert
       process.env.ACTIVE_DATABASE = currentDb;
       this.mesh.setActiveEngine(currentDb as any);
       this.repositoryRegistry.switchAllTo(currentDb as any);
-      throw new InternalServerErrorException(`Database switch failed: ${err.message}`);
+      throw new InternalServerErrorException('Database switch operation failed and was safely rolled back.');
     } finally {
       this.switchLock = false;
       this.logger.log('[DB Switcher] Mutex released.');

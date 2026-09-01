@@ -173,7 +173,7 @@ export const SearchPage: React.FC = () => {
         {/* Search Input Box */}
         <div className="relative">
           <input
-            type="search"
+            type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search stories by headline, topic, author, or keyword..."
