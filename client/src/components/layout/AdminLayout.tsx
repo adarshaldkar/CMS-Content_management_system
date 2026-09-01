@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -11,11 +11,13 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquare,
   ScrollText,
   Shield,
   Tag,
   Users,
+  X,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { useAuthStore } from '../../stores/authStore';
@@ -24,6 +26,7 @@ import { apiClient, fetchHealth } from '../../api/client';
 
 export const AdminLayout: React.FC = () => {
   const { user, clearAuth, hasRole } = useAuthStore();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   const { data: dbStatus } = useQuery({
@@ -87,16 +90,58 @@ export const AdminLayout: React.FC = () => {
   const badgeStyle = getDbBadgeStyle(activeDb);
 
   return (
-    <div className="min-h-screen bg-canvas-paper text-ink-primary flex font-sans">
-      {/* Editorial Admin Sidebar */}
-      <aside className="w-64 bg-white border-r border-border-subtle flex flex-col fixed inset-y-0 z-30">
-        {/* Brand */}
-        <div className="p-5 border-b border-border-subtle flex items-center justify-between">
+    <div className="min-h-screen bg-canvas-paper text-ink-primary flex flex-col lg:flex-row font-sans">
+      {/* Mobile Top App Bar for Admin */}
+      <header className="lg:hidden h-14 bg-white border-b border-border-subtle px-4 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1.5 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded transition-colors"
+            aria-label="Toggle Admin Navigation Menu"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
           <BrandLogo size="sm" />
         </div>
 
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 border text-[10px] font-mono font-medium uppercase ${badgeStyle.bg}`}
+            style={{ borderRadius: 2 }}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${badgeStyle.dot}`} />
+            {activeDb}
+          </span>
+        </div>
+      </header>
+
+      {/* Mobile Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Editorial Admin Sidebar (Fixed Desktop + Slide-out Mobile) */}
+      <aside
+        className={`w-64 bg-white border-r border-border-subtle flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="p-4 sm:p-5 border-b border-border-subtle flex items-center justify-between">
+          <BrandLogo size="sm" />
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden p-1 text-ink-secondary hover:text-ink-primary rounded"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
         {/* Database Status Telemetry */}
-        <div className="px-5 py-3 border-b border-border-subtle bg-canvas-paper">
+        <div className="px-4 sm:px-5 py-3 border-b border-border-subtle bg-canvas-paper">
           <div className="flex items-center justify-between text-xs">
             <span className="text-ink-secondary flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider font-semibold">
               <HardDrive size={12} />
@@ -121,6 +166,7 @@ export const AdminLayout: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2 text-xs transition-colors ${
                   isActive
@@ -142,6 +188,7 @@ export const AdminLayout: React.FC = () => {
               </div>
               <NavLink
                 to="/admin/database"
+                onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 px-3 py-2 text-xs transition-colors ${
                     isActive
@@ -161,7 +208,7 @@ export const AdminLayout: React.FC = () => {
         <div className="p-4 border-t border-border-subtle bg-canvas-paper">
           <div className="flex items-center gap-3 mb-3">
             <div
-              className="w-8 h-8 bg-ink-primary text-white flex items-center justify-center text-xs font-mono font-bold uppercase shrink-0"
+              className="w-8 h-8 bg-ink-primary text-white flex items-center justify-center text-xs font-mono font-bold uppercase shrink-0 overflow-hidden"
               style={{ borderRadius: 2 }}
             >
               {user?.avatarUrl ? (
@@ -201,13 +248,13 @@ export const AdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Admin View Container */}
-      <div className="flex-1 pl-64 flex flex-col min-h-screen">
+      {/* Main Admin View Container (Fluid on mobile, left-padded on desktop) */}
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen w-full min-w-0">
         {/* High-Assurance Admin Security & Session Telemetry Bar */}
-        <header className="h-12 bg-white border-b border-border-subtle px-8 flex items-center justify-between sticky top-0 z-20 font-mono text-[11px]">
+        <header className="h-12 bg-white border-b border-border-subtle px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20 font-mono text-[11px]">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 font-semibold">
-              <Shield size={13} className="text-emerald-600" />
+            <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 font-semibold text-[10px] sm:text-xs">
+              <Shield size={13} className="text-emerald-600 shrink-0" />
               <span>HIGH-ASSURANCE SESSION</span>
             </span>
             <span className="hidden md:inline-flex items-center gap-1 text-ink-secondary">
@@ -227,12 +274,12 @@ export const AdminLayout: React.FC = () => {
               title="Lock administrative session"
             >
               <LogOut size={11} />
-              <span>LOCK SESSION</span>
+              <span className="hidden sm:inline">LOCK SESSION</span>
             </button>
           </div>
         </header>
 
-        <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0">
           <Outlet />
         </main>
       </div>
