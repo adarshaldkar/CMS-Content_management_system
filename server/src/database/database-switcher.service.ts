@@ -17,6 +17,8 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
 import { ALL_DATABASE_REPOSITORIES } from '../repositories/repository.providers';
 import { AuditEventType, type AuthUser } from '../domain/models';
 
+import { RedisService } from '../redis/redis.service';
+
 export interface DatabaseHealthStatus {
   activeDatabase: DatabaseEngine;
   healthyCount: number;
@@ -64,6 +66,7 @@ export type SwitchState =
 export class DatabaseSwitcherService {
   private readonly logger = new Logger(DatabaseSwitcherService.name);
   private switchLock = false;
+  private switchVersion = 1;
 
   constructor(
     private readonly postgres: PostgresService,
@@ -75,7 +78,26 @@ export class DatabaseSwitcherService {
     @InjectConnection() private readonly mongoConnection: Connection,
     private readonly auditService: AuditService,
     private readonly repositoryRegistry: RepositoryRegistryService,
-  ) {}
+    private readonly redisService: RedisService,
+  ) {
+    // Listen for multi-node Redis Pub/Sub cluster switch events
+    this.redisService.subscribe('cms:channel:mesh_switch', (rawMessage) => {
+      try {
+        const event = JSON.parse(rawMessage);
+        if (event?.targetDb && event.targetDb !== this.mesh.getActiveEngine()) {
+          this.logger.log(`[DB Switcher Pub/Sub] Received cluster switch event to '${event.targetDb}' (Version ${event.switchVersion})`);
+          process.env.ACTIVE_DATABASE = event.targetDb;
+          this.mesh.setActiveEngine(event.targetDb);
+          this.repositoryRegistry.switchAllTo(event.targetDb);
+          if (event.switchVersion) {
+            this.switchVersion = Math.max(this.switchVersion, event.switchVersion);
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`[DB Switcher Pub/Sub] Failed to parse message: ${err.message}`);
+      }
+    });
+  }
 
   async getStatus(): Promise<DatabaseHealthStatus> {
     const meshStatus = await this.mesh.getMeshStatus();
@@ -158,6 +180,8 @@ export class DatabaseSwitcherService {
     this.switchLock = true;
     this.logger.log(`[DB Switcher] Mutex acquired. Initiating switch: ${currentDb} -> ${targetDb}`);
 
+    const lockResult = await this.redisService.acquireFencingLock('db_switch', 20000);
+
     try {
       // Step 1: Validate target DB health
       if (targetDb === 'postgres') {
@@ -180,21 +204,28 @@ export class DatabaseSwitcherService {
       }
 
       // Step 2: Atomic pointer swap and repository proxy rebind.
-      // Every registered seamless coordinator exposes __switchActive, so the
-      // registry can atomically re-point all of them (Postgres, Mongo and the
-      // SQL engine replicas) at the newly chosen active engine.
+      this.switchVersion++;
       process.env.ACTIVE_DATABASE = targetDb;
       this.mesh.setActiveEngine(targetDb);
       this.repositoryRegistry.switchAllTo(targetDb);
-      this.logger.log(`[DB Switcher] Active database pointer atomically switched to: ${targetDb}`);
+      this.logger.log(`[DB Switcher] Active database pointer atomically switched to: ${targetDb} (Version ${this.switchVersion})`);
 
-      // Step 3: Audit trail
+      // Step 3: Broadcast switch event to all cluster nodes via Redis Pub/Sub
+      await this.redisService.publish('cms:channel:mesh_switch', {
+        targetDb,
+        switchVersion: this.switchVersion,
+        switchedBy: actor.id,
+        fencingToken: lockResult?.fencingToken,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Step 4: Audit trail
       await this.auditService.log({
         actorId: actor.id,
         action: AuditEventType.DB_SWITCH_SUCCESS,
         resource: `Database:${targetDb}`,
         result: 'SUCCESS',
-        metadata: { from: currentDb, to: targetDb },
+        metadata: { from: currentDb, to: targetDb, switchVersion: this.switchVersion },
       });
 
       return {
@@ -211,6 +242,9 @@ export class DatabaseSwitcherService {
       this.repositoryRegistry.switchAllTo(currentDb as any);
       throw new InternalServerErrorException('Database switch operation failed and was safely rolled back.');
     } finally {
+      if (lockResult?.lockId) {
+        await this.redisService.releaseFencingLock('db_switch', lockResult.lockId);
+      }
       this.switchLock = false;
       this.logger.log('[DB Switcher] Mutex released.');
     }

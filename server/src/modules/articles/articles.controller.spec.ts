@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ArticlesController } from './articles.controller';
 import { ArticleService } from './article.service';
 import { WorkflowService } from './workflow.service';
+import { RedisService } from '../../redis/redis.service';
 import {
   ARTICLE_REPOSITORY,
   type IArticleRepository,
@@ -100,6 +101,16 @@ describe('ArticlesController & ArticleService', () => {
         {
           provide: WorkflowService,
           useValue: mockWorkflowService,
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            getCached: jest.fn().mockResolvedValue(null),
+            setCached: jest.fn().mockResolvedValue(undefined),
+            delCached: jest.fn().mockResolvedValue(undefined),
+            coalesce: jest.fn((key, fn) => fn()),
+            isHealthy: jest.fn().mockReturnValue(true),
+          },
         },
       ],
     }).compile();

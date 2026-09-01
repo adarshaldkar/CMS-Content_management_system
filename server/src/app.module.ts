@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppConfigModule } from './config/app-config.module';
+import { RedisModule } from './redis/redis.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './modules/health/health.module';
 import { ArticlesModule } from './modules/articles/articles.module';
@@ -19,6 +20,7 @@ import { PublishingSlotsModule } from './modules/publishing-slots/publishing-slo
 @Module({
   imports: [
     AppConfigModule,
+    RedisModule,
     DatabaseModule,
     HealthModule,
     AuditModule,

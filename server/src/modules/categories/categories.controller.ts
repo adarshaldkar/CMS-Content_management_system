@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
@@ -16,14 +17,21 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { Permission, type Category, type PaginatedResult } from '../../domain/models';
+import { RedisService } from '../../redis/redis.service';
+import { RedisCacheInterceptor, Cacheable } from '../../redis/redis-cache.interceptor';
 
 @ApiTags('categories')
 @Controller('categories')
 @UseGuards(CsrfGuard)
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly redisService: RedisService,
+  ) {}
 
   @Public()
+  @UseInterceptors(RedisCacheInterceptor)
+  @Cacheable(600)
   @Get()
   @ApiOperation({ summary: 'List all categories with pagination & search' })
   async findAll(
@@ -41,6 +49,8 @@ export class CategoriesController {
   }
 
   @Public()
+  @UseInterceptors(RedisCacheInterceptor)
+  @Cacheable(600)
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get category by slug' })
   async findBySlug(@Param('slug') slug: string): Promise<Category> {
@@ -61,7 +71,9 @@ export class CategoriesController {
   async create(
     @Body() body: { name: string; slug: string; description?: string; status?: 'active' | 'inactive' },
   ): Promise<Category> {
-    return this.categoriesService.create(body);
+    const category = await this.categoriesService.create(body);
+    await this.invalidateCategoryCache(category);
+    return category;
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -72,7 +84,9 @@ export class CategoriesController {
     @Param('id') id: string,
     @Body() body: { name?: string; slug?: string; description?: string; status?: 'active' | 'inactive' },
   ): Promise<Category> {
-    return this.categoriesService.update(id, body);
+    const category = await this.categoriesService.update(id, body);
+    await this.invalidateCategoryCache(category);
+    return category;
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -81,6 +95,16 @@ export class CategoriesController {
   @ApiOperation({ summary: 'Soft delete a category' })
   async delete(@Param('id') id: string): Promise<{ success: boolean }> {
     const success = await this.categoriesService.delete(id);
+    await this.redisService.delCached('cms:v1:cache:categories');
     return { success };
+  }
+
+  private async invalidateCategoryCache(category?: Category | null): Promise<void> {
+    if (!category) return;
+    await this.redisService.delCached(
+      `cms:v1:cache:categories:slug:${category.slug}`,
+      `cms:v1:cache:categories:id:${category.id}`,
+      'cms:v1:cache:categories',
+    );
   }
 }

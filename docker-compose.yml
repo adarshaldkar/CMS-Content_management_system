@@ -109,6 +109,21 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: cms-redis
+    restart: unless-stopped
+    command: redis-server --requirepass cms_dev_password --maxmemory 512mb --maxmemory-policy volatile-lru --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'cms_dev_password', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
   mongo_data:
@@ -116,3 +131,4 @@ volumes:
   mysql_data:
   cockroach_data:
   clickhouse_data:
+  redis_data:

@@ -18,6 +18,10 @@ export const envSchema = z.object({
   ACTIVE_DATABASE: z
     .enum(['postgres', 'mongodb', 'mariadb', 'mysql', 'cockroach', 'clickhouse'])
     .default('postgres'),
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().int().positive().default(6379),
+  REDIS_PASSWORD: z.string().default('cms_dev_password'),
+  REDIS_DB: z.coerce.number().int().min(0).max(15).default(0),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   COOKIE_SECURE: z

@@ -7,6 +7,7 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -31,6 +32,8 @@ import {
   type UpdateArticleDto,
   type WorkflowTransitionDto,
 } from '../../domain/models';
+import { RedisService } from '../../redis/redis.service';
+import { RedisCacheInterceptor, Cacheable } from '../../redis/redis-cache.interceptor';
 
 @ApiTags('articles')
 @Controller('articles')
@@ -39,10 +42,13 @@ export class ArticlesController {
   constructor(
     private readonly articleService: ArticleService,
     private readonly workflowService: WorkflowService,
+    private readonly redisService: RedisService,
   ) {}
 
   @Public()
   @Throttle({ default: { limit: 600, ttl: 60000 } })
+  @UseInterceptors(RedisCacheInterceptor)
+  @Cacheable(60)
   @Get()
   @ApiOperation({ summary: 'List public published articles or filter by query' })
   async list(
@@ -86,6 +92,8 @@ export class ArticlesController {
   }
 
   @Public()
+  @UseInterceptors(RedisCacheInterceptor)
+  @Cacheable(300)
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get a published article by slug' })
   async getBySlug(@Param('slug') slug: string): Promise<Article | null> {
@@ -105,7 +113,9 @@ export class ArticlesController {
     @Body() dto: CreateArticleDto,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
-    return this.workflowService.createArticle(dto, user);
+    const article = await this.workflowService.createArticle(dto, user);
+    await this.invalidateArticleCache(article);
+    return article;
   }
 
   @Patch(':id')
@@ -116,7 +126,9 @@ export class ArticlesController {
     @Body() dto: UpdateArticleDto,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
-    return this.workflowService.updateArticle(id, dto, user);
+    const article = await this.workflowService.updateArticle(id, dto, user);
+    await this.invalidateArticleCache(article);
+    return article;
   }
 
   @Post(':id/transition')
@@ -126,7 +138,9 @@ export class ArticlesController {
     @Body() dto: WorkflowTransitionDto,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
-    return this.workflowService.transitionState(id, dto, user);
+    const article = await this.workflowService.transitionState(id, dto, user);
+    await this.invalidateArticleCache(article);
+    return article;
   }
 
   @Get(':id/revisions')
@@ -146,7 +160,17 @@ export class ArticlesController {
     @Param('revisionId') revisionId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
-    return this.workflowService.restoreRevision(id, revisionId, user);
+    const article = await this.workflowService.restoreRevision(id, revisionId, user);
+    await this.invalidateArticleCache(article);
+    return article;
   }
 
+  private async invalidateArticleCache(article?: Article | null): Promise<void> {
+    if (!article) return;
+    await this.redisService.delCached(
+      `cms:v1:cache:articles:slug:${article.slug}`,
+      `cms:v1:cache:articles:id:${article.id}`,
+      'cms:v1:cache:articles',
+    );
+  }
 }

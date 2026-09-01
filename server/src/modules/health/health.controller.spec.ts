@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { ConfigService } from '@nestjs/config';
+import { RedisService } from '../../redis/redis.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -22,6 +23,13 @@ describe('HealthController', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            isHealthy: jest.fn().mockReturnValue(true),
+            getClient: jest.fn().mockReturnValue(null),
+          },
         },
       ],
     }).compile();

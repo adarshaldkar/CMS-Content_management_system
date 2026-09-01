@@ -159,6 +159,33 @@ export const DatabaseSwitcherPage: React.FC = () => {
   const [switchState, setSwitchState] = useState<SwitchState>('IDLE');
   const [targetEngine, setTargetEngine] = useState<DatabaseEngine | null>(null);
   const [probeResult, setProbeResult] = useState<string | null>(null);
+  const [purgeNotice, setPurgeNotice] = useState<string | null>(null);
+
+  // Redis Cluster Telemetry Query
+  const {
+    data: redisData,
+    refetch: refetchRedis,
+    isFetching: isFetchingRedis,
+  } = useQuery({
+    queryKey: ['redisTelemetry'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/health/redis');
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+
+  const purgeMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post('/health/redis/purge');
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['redisTelemetry'] });
+      setPurgeNotice(`Successfully purged ${data.purgedKeys} L2 cache keys from Redis`);
+      setTimeout(() => setPurgeNotice(null), 4000);
+    },
+  });
 
   // 1. Fetch DB Status & Health
   const { data: dbStatus, isLoading, refetch, isFetching } = useQuery({
@@ -302,6 +329,102 @@ export const DatabaseSwitcherPage: React.FC = () => {
               {dbStatus?.registeredRepositories?.total ?? 0} across {Object.keys(dbStatus?.registeredRepositories?.byEngine ?? {}).length} engines
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Redis Acceleration & L2 Cache Mesh Panel */}
+      <div className="bg-white border border-border-subtle p-5 font-mono shadow-xs space-y-4" style={{ borderRadius: 2 }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded bg-red-50 text-red-600 flex items-center justify-center font-bold">
+              <Zap size={16} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-ink-primary uppercase tracking-wider flex items-center gap-2">
+                <span>Redis L2 Acceleration & Mesh Signaling</span>
+                <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase rounded ${
+                  redisData?.status === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {redisData?.status === 'healthy' ? 'PORT 6379 CONNECTED' : 'DEGRADED'}
+                </span>
+              </div>
+              <p className="text-[11px] text-ink-secondary mt-0.5">
+                Sub-millisecond response caching, single-flight coalescing, distributed fencing locks, and instant Pub/Sub signaling.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => refetchRedis()}
+              disabled={isFetchingRedis}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-border-subtle text-xs text-ink-primary transition-colors font-mono"
+              style={{ borderRadius: 2 }}
+              title="Ping Redis and measure roundtrip response latency"
+            >
+              <RefreshCw size={11} className={isFetchingRedis ? 'animate-spin text-red-600' : ''} />
+              <span>Probe Ping</span>
+            </button>
+
+            <button
+              onClick={() => purgeMutation.mutate()}
+              disabled={purgeMutation.isPending}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-xs text-red-700 transition-colors font-mono font-medium"
+              style={{ borderRadius: 2 }}
+              title="Purge all cached L2 response keys"
+            >
+              <RefreshCw size={11} className={purgeMutation.isPending ? 'animate-spin' : ''} />
+              <span>Purge Cache</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Redis Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="bg-canvas-paper p-3 border border-border-subtle" style={{ borderRadius: 2 }}>
+            <div className="text-[10px] text-ink-secondary uppercase tracking-wider">Redis Ping Latency</div>
+            <div className="text-sm font-bold text-emerald-700 mt-1">
+              &lt; {redisData?.pingLatencyMs ?? 1} ms
+            </div>
+          </div>
+
+          <div className="bg-canvas-paper p-3 border border-border-subtle" style={{ borderRadius: 2 }}>
+            <div className="text-[10px] text-ink-secondary uppercase tracking-wider">Active L2 Cache Keys</div>
+            <div className="text-sm font-bold text-ink-primary mt-1">
+              {redisData?.cachedKeysCount ?? 0} keys <span className="text-[10px] text-ink-secondary font-normal">(cms:v1:cache:*)</span>
+            </div>
+          </div>
+
+          <div className="bg-canvas-paper p-3 border border-border-subtle" style={{ borderRadius: 2 }}>
+            <div className="text-[10px] text-ink-secondary uppercase tracking-wider">Memory Allocation</div>
+            <div className="text-sm font-bold text-ink-primary mt-1">
+              {redisData?.memoryUsed ?? '0 KB'} <span className="text-[10px] text-ink-secondary font-normal">(512MB max)</span>
+            </div>
+          </div>
+
+          <div className="bg-canvas-paper p-3 border border-border-subtle" style={{ borderRadius: 2 }}>
+            <div className="text-[10px] text-ink-secondary uppercase tracking-wider">Pub/Sub Signaling</div>
+            <div className="text-sm font-bold text-indigo-700 mt-1">
+              cms:channel:mesh_switch
+            </div>
+          </div>
+        </div>
+
+        {/* Purge Notice Badge */}
+        {purgeNotice && (
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono flex items-center gap-2 animate-fade-in" style={{ borderRadius: 2 }}>
+            <CheckCircle2 size={13} className="text-emerald-600" />
+            <span>{purgeNotice}</span>
+          </div>
+        )}
+
+        <div className="text-[11px] text-ink-secondary bg-slate-50 p-2.5 border border-border-subtle flex flex-wrap items-center justify-between gap-2" style={{ borderRadius: 2 }}>
+          <span>
+            Diagnostic Header: Inspect network requests for <strong className="text-ink-primary">X-Cache: HIT</strong> (sub-millisecond cached) or <strong className="text-ink-primary">X-Cache: MISS</strong> (origin database query).
+          </span>
+          <span className="text-[10px] font-mono text-ink-secondary">
+            Eviction Policy: {redisData?.evictionPolicy || 'volatile-lru (512MB)'}
+          </span>
         </div>
       </div>
 
