@@ -115,4 +115,15 @@ export const jobsApi = {
     );
     return data;
   },
+
+  async dispatchTestJob(
+    queueName: string,
+    type: 'delayed' | 'simulate-dlq' | 'immediate' = 'delayed',
+  ): Promise<{ success: boolean; jobId: string; type: string }> {
+    const { data } = await apiClient.post<{ success: boolean; jobId: string; type: string }>(
+      `/admin/queues/${queueName}/dispatch-test`,
+      { type },
+    );
+    return data;
+  },
 };

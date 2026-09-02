@@ -122,4 +122,14 @@ export class JobsAdminController {
   ): Promise<{ removedCount: number }> {
     return this.jobsAdminService.cleanQueue(queueName, dto);
   }
+
+  @Post(':queueName/dispatch-test')
+  @ApiOperation({ summary: 'Dispatch test delayed or simulated DLQ job for operational drills' })
+  @RequirePermissions(Permission.SYSTEM_MAINTENANCE)
+  async dispatchTest(
+    @Param('queueName') queueName: string,
+    @Body() body: { type?: 'delayed' | 'simulate-dlq' | 'immediate' },
+  ): Promise<{ success: boolean; jobId: string; type: string }> {
+    return this.jobsAdminService.dispatchTestJob(queueName, body.type || 'delayed');
+  }
 }

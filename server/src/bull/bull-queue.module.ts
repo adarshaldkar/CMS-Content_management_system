@@ -17,12 +17,12 @@ import { QUEUE_NAMES } from './bull-queue.constants';
         const db = configService.get('REDIS_DB', { infer: true });
 
         return {
+          prefix: 'bull:cms',
           connection: {
             host,
             port,
             password: password || undefined,
             db,
-            keyPrefix: 'bull:cms:',
             maxRetriesPerRequest: null,
             enableReadyCheck: false,
           },

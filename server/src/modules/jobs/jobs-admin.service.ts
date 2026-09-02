@@ -320,4 +320,63 @@ export class JobsAdminService {
     this.logger.log(`Cleaned ${removed.length} [${status}] jobs from queue [${queueName}].`);
     return { removedCount: removed.length };
   }
+
+  /**
+   * Dispatches a test job for operational verification and DLQ drill testing
+   */
+  async dispatchTestJob(
+    queueName: string,
+    type: 'delayed' | 'simulate-dlq' | 'immediate' = 'delayed',
+  ): Promise<{ success: boolean; jobId: string; type: string }> {
+    const queue = this.getQueue(queueName);
+    const now = Date.now();
+
+    if (type === 'delayed') {
+      const job = await queue.add(
+        'sample-delayed-dispatch',
+        {
+          simulation: true,
+          purpose: 'Demonstration of delayed queue scheduling',
+          scheduledRelease: new Date(now + 120000).toISOString(),
+          enqueuedAt: new Date(now).toISOString(),
+        },
+        {
+          delay: 120000, // 2 minutes delay
+          attempts: 3,
+        },
+      );
+      return { success: true, jobId: String(job.id), type: 'delayed' };
+    }
+
+    if (type === 'simulate-dlq') {
+      const job = await queue.add(
+        'sample-simulated-dlq-failure',
+        {
+          simulation: true,
+          purpose: 'Simulated Dead-Letter Queue failure for operator recovery drill',
+          mockSecretToken: 'test-secret-jwt-token-12345',
+          authorPasswordHash: 'argon2-secret-hash-for-redaction-test',
+          databaseHost: 'localhost:5432',
+          enqueuedAt: new Date(now).toISOString(),
+        },
+        {
+          attempts: 1,
+        },
+      );
+      return { success: true, jobId: String(job.id), type: 'simulate-dlq' };
+    }
+
+    const job = await queue.add(
+      'sample-immediate-dispatch',
+      {
+        simulation: true,
+        purpose: 'Demonstration of immediate execution',
+        enqueuedAt: new Date(now).toISOString(),
+      },
+      {
+        attempts: 2,
+      },
+    );
+    return { success: true, jobId: String(job.id), type: 'immediate' };
+  }
 }

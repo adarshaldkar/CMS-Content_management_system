@@ -149,6 +149,19 @@ export const JobsManagerPage: React.FC = () => {
     },
   });
 
+  const dispatchTestMutation = useMutation({
+    mutationFn: (type: 'delayed' | 'simulate-dlq' | 'immediate') =>
+      jobsApi.dispatchTestJob(selectedQueue, type),
+    onSuccess: (data) => {
+      setActionSuccess(`Dispatched sample ${data.type} job [${data.jobId}]. Telemetry updated.`);
+      queryClient.invalidateQueries({ queryKey: ['adminQueues'] });
+      queryClient.invalidateQueries({ queryKey: ['adminQueueJobs'] });
+    },
+    onError: (err: any) => {
+      setActionError(err.response?.data?.message || err.message || 'Failed to dispatch test job.');
+    },
+  });
+
   const currentQueueSummary = queues.find((q) => q.queueName === selectedQueue);
 
   // Overall Cluster Totals
@@ -375,7 +388,29 @@ export const JobsManagerPage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Dispatch Sample Delayed Job Button */}
+            <button
+              onClick={() => dispatchTestMutation.mutate('delayed')}
+              disabled={dispatchTestMutation.isPending}
+              className="px-3 py-1.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-mono rounded flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Enqueue sample job with 2-minute delay"
+            >
+              <Clock size={12} />
+              <span>+ Enqueue Delayed Job (+2m)</span>
+            </button>
+
+            {/* Simulate DLQ Failure Button */}
+            <button
+              onClick={() => dispatchTestMutation.mutate('simulate-dlq')}
+              disabled={dispatchTestMutation.isPending}
+              className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-mono rounded flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Enqueue simulated task for Dead-Letter testing"
+            >
+              <AlertTriangle size={12} />
+              <span>+ Simulate DLQ Task</span>
+            </button>
+
             {/* Pause / Resume Button */}
             {currentQueueSummary.isPaused ? (
               <button

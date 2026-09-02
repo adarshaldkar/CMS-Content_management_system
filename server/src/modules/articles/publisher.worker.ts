@@ -66,6 +66,16 @@ export class PublisherWorker extends WorkerHost implements OnModuleInit {
   ): Promise<{ success: boolean; published: boolean; reason?: string }> {
     const { articleId, version, publishingSlotId } = job.data;
 
+    // Handle simulated test drill tasks
+    if ((job.data as any)?.simulation) {
+      if ((job.data as any).purpose?.includes('Simulated Dead-Letter')) {
+        this.logger.warn(`Simulating DLQ Failure drill for job [${job.id}]`);
+        throw new Error('Simulated DLQ drill exception: Database connection timeout during background dispatch.');
+      }
+      this.logger.log(`Simulated test job [${job.id}] completed successfully.`);
+      return { success: true, published: true, reason: 'SIMULATED_TEST_JOB' };
+    }
+
     this.logger.log(`Processing scheduled publish job [${job.id}] for article [${articleId}] (version ${version})`);
 
     const article = await this.articleRepo.findById(articleId);
