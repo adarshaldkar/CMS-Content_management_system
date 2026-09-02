@@ -6,7 +6,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import {
   ARTICLE_REPOSITORY,
   type IArticleRepository,
@@ -36,6 +39,7 @@ import { OwnershipHelper } from '../../common/guards/ownership.guard';
 import { PublishingSlotsService } from '../publishing-slots/publishing-slots.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../domain/models';
+import { QUEUE_NAMES, JOB_NAMES } from '../../bull/bull-queue.constants';
 
 @Injectable()
 export class WorkflowService {
@@ -49,6 +53,9 @@ export class WorkflowService {
     private readonly auditService: AuditService,
     private readonly slotsService: PublishingSlotsService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.SCHEDULED_PUBLISHING)
+    private readonly publishingQueue?: Queue,
   ) {}
 
   private slugify(text: string): string {
@@ -303,6 +310,43 @@ export class WorkflowService {
         reviewNote: transitionDto.reviewNote,
       },
     });
+
+    // BullMQ delayed job management for scheduled publishing
+    if (this.publishingQueue) {
+      if (finalTargetStatus === ContentStatus.SCHEDULED && updatePayload.scheduledAt) {
+        const delayMs = Math.max(0, new Date(updatePayload.scheduledAt).getTime() - Date.now());
+        const jobId = `job:publish:${updated.id}:${updated.version}`;
+        await this.publishingQueue.add(
+          JOB_NAMES.PUBLISH_SCHEDULED_ARTICLE,
+          {
+            articleId: updated.id,
+            version: updated.version,
+            scheduledAt: new Date(updatePayload.scheduledAt).toISOString(),
+            publishingSlotId: updatePayload.publishingSlotId || null,
+            enqueuedByUserId: user.id,
+            enqueuedAt: new Date().toISOString(),
+          },
+          {
+            jobId,
+            delay: delayMs,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+          },
+        );
+      } else if (currentStatus === ContentStatus.SCHEDULED && finalTargetStatus !== ContentStatus.SCHEDULED) {
+        // Unscheduling or reverting: remove any pending delayed jobs
+        try {
+          const delayedJobs = await this.publishingQueue.getDelayed();
+          for (const job of delayedJobs) {
+            if (job.data?.articleId === updated.id) {
+              await job.remove();
+            }
+          }
+        } catch (queueErr) {
+          this.logger.warn(`Failed to remove delayed publish job for [${updated.id}]: ${(queueErr as Error).message}`);
+        }
+      }
+    }
 
     // Dispatch in-app notification to author
     if (updated.authorId && updated.authorId !== user.id) {

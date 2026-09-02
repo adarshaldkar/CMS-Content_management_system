@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ConflictException,
@@ -17,6 +18,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { PublishingSlotsService } from '../publishing-slots/publishing-slots.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QUEUE_NAMES } from '../../bull/bull-queue.constants';
 import {
   ContentStatus,
   Permission,
@@ -111,6 +113,13 @@ describe('WorkflowService (Publishing State Machine, Revisions & Concurrency)', 
           provide: NotificationsService,
           useValue: {
             notify: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: getQueueToken(QUEUE_NAMES.SCHEDULED_PUBLISHING),
+          useValue: {
+            add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+            getDelayed: jest.fn().mockResolvedValue([]),
           },
         },
       ],

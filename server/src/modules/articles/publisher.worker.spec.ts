@@ -1,19 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { PublisherWorker } from './publisher.worker';
 import {
   ARTICLE_REPOSITORY,
   type IArticleRepository,
 } from '../../repositories/interfaces/article.repository.interface';
 import { AuditService } from '../audit/audit.service';
+import { RedisService } from '../../redis/redis.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ContentStatus, type Article } from '../../domain/models';
+import { QUEUE_NAMES } from '../../bull/bull-queue.constants';
 
-describe('PublisherWorker (Scheduled Publishing Concurrency & Idempotency)', () => {
+describe('PublisherWorker (BullMQ Scheduled Publishing & Idempotency)', () => {
   let worker: PublisherWorker;
 
-  const dueArticle: Article = {
+  const scheduledArticle: Article = {
     id: 'art-scheduled-1',
-    title: 'Scheduled Release Article',
-    slug: 'scheduled-release-article',
+    title: 'Scheduled Release Story',
+    slug: 'scheduled-release-story',
     description: 'Excerpt...',
     content: '<p>Content</p>',
     authorId: 'author-1',
@@ -27,26 +31,33 @@ describe('PublisherWorker (Scheduled Publishing Concurrency & Idempotency)', () 
     seoTitle: null,
     seoDescription: null,
     reviewNote: null,
-    scheduledAt: new Date(Date.now() - 5 * 60 * 1000), // Due 5 minutes ago!
+    scheduledAt: new Date(Date.now() - 5 * 60 * 1000),
     publishedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,
   };
 
-  const futureArticle: Article = {
-    ...dueArticle,
-    id: 'art-future-2',
-    scheduledAt: new Date(Date.now() + 60 * 60 * 1000), // Future: 1 hour from now
-  };
-
   const mockArticleRepo: Partial<IArticleRepository> = {
+    findById: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
   };
 
   const mockAuditService: Partial<AuditService> = {
     log: jest.fn().mockResolvedValue({} as any),
+  };
+
+  const mockRedisService: Partial<RedisService> = {
+    delCached: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockNotificationsService: Partial<NotificationsService> = {
+    notify: jest.fn().mockResolvedValue({} as any),
+  };
+
+  const mockQueue = {
+    add: jest.fn().mockResolvedValue({ id: 'job-1' }),
   };
 
   beforeEach(async () => {
@@ -57,72 +68,95 @@ describe('PublisherWorker (Scheduled Publishing Concurrency & Idempotency)', () 
         PublisherWorker,
         { provide: ARTICLE_REPOSITORY, useValue: mockArticleRepo },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: RedisService, useValue: mockRedisService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: getQueueToken(QUEUE_NAMES.SCHEDULED_PUBLISHING), useValue: mockQueue },
       ],
     }).compile();
 
     worker = module.get<PublisherWorker>(PublisherWorker);
   });
 
-  afterEach(() => {
-    worker.onModuleDestroy();
+  it('should be defined', () => {
+    expect(worker).toBeDefined();
   });
 
-  it('should promote due scheduled articles to PUBLISHED and leave future articles untouched', async () => {
-    (mockArticleRepo.findMany as jest.Mock).mockResolvedValue({
-      items: [dueArticle, futureArticle],
-      total: 2,
-      page: 1,
-      limit: 100,
-      totalPages: 1,
-    });
-
-    (mockArticleRepo.update as jest.Mock).mockResolvedValue({
-      ...dueArticle,
-      status: ContentStatus.PUBLISHED,
-    });
-
-    const promoted = await worker.processDueArticles();
-
-    expect(promoted).toBe(1);
-    expect(mockArticleRepo.update).toHaveBeenCalledWith(
-      'art-scheduled-1',
-      expect.objectContaining({
+  describe('process (BullMQ Job Processor)', () => {
+    it('should promote scheduled article to PUBLISHED, invalidate cache, log audit, and notify author', async () => {
+      (mockArticleRepo.findById as jest.Mock).mockResolvedValue(scheduledArticle);
+      (mockArticleRepo.update as jest.Mock).mockResolvedValue({
+        ...scheduledArticle,
         status: ContentStatus.PUBLISHED,
-      }),
-    );
-    expect(mockArticleRepo.update).not.toHaveBeenCalledWith(
-      'art-future-2',
-      expect.anything(),
-    );
-    expect(mockAuditService.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'ARTICLE_STATUS_CHANGED',
-        resource: 'Article:art-scheduled-1',
-      }),
-    );
-  });
+        version: 3,
+      });
 
-  it('should be idempotent and prevent race conditions if called concurrently', async () => {
-    (mockArticleRepo.findMany as jest.Mock).mockResolvedValue({
-      items: [dueArticle],
-      total: 1,
-      page: 1,
-      limit: 100,
-      totalPages: 1,
+      const result = await worker.process({
+        id: 'job-publish-1',
+        data: {
+          articleId: 'art-scheduled-1',
+          version: 2,
+          scheduledAt: new Date().toISOString(),
+          enqueuedByUserId: 'author-1',
+          enqueuedAt: new Date().toISOString(),
+        },
+      } as any);
+
+      expect(result.success).toBe(true);
+      expect(result.published).toBe(true);
+      expect(mockArticleRepo.update).toHaveBeenCalledWith(
+        'art-scheduled-1',
+        expect.objectContaining({
+          status: ContentStatus.PUBLISHED,
+        }),
+      );
+      expect(mockRedisService.delCached).toHaveBeenCalled();
+      expect(mockAuditService.log).toHaveBeenCalled();
     });
 
-    (mockArticleRepo.update as jest.Mock).mockResolvedValue({
-      ...dueArticle,
-      status: ContentStatus.PUBLISHED,
+    it('should be idempotent: if already PUBLISHED, return clean No-Op without updating', async () => {
+      (mockArticleRepo.findById as jest.Mock).mockResolvedValue({
+        ...scheduledArticle,
+        status: ContentStatus.PUBLISHED,
+      });
+
+      const result = await worker.process({
+        id: 'job-publish-1',
+        data: {
+          articleId: 'art-scheduled-1',
+          version: 2,
+          scheduledAt: new Date().toISOString(),
+          enqueuedByUserId: 'author-1',
+          enqueuedAt: new Date().toISOString(),
+        },
+      } as any);
+
+      expect(result.success).toBe(true);
+      expect(result.published).toBe(false);
+      expect(result.reason).toBe('ALREADY_PUBLISHED');
+      expect(mockArticleRepo.update).not.toHaveBeenCalled();
     });
 
-    // Run two worker cycles concurrently
-    const [result1, result2] = await Promise.all([
-      worker.processDueArticles(),
-      worker.processDueArticles(),
-    ]);
+    it('should discard stale job if version has incremented past job payload', async () => {
+      (mockArticleRepo.findById as jest.Mock).mockResolvedValue({
+        ...scheduledArticle,
+        version: 4, // Article was edited / rescheduled to higher version
+      });
 
-    // One of them processes the job, the other safely yields (lock prevents duplicate execution)
-    expect(result1 + result2).toBe(1);
+      const result = await worker.process({
+        id: 'job-publish-old',
+        data: {
+          articleId: 'art-scheduled-1',
+          version: 2, // Stale version
+          scheduledAt: new Date().toISOString(),
+          enqueuedByUserId: 'author-1',
+          enqueuedAt: new Date().toISOString(),
+        },
+      } as any);
+
+      expect(result.success).toBe(true);
+      expect(result.published).toBe(false);
+      expect(result.reason).toBe('STALE_VERSION');
+      expect(mockArticleRepo.update).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,6 +1,6 @@
 # The Gazette CMS — Distributed Job Queues & Admin DLQ Operations Architecture
 
-**Document Status**: Production-Frozen Specification (v1.0)  
+**Document Status**: Production-Frozen Specification (v2.0)  
 **Date**: September 2, 2026  
 **Target Systems**: NestJS Backend, BullMQ v5, Redis 7 (Isolated Queue Database), PostgreSQL / MongoDB, React Admin Governance Console  
 **Audience**: Backend Engineers, Platform Architects, DevOps Engineers, System Operators  
@@ -20,7 +20,7 @@ In a distributed, multi-instance content management platform, long-running, sche
 3. **Graceful Retries & Dead-Letter Isolation (DLQ)**:
    - Network timeouts to third-party services (Web Push endpoints, transactional email providers) or secondary database replicas must not block primary user requests. BullMQ provides deterministic exponential backoff and isolates permanently failed tasks into a Dead-Letter Queue (DLQ).
 4. **Operational Governance & Diagnostics**:
-   - Administrators and platform operators need complete real-time visibility into queue backlogs, failed jobs, execution latencies, error stack traces, and the ability to trigger bulk or single-job retries with a single click.
+   - Administrators and platform operators need complete real-time visibility into queue backlogs, failed jobs, execution latencies, sanitized error stack traces, and the ability to trigger bulk or single-job retries with a single click.
 
 ---
 
@@ -46,11 +46,18 @@ To prevent high-volume asynchronous tasks (e.g. 5,000 notification dispatches) f
 |     - Concurrency: 10 workers | Max Retries: 10 | Backoff: Exponential (10s)  |
 |                                                                               |
 |  4. [analytics-rollup] (Low Priority / Periodic)                              |
-|     - ClickHouse view count sync and hourly engagement metric rollups.       |
+|     - Periodic aggregation and rollups for ClickHouse columnar views.         |
 |     - Concurrency: 2 workers | Max Retries: 3 | Backoff: Fixed (30s)          |
 |                                                                               |
 +-------------------------------------------------------------------------------+
 ```
+
+### 2.1 Architectural Asymmetry Note (ClickHouse vs Relational Replicas)
+
+- **Relational Secondary Replicas** (`MariaDB`, `MySQL`, `CockroachDB`):
+  - Handled via `mesh-reconciliation` queue for transactional statement/mutation replay.
+- **ClickHouse (Columnar Analytics Store)**:
+  - Not treated as a relational replica. Raw view and interaction events stream directly through `Redis Stream` (`cms:stream:article_views`) to ClickHouse batch ingestion workers. The `analytics-rollup` queue only manages periodic rollup aggregations and trend calculation jobs.
 
 ---
 
@@ -126,7 +133,7 @@ To prevent high-volume asynchronous tasks (e.g. 5,000 notification dispatches) f
 
 ---
 
-## 4. Job State Machine & Retry Policies
+## 4. Job State Machine, Idempotency & Worker Crash Recovery
 
 Each job moves through the strict BullMQ lifecycle:
 
@@ -162,14 +169,32 @@ Each job moves through the strict BullMQ lifecycle:
                                                                   +---------------+
 ```
 
-### Retry Configuration Table
+### 4.1 Explicit Worker Idempotency Rules
 
-| Queue Name | Max Attempts | Backoff Type | Initial Delay | Remove on Complete | Remove on Fail |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `scheduled-publishing` | 3 | Exponential | 5,000 ms | Keep 500 | Keep (DLQ) |
-| `notification-outbox` | 5 | Exponential | 2,000 ms | Keep 1,000 | Keep (DLQ) |
-| `mesh-reconciliation` | 10 | Exponential | 10,000 ms | Keep 2,000 | Keep (DLQ) |
-| `analytics-rollup` | 3 | Fixed | 30,000 ms | Keep 100 | Keep (DLQ) |
+Every worker processor must be completely safe to execute multiple times without unintended side effects:
+
+```
+Job Arrival
+    ↓
+Check Database State & Version Fencing Token
+    ↓
+Already in Target State? (e.g. article is already 'PUBLISHED')
+    ↓
+YES → Log informational notice & return immediately (No-Op)
+NO  → Execute mutation within atomic transaction
+```
+
+- **Publishing Processor**: If the article's status is already `PUBLISHED` or the version has incremented past the job payload, the worker logs a no-op and exits cleanly.
+- **Notification Processor**: Uses Redis deduplication key (`SET ... NX`) and DB unique grouping keys to ensure duplicate deliveries never spawn duplicate rows.
+- **Mesh Reconciliation**: Uses idempotent SQL (`INSERT ... ON CONFLICT / ON DUPLICATE KEY UPDATE`) so repeated retries are safe.
+
+### 4.2 Worker Crash & Stalled Job Recovery Semantics
+
+When a worker Node.js process crashes unexpectedly while processing an `ACTIVE` job:
+1. **Heartbeat Lease**: BullMQ workers renew a lock on the job every 15,000 ms (`lockDuration: 30000`).
+2. **Stalled Detection**: BullMQ monitors active locks via `stalledInterval: 30000`. If a worker terminates without releasing the lock, the job is marked `stalled`.
+3. **Automatic Reprocessing**: Stalled jobs are automatically re-enqueued to `WAITING` (up to `maxStalledCount: 2`).
+4. **Safety Guarantee**: Because all processors enforce **Idempotency Rule 4.1**, re-running a stalled job will never create duplicate state mutations or corrupt data.
 
 ---
 
@@ -181,9 +206,9 @@ All administrative queue management endpoints are protected by `JwtAuthGuard`, `
 
 | Method | Endpoint | Description | Request Body | Response |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/admin/queues` | Overview statistics for all queues | None | `QueueSummaryDto[]` |
+| `GET` | `/api/admin/queues` | Overview statistics & latency for all queues | None | `QueueSummaryDto[]` |
 | `GET` | `/api/admin/queues/:queueName/jobs` | Paginated list of jobs filtered by state | Query: `state, page, limit` | `PaginatedJobsDto` |
-| `GET` | `/api/admin/queues/:queueName/jobs/:jobId` | Detailed diagnostic inspect for single job | None | `JobDetailDto` |
+| `GET` | `/api/admin/queues/:queueName/jobs/:jobId` | Sanitized diagnostic inspect for single job | None | `JobDetailDto` |
 | `POST` | `/api/admin/queues/:queueName/jobs/:jobId/retry` | Re-enqueue a failed DLQ job | None | `{ success: true, jobId }` |
 | `POST` | `/api/admin/queues/:queueName/retry-all-failed` | Bulk re-enqueue all failed jobs in DLQ | None | `{ success: true, count }` |
 | `DELETE` | `/api/admin/queues/:queueName/jobs/:jobId` | Permanently remove job from queue | None | `{ success: true }` |
@@ -191,9 +216,30 @@ All administrative queue management endpoints are protected by `JwtAuthGuard`, `
 | `POST` | `/api/admin/queues/:queueName/resume` | Resume queue processing | None | `{ paused: false }` |
 | `POST` | `/api/admin/queues/:queueName/clean` | Clean completed or old failed jobs | Body: `{ gracePeriodMs, status }` | `{ removedCount: number }` |
 
-### 5.2 Response Schemas
+### 5.2 Sanitization & Sensitive Data Redaction in Admin DLQ
 
-#### Queue Summary (`GET /api/admin/queues`)
+To prevent credential leakage or PII exposure in the Admin Console:
+1. **Payload Redaction**: Before returning job payloads in `JobDetailDto`, all fields matching `/password|token|secret|authorization|cookie|email/i` are masked with `"[REDACTED]"`.
+2. **Stack Trace Masking**: Absolute system paths (e.g. `/home/deploy/app/src/...` or `C:\Users\...`) are stripped to standard relative repository paths (`server/src/...`).
+
+---
+
+## 6. Backpressure, Depth Thresholds & Queue Observability
+
+### 6.1 Queue Backpressure & Rate Control
+
+When an upstream event causes a traffic spike (e.g. 20,000 notifications in 1 minute):
+
+| Queue | Warning Depth | Critical Depth | Backpressure Action |
+| :--- | :--- | :--- | :--- |
+| `scheduled-publishing` | > 50 waiting | > 200 waiting | Alert Ops + Concurrency auto-scales to 10 |
+| `notification-outbox` | > 2,000 waiting | > 10,000 waiting | Throttle non-critical email digests; prioritize breaking editorial alerts |
+| `mesh-reconciliation` | > 500 waiting | > 2,000 waiting | Log degraded replica health warning |
+
+### 6.2 Advanced Queue Observability Metrics
+
+The `GET /api/admin/queues` endpoint returns complete telemetry for operational monitoring:
+
 ```json
 [
   {
@@ -205,80 +251,20 @@ All administrative queue management endpoints are protected by `JwtAuthGuard`, `
       "delayed": 14,
       "failed": 0,
       "completed": 342,
+      "stalled": 0,
       "paused": 0
+    },
+    "metrics": {
+      "oldestWaitingJobAgeMs": 0,
+      "p95ProcessingLatencyMs": 142,
+      "throughputPerMinute": 18,
+      "dlqSize": 0
     },
     "workersCount": 2,
     "memoryUsageBytes": 1048576
-  },
-  {
-    "queueName": "notification-outbox",
-    "isPaused": false,
-    "counts": {
-      "active": 3,
-      "waiting": 12,
-      "delayed": 0,
-      "failed": 2,
-      "completed": 12840,
-      "paused": 0
-    },
-    "workersCount": 4,
-    "memoryUsageBytes": 4194304
   }
 ]
 ```
-
-#### Job Details & Error Diagnostics (`GET /api/admin/queues/:queueName/jobs/:jobId`)
-```json
-{
-  "id": "job:publish:art-991:v2",
-  "name": "publish-scheduled-article",
-  "data": {
-    "articleId": "art-991",
-    "version": 2,
-    "scheduledAt": "2026-09-02T01:00:00.000Z"
-  },
-  "opts": {
-    "attempts": 3,
-    "delay": 1800000
-  },
-  "progress": 100,
-  "attemptsMade": 2,
-  "stacktrace": [
-    "Error: Database connection timeout\n    at PostgresService.query (/app/database/postgres.service.ts:45)\n    at PublisherWorker.process (/app/modules/articles/publisher.worker.ts:88)"
-  ],
-  "failedReason": "Database connection timeout",
-  "timestamp": 1788290000000,
-  "processedOn": 1788291800000,
-  "finishedOn": 1788291802000
-}
-```
-
----
-
-## 6. Frontend Admin Queue & DLQ Operations Console
-
-The operational console will be integrated into the Admin Governance area under **Background Jobs & DLQ** (`/admin/jobs`).
-
-### 6.1 UI Components & Capabilities
-
-1. **Queue Metric Cards (Top Bar)**:
-   - Live counters for **Active**, **Waiting**, **Delayed**, **Completed**, and **Failed (DLQ)** across all 4 queues.
-   - Real-time polling or SSE updates every 5 seconds.
-   - Global Pause / Resume switches for emergency operational maintenance.
-
-2. **Dead-Letter Queue (DLQ) Inspector Tab**:
-   - Dedicated table displaying all jobs in `failed` state across queues.
-   - Columns: `Queue`, `Job ID`, `Attempts Made`, `Failed Reason`, `Last Attempt Time`, `Actions`.
-   - **One-Click Retry Button**: Re-enqueues the job with fresh attempt limits.
-   - **Bulk "Retry All Failed" Action**: Recovers all failed items simultaneously.
-   - **Error Stack Trace Modal**: Inspects raw stack traces and JSON payload parameters to diagnose root causes before retrying.
-
-3. **Scheduled & Delayed Dispatches Tab**:
-   - Displays all manuscripts waiting for scheduled promotion.
-   - Columns: `Manuscript Title`, `Scheduled Time`, `Countdown`, `Job ID`, `Immediate Publish Action`, `Cancel Schedule Action`.
-
-4. **Queue Cleaning & Purging Tools**:
-   - Allows operators to clean jobs older than 7 days (`COMPLETED` or `FAILED`) to reclaim Redis memory.
 
 ---
 
@@ -301,6 +287,7 @@ The operational console will be integrated into the Admin Governance area under 
 |                                                                                |
 |  Phase 3: Admin Queue & DLQ Management API                                     |
 |  - Create JobsAdminService and JobsAdminController.                            |
+|  - Implement sensitive data redaction filter and stack trace sanitizer.        |
 |  - Expose summary metrics, paginated job lists, single/bulk retries, deletes.  |
 |                                                                                |
 |  Phase 4: Admin Governance Frontend (Jobs & DLQ Console)                       |
@@ -324,6 +311,6 @@ The operational console will be integrated into the Admin Governance area under 
 - [ ] Multiple server instances can run concurrently without executing duplicate publishing transitions.
 - [ ] Reverting a scheduled article to Draft cleanly removes the delayed BullMQ job from Redis.
 - [ ] Intentionally failed jobs are captured in the Dead-Letter Queue (DLQ).
-- [ ] `/api/admin/queues` returns accurate counts for `active`, `delayed`, `failed`, and `completed`.
+- [ ] `/api/admin/queues` returns accurate counts for `active`, `delayed`, `failed`, `completed`, and `oldestWaitingJobAgeMs`.
 - [ ] Admin Console (`/admin/jobs`) displays live queue metrics and allows single-click and bulk DLQ retries.
 - [ ] 100% green unit test suite across all services and workers.

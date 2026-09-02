@@ -42,6 +42,7 @@ const CommentsModerationPage = lazy(() => import('./pages/admin/CommentsModerati
 const AuditLogExplorerPage = lazy(() => import('./pages/admin/AuditLogExplorerPage').then((m) => ({ default: m.AuditLogExplorerPage })));
 const DatabaseSwitcherPage = lazy(() => import('./pages/admin/DatabaseSwitcherPage').then((m) => ({ default: m.DatabaseSwitcherPage })));
 const PublishingSlotsManagerPage = lazy(() => import('./pages/admin/PublishingSlotsManagerPage').then((m) => ({ default: m.PublishingSlotsManagerPage })));
+const JobsManagerPage = lazy(() => import('./pages/admin/JobsManagerPage').then((m) => ({ default: m.JobsManagerPage })));
 const AdminPanelPage = lazy(() => import('./pages/AdminPanelPage').then((m) => ({ default: m.AdminPanelPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
@@ -126,6 +127,7 @@ export default function App() {
               <Route path="/admin/comments" element={<CommentsModerationPage />} />
               <Route path="/admin/audit" element={<AuditLogExplorerPage />} />
               <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
+              <Route path="/admin/jobs" element={<JobsManagerPage />} />
               <Route path="/admin/*" element={<AdminPanelPage />} />
             </Route>
           </Route>
