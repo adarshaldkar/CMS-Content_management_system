@@ -53,6 +53,10 @@ import {
   NOTIFICATION_REPOSITORY,
   type INotificationRepository,
 } from './interfaces/notification.repository.interface';
+import {
+  NEWSLETTER_REPOSITORY,
+  type INewsletterRepository,
+} from './interfaces/newsletter.repository.interface';
 import type { SupportedDbName } from './repository-proxy';
 
 // PostgreSQL Repositories
@@ -69,6 +73,7 @@ import { PostgresLikeRepository } from './postgres/postgres-like.repository';
 import { PostgresFollowRepository } from './postgres/postgres-follow.repository';
 import { PostgresPublishingSlotRepository } from './postgres/postgres-publishing-slot.repository';
 import { PostgresNotificationRepository } from './postgres/postgres-notification.repository';
+import { PostgresNewsletterRepository } from './postgres/postgres-newsletter.repository';
 
 // MongoDB Repositories
 import { MongoArticleRepository } from './mongo/mongo-article.repository';
@@ -84,7 +89,7 @@ import { MongoLikeRepository } from './mongo/mongo-like.repository';
 import { MongoFollowRepository } from './mongo/mongo-follow.repository';
 import { MongoPublishingSlotRepository } from './mongo/mongo-publishing-slot.repository';
 import { MongoNotificationRepository } from './mongo/mongo-notification.repository';
-import { SeamlessNotificationRepository } from './seamless/seamless-notification.repository';
+import { MongoNewsletterRepository } from './mongo/mongo-newsletter.repository';
 
 // MariaDB Repositories
 import { MariaDbUserRepository } from './mariadb/mariadb-user.repository';
@@ -144,6 +149,8 @@ import { SeamlessBookmarkRepository } from './seamless/seamless-bookmark.reposit
 import { SeamlessLikeRepository } from './seamless/seamless-like.repository';
 import { SeamlessFollowRepository } from './seamless/seamless-follow.repository';
 import { SeamlessPublishingSlotRepository } from './seamless/seamless-publishing-slot.repository';
+import { SeamlessNotificationRepository } from './seamless/seamless-notification.repository';
+import { SeamlessNewsletterRepository } from './seamless/seamless-newsletter.repository';
 
 // Runtime-Switchable Registry
 import { RepositoryRegistryService } from './repository-registry.service';
@@ -745,6 +752,28 @@ export const notificationRepositoryProvider: FactoryProvider<INotificationReposi
   },
 };
 
+export const newsletterRepositoryProvider: FactoryProvider<INewsletterRepository> = {
+  provide: NEWSLETTER_REPOSITORY,
+  inject: [
+    ConfigService,
+    PostgresNewsletterRepository,
+    MongoNewsletterRepository,
+    RepositoryRegistryService,
+  ],
+  useFactory: (
+    config: ConfigService<EnvConfig, true>,
+    postgresRepo: PostgresNewsletterRepository,
+    mongoRepo: MongoNewsletterRepository,
+    registry: RepositoryRegistryService,
+  ): INewsletterRepository => {
+    const active = config.get('ACTIVE_DATABASE', { infer: true }) || 'postgres';
+    const seamless = new SeamlessNewsletterRepository(postgresRepo, mongoRepo, active as SupportedDbName);
+    registry.setInitialActive(active);
+    registry.register(seamless);
+    return seamless;
+  },
+};
+
 export const ALL_DATABASE_REPOSITORIES = [
   // PostgreSQL
   PostgresUserRepository,
@@ -759,6 +788,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   PostgresAuditLogRepository,
   PostgresPublishingSlotRepository,
   PostgresNotificationRepository,
+  PostgresNewsletterRepository,
 
   // MongoDB
   MongoUserRepository,
@@ -774,6 +804,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   MongoFollowRepository,
   MongoPublishingSlotRepository,
   MongoNotificationRepository,
+  MongoNewsletterRepository,
 
   // MariaDB
   MariaDbUserRepository,

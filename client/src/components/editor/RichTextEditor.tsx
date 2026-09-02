@@ -12,11 +12,16 @@ import {
   ListOrdered,
   Link as LinkIcon,
   Image as ImageIcon,
+  Video,
   Undo,
   Redo,
   RemoveFormatting,
 } from 'lucide-react';
 import { MediaPickerModal } from './MediaPickerModal';
+import { RichEmbedModal } from './RichEmbedModal';
+import { embedsApi, type EmbedMetadataResponse } from '../../api/embeds.api';
+import { formatEmbedHtml } from '../../utils/embedFormatter';
+import { isValidUrl, detectEmbedInfo } from '../../utils/embedParser';
 
 interface RichTextEditorProps {
   value: string;
@@ -31,6 +36,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [embedModalOpen, setEmbedModalOpen] = useState(false);
+  const [embedModalUrl, setEmbedModalUrl] = useState('');
   const lastHtmlRef = useRef<string>('');
 
   // Synchronize incoming external value changes (async load from API, revision restores, initial mount)
@@ -107,6 +114,42 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     executeCommand('insertImage', url);
   };
 
+  const handleEmbedInsert = (embedData: EmbedMetadataResponse) => {
+    const embedHtml = formatEmbedHtml(embedData, {
+      width: 'wide',
+      caption: embedData.caption,
+      displayMode: embedData.displayMode || 'embed',
+    });
+    executeCommand('insertHTML', embedHtml + '<p><br></p>');
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const pastedText = e.clipboardData.getData('text/plain')?.trim();
+    if (pastedText && isValidUrl(pastedText)) {
+      const detected = detectEmbedInfo(pastedText);
+      if (detected) {
+        e.preventDefault();
+        try {
+          const scraped = await embedsApi.scrape(pastedText);
+          handleEmbedInsert(scraped);
+        } catch {
+          const fallbackData: EmbedMetadataResponse = {
+            url: pastedText,
+            provider: detected.provider,
+            providerName: detected.providerName,
+            videoId: detected.videoId,
+            embedUrl: detected.embedUrl || pastedText,
+            title: `${detected.providerName} Media`,
+            aspectRatio: '16:9',
+            displayMode: detected.isMedia ? 'embed' : 'card',
+            snapshottedAt: new Date().toISOString(),
+          };
+          handleEmbedInsert(fallbackData);
+        }
+      }
+    }
+  };
+
   // Format button helper that prevents mousedown from stealing focus
   const renderFormatButton = (
     title: string,
@@ -179,6 +222,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <ImageIcon className="w-3.5 h-3.5 text-accent-crimson" />,
           () => setMediaPickerOpen(true),
         )}
+        {renderFormatButton(
+          'Embed Video or Rich Link (YouTube, Vimeo, Loom, Spotify, X)',
+          <Video className="w-3.5 h-3.5 text-indigo-600" />,
+          () => {
+            setEmbedModalUrl('');
+            setEmbedModalOpen(true);
+          },
+        )}
         {renderFormatButton('Clear Formatting', <RemoveFormatting className="w-3.5 h-3.5" />, () =>
           executeCommand('removeFormat'),
         )}
@@ -203,6 +254,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onBlur={handleInput}
         onKeyUp={handleInput}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         data-placeholder={placeholder}
         style={{ minHeight: '480px', outline: 'none' }}
         className="manuscript-editor w-full p-8 text-ink-primary text-base sm:text-lg leading-relaxed font-sans cursor-text focus:outline-none"
@@ -212,6 +264,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         isOpen={mediaPickerOpen}
         onClose={() => setMediaPickerOpen(false)}
         onSelect={handleMediaSelected}
+      />
+
+      <RichEmbedModal
+        isOpen={embedModalOpen}
+        initialUrl={embedModalUrl}
+        onClose={() => setEmbedModalOpen(false)}
+        onInsert={handleEmbedInsert}
       />
     </div>
   );

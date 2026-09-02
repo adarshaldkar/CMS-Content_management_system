@@ -19,6 +19,8 @@ import { FollowsModule } from './modules/follows/follows.module';
 import { PublishingSlotsModule } from './modules/publishing-slots/publishing-slots.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
+import { NewsletterModule } from './modules/newsletter/newsletter.module';
+import { EmbedsModule } from './modules/embeds/embeds.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { JobsModule } from './modules/jobs/jobs.module';
     PublishingSlotsModule,
     NotificationsModule,
     JobsModule,
+    NewsletterModule,
+    EmbedsModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

@@ -19,5 +19,6 @@ export { FollowTargetType } from './social.model';
 export type { Bookmark, CreateBookmarkDto, Like, CreateLikeDto, Follow, CreateFollowDto, FollowQueryFilters } from './social.model';
 export * from './publishing-slot.model';
 export * from './notification.model';
+export * from './newsletter.model';
 
 

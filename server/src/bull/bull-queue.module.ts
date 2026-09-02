@@ -58,6 +58,15 @@ import { QUEUE_NAMES } from './bull-queue.constants';
         },
       },
       {
+        name: QUEUE_NAMES.NEWSLETTER_BROADCAST,
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 3000 },
+          removeOnComplete: 1000,
+          removeOnFail: false,
+        },
+      },
+      {
         name: QUEUE_NAMES.MESH_RECONCILIATION,
         defaultJobOptions: {
           attempts: 10,

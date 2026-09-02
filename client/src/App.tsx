@@ -17,6 +17,8 @@ const CategoryArchivePage = lazy(() => import('./pages/CategoryArchivePage').the
 const TagArchivePage = lazy(() => import('./pages/TagArchivePage').then((m) => ({ default: m.TagArchivePage })));
 const ForYouFeedPage = lazy(() => import('./pages/ForYouFeedPage').then((m) => ({ default: m.ForYouFeedPage })));
 const SearchPage = lazy(() => import('./pages/SearchPage').then((m) => ({ default: m.SearchPage })));
+const NewsletterVerifyPage = lazy(() => import('./pages/newsletter/NewsletterVerifyPage').then((m) => ({ default: m.NewsletterVerifyPage })));
+const NewsletterPreferencesPage = lazy(() => import('./pages/newsletter/NewsletterPreferencesPage').then((m) => ({ default: m.NewsletterPreferencesPage })));
 
 // Auth Pages
 const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })));
@@ -43,6 +45,7 @@ const AuditLogExplorerPage = lazy(() => import('./pages/admin/AuditLogExplorerPa
 const DatabaseSwitcherPage = lazy(() => import('./pages/admin/DatabaseSwitcherPage').then((m) => ({ default: m.DatabaseSwitcherPage })));
 const PublishingSlotsManagerPage = lazy(() => import('./pages/admin/PublishingSlotsManagerPage').then((m) => ({ default: m.PublishingSlotsManagerPage })));
 const JobsManagerPage = lazy(() => import('./pages/admin/JobsManagerPage').then((m) => ({ default: m.JobsManagerPage })));
+const NewsletterManagerPage = lazy(() => import('./pages/admin/NewsletterManagerPage').then((m) => ({ default: m.NewsletterManagerPage })));
 const AdminPanelPage = lazy(() => import('./pages/AdminPanelPage').then((m) => ({ default: m.AdminPanelPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
@@ -72,6 +75,8 @@ export default function App() {
             <Route path="/tags/:slug" element={<TagArchivePage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/feed" element={<ForYouFeedPage />} />
+            <Route path="/newsletter/verify/:token" element={<NewsletterVerifyPage />} />
+            <Route path="/newsletter/preferences/:token" element={<NewsletterPreferencesPage />} />
           </Route>
 
           {/* 2. Public-Only Auth Routes */}
@@ -128,6 +133,7 @@ export default function App() {
               <Route path="/admin/audit" element={<AuditLogExplorerPage />} />
               <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
               <Route path="/admin/jobs" element={<JobsManagerPage />} />
+              <Route path="/admin/newsletter" element={<NewsletterManagerPage />} />
               <Route path="/admin/*" element={<AdminPanelPage />} />
             </Route>
           </Route>

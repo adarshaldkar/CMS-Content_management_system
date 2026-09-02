@@ -69,6 +69,8 @@ export enum Permission {
   SYSTEM_MAINTENANCE = 'system.maintenance',
   SLOT_MANAGE = 'slot.manage',
   SLOT_READ = 'slot.read',
+  NEWSLETTER_MANAGE = 'newsletter.manage',
+  NEWSLETTER_BROADCAST = 'newsletter.broadcast',
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -77,6 +79,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.SYSTEM_MAINTENANCE,
     Permission.SLOT_MANAGE,
     Permission.SLOT_READ,
+    Permission.NEWSLETTER_MANAGE,
+    Permission.NEWSLETTER_BROADCAST,
     Permission.ARTICLE_READ_PUBLISHED,
     Permission.ARTICLE_READ_ANY,
     Permission.ARTICLE_CREATE,
@@ -125,6 +129,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   [UserRole.EDITOR]: [
     Permission.SLOT_READ,
+    Permission.NEWSLETTER_MANAGE,
+    Permission.NEWSLETTER_BROADCAST,
     Permission.ARTICLE_READ_PUBLISHED,
     Permission.ARTICLE_READ_ANY,
     Permission.ARTICLE_CREATE,

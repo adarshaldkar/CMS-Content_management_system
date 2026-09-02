@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Clock, TrendingUp, ArrowRight, Send, BookOpen, Flame } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Clock, TrendingUp, ArrowRight, Send, BookOpen, Flame, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
 import { apiClient } from '../api/client';
+import { newsletterApi, type SubscribeResponse } from '../api/newsletter.api';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { Skeleton, ArticleCardSkeleton } from '../components/common/SkeletonLoader';
 import heroMasthead from '../assets/hero.png';
@@ -153,7 +154,17 @@ const FeedRow: React.FC<{ article: Article }> = ({ article }) => {
 export const HomePage: React.FC = () => {
   const [heroImgErr, setHeroImgErr] = useState(false);
   const [email, setEmail] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(['technology', 'ai']);
+  const [subscribeResult, setSubscribeResult] = useState<SubscribeResponse | null>(null);
+
+  const subscribeMutation = useMutation({
+    mutationFn: async (data: { email: string; topics?: string[] }) => {
+      return await newsletterApi.subscribe(data);
+    },
+    onSuccess: (data) => {
+      setSubscribeResult(data);
+    },
+  });
 
   const { data: latestData, isLoading } = useQuery({
     queryKey: ['homeLatest'],
@@ -394,23 +405,46 @@ export const HomePage: React.FC = () => {
             <p className="text-[13px] font-serif font-bold text-ink-primary leading-snug mb-1">
               The Gazette Daily Briefing
             </p>
-            <p className="text-[12px] text-ink-secondary leading-relaxed mb-4">
-              Sharp analysis delivered every Tuesday morning. No noise, just the stories that matter.
+            <p className="text-[12px] text-ink-secondary leading-relaxed mb-3">
+              Curated editorial analysis delivered directly to your inbox. Double opt-in secured with one-click unsubscribe protection.
             </p>
-            {isSubscribed ? (
-              <div className="bg-emerald-50 border border-emerald-200 p-4 text-center space-y-1.5 animate-fade-in">
-                <div className="flex items-center justify-center gap-1.5 text-emerald-800 font-serif font-bold text-sm">
-                  <span>Subscribed to Morning Dispatch</span>
+
+            {subscribeResult ? (
+              <div className="bg-slate-50 border border-border-subtle p-4 space-y-2.5 animate-fade-in">
+                <div className="flex items-center gap-1.5 text-ink-primary font-serif font-bold text-xs">
+                  <ShieldCheck size={14} className="text-emerald-700 shrink-0" />
+                  <span>
+                    {subscribeResult.isAlreadySubscribed
+                      ? 'Already Subscribed'
+                      : 'Verification Link Dispatched'}
+                  </span>
                 </div>
-                <p className="text-[11px] font-mono text-emerald-700">
-                  Daily briefings will be dispatched to <span className="font-semibold">{email || 'your inbox'}</span>.
+                <p className="text-[11px] text-ink-secondary leading-relaxed">
+                  {subscribeResult.message}
                 </p>
+                {subscribeResult.verificationToken && (
+                  <div className="pt-2 border-t border-border-subtle">
+                    <p className="text-[10px] font-mono text-indigo-700 mb-1">
+                      Local Verification Demo:
+                    </p>
+                    <Link
+                      to={`/newsletter/verify/${subscribeResult.verificationToken}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-[11px] font-mono font-medium rounded border border-indigo-200 transition-colors"
+                    >
+                      <Sparkles size={11} />
+                      <span>Verify Subscription Now</span>
+                    </Link>
+                  </div>
+                )}
                 <button
                   type="button"
-                  onClick={() => { setIsSubscribed(false); setEmail(''); }}
-                  className="text-[10px] font-mono text-emerald-800 underline hover:text-emerald-950 mt-1 block mx-auto"
+                  onClick={() => {
+                    setSubscribeResult(null);
+                    setEmail('');
+                  }}
+                  className="text-[10px] font-mono text-ink-secondary underline hover:text-ink-primary block pt-1"
                 >
-                  Change email
+                  Subscribe another address
                 </button>
               </div>
             ) : (
@@ -418,11 +452,46 @@ export const HomePage: React.FC = () => {
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (email.trim()) {
-                    setIsSubscribed(true);
+                    subscribeMutation.mutate({
+                      email: email.trim(),
+                      topics: selectedTopics,
+                    });
                   }
                 }}
-                className="space-y-2"
+                className="space-y-2.5"
               >
+                {/* Topic selector pills */}
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { id: 'technology', label: 'Tech' },
+                    { id: 'ai', label: 'AI' },
+                    { id: 'policy-governance', label: 'Policy' },
+                    { id: 'media-culture', label: 'Culture' },
+                  ].map((topic) => {
+                    const isSelected = selectedTopics.includes(topic.id);
+                    return (
+                      <button
+                        type="button"
+                        key={topic.id}
+                        onClick={() => {
+                          setSelectedTopics((prev) =>
+                            isSelected
+                              ? prev.filter((t) => t !== topic.id)
+                              : [...prev, topic.id],
+                          );
+                        }}
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded transition-colors ${
+                          isSelected
+                            ? 'bg-ink-primary text-white'
+                            : 'bg-slate-100 text-ink-secondary hover:bg-slate-200'
+                        }`}
+                      >
+                        {topic.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <input
                   type="email"
                   required
@@ -431,12 +500,25 @@ export const HomePage: React.FC = () => {
                   placeholder="your@email.com"
                   className="w-full px-3 py-2 text-[12px] border border-border-subtle bg-white text-ink-primary placeholder-slate-400 focus:outline-none focus:border-ink-primary transition-colors"
                 />
+
+                {subscribeMutation.isError && (
+                  <p className="text-[11px] font-mono text-accent-crimson">
+                    {(subscribeMutation.error as any)?.response?.data?.message ||
+                      'Subscription failed. Please try again.'}
+                  </p>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full flex items-center justify-center gap-2 py-2 bg-ink-primary hover:bg-slate-800 text-white text-[12px] font-semibold tracking-wide transition-colors"
+                  disabled={subscribeMutation.isPending}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-ink-primary hover:bg-slate-800 text-white text-[12px] font-semibold tracking-wide transition-colors disabled:opacity-50"
                 >
                   <Send size={12} />
-                  Subscribe to Dispatch
+                  <span>
+                    {subscribeMutation.isPending
+                      ? 'Dispatching Verification...'
+                      : 'Subscribe to Dispatch'}
+                  </span>
                 </button>
               </form>
             )}
