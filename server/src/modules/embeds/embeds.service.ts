@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { YoutubeTranscript } from 'youtube-transcript';
 import { RedisService } from '../../redis/redis.service';
 import { safeFetch, validateUrlSyntactics } from './utils/ssrf-validator.util';
 import type {
@@ -549,117 +550,74 @@ export class EmbedsService {
     fallbackTitle: string,
   ): Promise<{ transcript?: string; transcriptLines?: TranscriptLineDto[]; hasTranscript: boolean }> {
     try {
+      // 1. Primary: Use YoutubeTranscript library
+      const rawLines = await YoutubeTranscript.fetchTranscript(videoId).catch(() => null);
+      if (rawLines && rawLines.length > 0) {
+        const lines: TranscriptLineDto[] = rawLines
+          .map((item: any) => {
+            const seconds = Math.floor((item.offset || 0) / 1000);
+            const time = this.formatTimestamp(seconds);
+            const text = this.decodeXmlEntities(item.text || '').replace(/\n/g, ' ').trim();
+            return { time, seconds, text };
+          })
+          .filter((l: any) => l.text.length > 0);
+
+        if (lines.length > 0) {
+          const formattedTranscript = lines.map((l) => `${l.time} ${l.text}`).join('\n');
+          return {
+            transcript: formattedTranscript,
+            transcriptLines: lines,
+            hasTranscript: true,
+          };
+        }
+      }
+    } catch (err: any) {
+      this.logger.debug(`YoutubeTranscript fetch failed: ${err.message}`);
+    }
+
+    // 2. Fallback: Parse description or chapters from YouTube watch page
+    try {
       const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
       const pageRes = await safeFetch(watchUrl, {
-        timeoutMs: 6000,
+        timeoutMs: 5000,
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
           Cookie: 'CONSENT=PENDING+999; SOCS=CAESEwgDEgk2MTQ1NzU4MTIaAmVuIAEaBgiA_LyaBg',
         },
       });
 
       const html = pageRes.text;
-
-      // 1. Look for captionTracks in player response
-      const captionMatch = html.match(/"captionTracks":\s*(\[\{.*?\}\])/);
-      if (captionMatch && captionMatch[1]) {
-        try {
-          const captionTracks = JSON.parse(captionMatch[1]);
-          const track =
-            captionTracks.find(
-              (t: any) =>
-                t.languageCode === 'en' ||
-                t.vssId?.includes('.en') ||
-                t.vssId?.includes('a.en'),
-            ) || captionTracks[0];
-
-          if (track && track.baseUrl) {
-            const timedTextUrl = track.baseUrl.replace(/\\u0026/g, '&');
-            const captionRes = await safeFetch(timedTextUrl, {
-              timeoutMs: 5000,
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              },
-            });
-            const xml = captionRes.text;
-
-            const cueRegex =
-              /<text\s+start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>([\s\S]*?)<\/text>/gi;
-            const lines: TranscriptLineDto[] = [];
-            let match: RegExpExecArray | null;
-
-            while ((match = cueRegex.exec(xml)) !== null) {
-              const seconds = parseFloat(match[1]);
-              const rawText = match[3];
-              const text = this.decodeXmlEntities(rawText).replace(/\n/g, ' ').trim();
-              if (text) {
-                const timeStr = this.formatTimestamp(seconds);
-                lines.push({
-                  time: timeStr,
-                  seconds,
-                  text,
-                });
-              }
-            }
-
-            if (lines.length > 0) {
-              const formattedTranscript = lines.map((l) => `${l.time} ${l.text}`).join('\n');
-              return {
-                transcript: formattedTranscript,
-                transcriptLines: lines,
-                hasTranscript: true,
-              };
-            }
-          }
-        } catch (captionErr: any) {
-          this.logger.debug(`Failed parsing captionTracks: ${captionErr?.message}`);
-        }
-      }
-
-      // 2. Fallback: extract shortDescription or chapters from YouTube page
       const descMatch = html.match(/"shortDescription":\s*"((?:\\"|[^"])*)"/);
       if (descMatch && descMatch[1]) {
-        try {
-          const unescapedDesc = JSON.parse(`"${descMatch[1]}"`);
-          if (unescapedDesc && unescapedDesc.trim().length > 20) {
-            const descLines = unescapedDesc
-              .split('\n')
-              .map((line: string) => line.trim())
-              .filter((line: string) => line.length > 0);
+        const unescapedDesc = JSON.parse(`"${descMatch[1]}"`);
+        if (unescapedDesc && unescapedDesc.trim().length > 20) {
+          const descLines = unescapedDesc
+            .split('\n')
+            .map((line: string) => line.trim())
+            .filter((line: string) => line.length > 0);
 
-            const lines: TranscriptLineDto[] = descLines.map((line: string) => {
-              const timeMatch = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*(.*)$/);
-              if (timeMatch) {
-                return {
-                  time: `[${timeMatch[1]}]`,
-                  text: timeMatch[2] || line,
-                };
-              }
-              return { text: line };
-            });
+          const lines: TranscriptLineDto[] = descLines.map((line: string) => {
+            const timeMatch = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*(.*)$/);
+            if (timeMatch) {
+              return {
+                time: `[${timeMatch[1]}]`,
+                text: timeMatch[2] || line,
+              };
+            }
+            return { text: line };
+          });
 
-            return {
-              transcript: unescapedDesc,
-              transcriptLines: lines,
-              hasTranscript: true,
-            };
-          }
-        } catch {
-          // Ignore JSON parse error on description
+          return {
+            transcript: unescapedDesc,
+            transcriptLines: lines,
+            hasTranscript: true,
+          };
         }
       }
     } catch (err: any) {
-      this.logger.debug(`YouTube transcript extraction skipped: ${err.message}`);
+      this.logger.debug(`YouTube fallback description parse failed: ${err.message}`);
     }
 
-    return {
-      transcript: undefined,
-      transcriptLines: undefined,
-      hasTranscript: false,
-    };
+    return { hasTranscript: false };
   }
 
   /**
