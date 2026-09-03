@@ -9,7 +9,7 @@ import { authApi } from '../../api/auth.api';
 import { useAuthStore } from '../../stores/authStore';
 
 const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
   rememberMe: z.boolean().optional(),
 });
@@ -50,7 +50,6 @@ export const LoginPage: React.FC = () => {
     const timer = setInterval(() => {
       setRateLimitCountdown((prev) => {
         if (prev === null || prev <= 1) {
-          clearInterval(timer);
           return null;
         }
         return prev - 1;

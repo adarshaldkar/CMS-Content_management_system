@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { useContainer } from 'class-validator';
 import express from 'express';
 import * as path from 'path';
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 import type { EnvConfig } from './config/env.schema';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -53,7 +54,9 @@ async function bootstrap() {
     );
   }
 
-  const uploadDir = path.resolve(process.cwd(), 'uploads');
+  const uploadDir = fs.existsSync(path.resolve(process.cwd(), 'uploads'))
+    ? path.resolve(process.cwd(), 'uploads')
+    : path.resolve(process.cwd(), 'server', 'uploads');
   app.use('/uploads', express.static(uploadDir));
 
   // 1. Security Headers with tailored Content Security Policy

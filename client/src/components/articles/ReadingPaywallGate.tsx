@@ -47,8 +47,6 @@ export const ReadingPaywallGate: React.FC<ReadingPaywallGateProps> = ({
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timer);
-          setIsLocked(true);
           return 0;
         }
         return prev - 1;

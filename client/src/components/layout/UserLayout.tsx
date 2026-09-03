@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
 import { StatusBadge } from '../common/StatusBadge';
+import { EditorialAvatar } from '../common/EditorialAvatar';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../api/auth.api';
 
@@ -85,12 +86,8 @@ export const UserLayout: React.FC = () => {
             <PenTool size={12} />
             <span>Write</span>
           </Link>
-          <Link to="/profile" className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-mono uppercase overflow-hidden">
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-            ) : (
-              user?.name?.charAt(0) || 'U'
-            )}
+          <Link to="/profile" className="flex items-center">
+            <EditorialAvatar name={user?.name} avatarUrl={user?.avatarUrl} size="sm" />
           </Link>
         </div>
       </header>
@@ -183,17 +180,7 @@ export const UserLayout: React.FC = () => {
         {/* User Profile Footer */}
         <div className="p-4 border-t border-border-subtle bg-slate-50/50">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-mono uppercase overflow-hidden shrink-0">
-              {user?.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                user?.name?.charAt(0) || 'U'
-              )}
-            </div>
+            <EditorialAvatar name={user?.name} avatarUrl={user?.avatarUrl} size="md" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-ink-primary truncate">{user?.name}</p>
               {user?.role && <StatusBadge status={user.role} size="sm" />}

@@ -112,10 +112,27 @@ export function formatEmbedHtml(
       )}</figcaption>`
     : '';
 
+  const includeTranscript = options.includeTranscript !== false;
+  const transcriptText = data.transcript?.trim();
+  const transcriptHtml =
+    includeTranscript && transcriptText
+      ? `
+    <details class="cms-embed-transcript mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded text-left select-text">
+      <summary class="font-mono text-xs font-semibold text-accent-crimson cursor-pointer select-none flex items-center gap-2 hover:underline">
+        <span>📜 Extracted Transcript &amp; Content</span>
+      </summary>
+      <div class="cms-transcript-content mt-2.5 pt-2.5 border-t border-slate-200 text-xs font-mono text-ink-primary whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+${escapeHtml(transcriptText)}
+      </div>
+    </details>
+  `.trim()
+      : '';
+
   return `
 <figure class="cms-embed-block ${widthClass} clear-both select-none" data-provider="${data.provider}" data-url="${url}" data-embed-url="${embedUrl}" data-title="${title}" data-display-mode="${displayMode}" data-width="${width}">
   ${innerContent.trim()}
   ${captionHtml}
+  ${transcriptHtml ? '\n  ' + transcriptHtml : ''}
 </figure>
   `.trim();
 }

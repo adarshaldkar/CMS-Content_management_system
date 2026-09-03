@@ -16,9 +16,10 @@ export async function uploadMediaAsset(file: File): Promise<Media> {
 export async function listMediaAssets(
   page = 1,
   limit = 24,
+  scope?: 'own' | 'all',
 ): Promise<PaginatedResult<Media>> {
   const { data } = await apiClient.get<PaginatedResult<Media>>('/media', {
-    params: { page, limit },
+    params: { page, limit, ...(scope ? { scope } : {}) },
   });
   return data;
 }

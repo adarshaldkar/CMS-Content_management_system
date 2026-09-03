@@ -20,6 +20,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import NumberFlow from '@number-flow/react';
 import { jobsApi, type QueueSummary, type JobDetail } from '../../api/jobs.api';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
@@ -260,7 +261,9 @@ export const JobsManagerPage: React.FC = () => {
             <span className="text-[11px] font-mono uppercase tracking-wider font-semibold">Active Jobs</span>
             <Zap size={14} className="text-amber-500" />
           </div>
-          <div className="text-2xl font-editorial font-bold text-ink-primary">{totalActive}</div>
+          <div className="text-2xl font-editorial font-bold text-ink-primary">
+            <NumberFlow value={totalActive} />
+          </div>
           <span className="text-[10px] font-mono text-ink-secondary mt-1">Currently in execution</span>
         </div>
 
@@ -270,7 +273,9 @@ export const JobsManagerPage: React.FC = () => {
             <span className="text-[11px] font-mono uppercase tracking-wider font-semibold">Waiting</span>
             <Clock size={14} className="text-sky-500" />
           </div>
-          <div className="text-2xl font-editorial font-bold text-ink-primary">{totalWaiting}</div>
+          <div className="text-2xl font-editorial font-bold text-ink-primary">
+            <NumberFlow value={totalWaiting} />
+          </div>
           <span className="text-[10px] font-mono text-ink-secondary mt-1">In worker queues</span>
         </div>
 
@@ -280,7 +285,9 @@ export const JobsManagerPage: React.FC = () => {
             <span className="text-[11px] font-mono uppercase tracking-wider font-semibold">Delayed</span>
             <Layers size={14} className="text-indigo-500" />
           </div>
-          <div className="text-2xl font-editorial font-bold text-ink-primary">{totalDelayed}</div>
+          <div className="text-2xl font-editorial font-bold text-ink-primary">
+            <NumberFlow value={totalDelayed} />
+          </div>
           <span className="text-[10px] font-mono text-ink-secondary mt-1">Scheduled releases</span>
         </div>
 
@@ -305,7 +312,7 @@ export const JobsManagerPage: React.FC = () => {
               totalFailed > 0 ? 'text-rose-700' : 'text-ink-primary'
             }`}
           >
-            {totalFailed}
+            <NumberFlow value={totalFailed} />
           </div>
           <span
             className={`text-[10px] font-mono mt-1 ${
@@ -322,7 +329,9 @@ export const JobsManagerPage: React.FC = () => {
             <span className="text-[11px] font-mono uppercase tracking-wider font-semibold">Completed</span>
             <CheckCircle2 size={14} className="text-emerald-500" />
           </div>
-          <div className="text-2xl font-editorial font-bold text-ink-primary">{totalCompleted}</div>
+          <div className="text-2xl font-editorial font-bold text-ink-primary">
+            <NumberFlow value={totalCompleted} />
+          </div>
           <span className="text-[10px] font-mono text-ink-secondary mt-1">Successful dispatches</span>
         </div>
       </div>

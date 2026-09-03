@@ -8,6 +8,7 @@ import { AdminRoute } from './routes/AdminRoute';
 import { PublicOnlyRoute } from './routes/PublicOnlyRoute';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
+import { EditorialErrorBoundary } from './components/common/EditorialErrorBoundary';
 import { useAuthStore } from './stores/authStore';
 
 // ─── Route Code-Splitting with React.lazy (Optimized Performance) ──
@@ -66,81 +67,83 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <Suspense fallback={<PageLoaderFallback />}>
-        <Routes>
-          {/* 1. Public Editorial Layout */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/articles/:slug" element={<ArticleReaderPage />} />
-            <Route path="/category/:slug" element={<CategoryArchivePage />} />
-            <Route path="/tags/:slug" element={<TagArchivePage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/feed" element={<ForYouFeedPage />} />
-            <Route path="/newsletter/verify/:token" element={<NewsletterVerifyPage />} />
-            <Route path="/newsletter/preferences/:token" element={<NewsletterPreferencesPage />} />
-          </Route>
-
-          {/* 2. Public-Only Auth Routes */}
-          <Route element={<PublicOnlyRoute />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-          </Route>
-
-          {/* 3. Onboarding Flow (Protected) */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/onboarding" element={<OnboardingPage />} />
-          </Route>
-
-          {/* 4. Full-Screen Editorial Studio (Protected) */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/editor" element={<ArticleEditorPage />} />
-            <Route path="/editor/:id" element={<ArticleEditorPage />} />
-            <Route path="/write" element={<ArticleEditorPage />} />
-            <Route path="/write/:id" element={<ArticleEditorPage />} />
-          </Route>
-
-          {/* 5. User / Author Workspace (Protected) */}
-          <Route element={<ProtectedRoute />}>
-            <Route element={<UserLayout />}>
-              <Route path="/dashboard" element={<UserDashboardPage />} />
-              <Route path="/stories" element={<StoriesManagerPage />} />
-              <Route path="/workspace" element={<StoriesManagerPage />} />
-              <Route path="/library" element={<UserLibraryPage />} />
-              <Route path="/history" element={<UserLibraryPage />} />
-              <Route path="/network" element={<UserDashboardPage />} />
-              <Route path="/profile" element={<UserProfilePage />} />
-              <Route path="/settings" element={<UserSettingsPage />} />
-              <Route path="/user" element={<UserDashboardPage />} />
-              <Route path="/user/*" element={<UserDashboardPage />} />
+        <EditorialErrorBoundary fallbackTitle="Application Section Unavailable" fallbackMessage="An issue prevented this section of The Gazette from rendering properly.">
+          <Routes>
+            {/* 1. Public Editorial Layout */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/articles/:slug" element={<ArticleReaderPage />} />
+              <Route path="/category/:slug" element={<CategoryArchivePage />} />
+              <Route path="/tags/:slug" element={<TagArchivePage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/feed" element={<ForYouFeedPage />} />
+              <Route path="/newsletter/verify/:token" element={<NewsletterVerifyPage />} />
+              <Route path="/newsletter/preferences/:token" element={<NewsletterPreferencesPage />} />
             </Route>
-          </Route>
 
-          {/* 6. Admin Governance Suite (Role Protected) */}
-          <Route element={<AdminRoute />}>
-            <Route element={<AdminLayout />}>
-              <Route path="/admin" element={<AdminPanelPage />} />
-              <Route path="/admin/overview" element={<AdminPanelPage />} />
-              <Route path="/admin/dashboard" element={<AdminPanelPage />} />
-              <Route path="/admin/panel" element={<AdminPanelPage />} />
-              <Route path="/admin/review" element={<EditorialReviewPage />} />
-              <Route path="/admin/slots" element={<PublishingSlotsManagerPage />} />
-              <Route path="/admin/users" element={<UserManagementPage />} />
-              <Route path="/admin/categories" element={<TaxonomyManagerPage />} />
-              <Route path="/admin/tags" element={<TaxonomyManagerPage />} />
-              <Route path="/admin/media" element={<MediaLibraryPage />} />
-              <Route path="/admin/comments" element={<CommentsModerationPage />} />
-              <Route path="/admin/audit" element={<AuditLogExplorerPage />} />
-              <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
-              <Route path="/admin/jobs" element={<JobsManagerPage />} />
-              <Route path="/admin/newsletter" element={<NewsletterManagerPage />} />
-              <Route path="/admin/*" element={<AdminPanelPage />} />
+            {/* 2. Public-Only Auth Routes */}
+            <Route element={<PublicOnlyRoute />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
             </Route>
-          </Route>
 
-          {/* 7. Dedicated 404 Catch-All Route */}
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+            {/* 3. Onboarding Flow (Protected) */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/onboarding" element={<OnboardingPage />} />
+            </Route>
+
+            {/* 4. Full-Screen Editorial Studio (Protected) */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/editor" element={<ArticleEditorPage />} />
+              <Route path="/editor/:id" element={<ArticleEditorPage />} />
+              <Route path="/write" element={<ArticleEditorPage />} />
+              <Route path="/write/:id" element={<ArticleEditorPage />} />
+            </Route>
+
+            {/* 5. User / Author Workspace (Protected) */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<UserLayout />}>
+                <Route path="/dashboard" element={<UserDashboardPage />} />
+                <Route path="/stories" element={<StoriesManagerPage />} />
+                <Route path="/workspace" element={<StoriesManagerPage />} />
+                <Route path="/library" element={<UserLibraryPage />} />
+                <Route path="/history" element={<UserLibraryPage />} />
+                <Route path="/network" element={<UserDashboardPage />} />
+                <Route path="/profile" element={<UserProfilePage />} />
+                <Route path="/settings" element={<UserSettingsPage />} />
+                <Route path="/user" element={<UserDashboardPage />} />
+                <Route path="/user/*" element={<UserDashboardPage />} />
+              </Route>
+            </Route>
+
+            {/* 6. Admin Governance Suite (Role Protected) */}
+            <Route element={<AdminRoute />}>
+              <Route element={<AdminLayout />}>
+                <Route path="/admin" element={<AdminPanelPage />} />
+                <Route path="/admin/overview" element={<AdminPanelPage />} />
+                <Route path="/admin/dashboard" element={<AdminPanelPage />} />
+                <Route path="/admin/panel" element={<AdminPanelPage />} />
+                <Route path="/admin/review" element={<EditorialReviewPage />} />
+                <Route path="/admin/slots" element={<PublishingSlotsManagerPage />} />
+                <Route path="/admin/users" element={<UserManagementPage />} />
+                <Route path="/admin/categories" element={<TaxonomyManagerPage />} />
+                <Route path="/admin/tags" element={<TaxonomyManagerPage />} />
+                <Route path="/admin/media" element={<MediaLibraryPage />} />
+                <Route path="/admin/comments" element={<CommentsModerationPage />} />
+                <Route path="/admin/audit" element={<AuditLogExplorerPage />} />
+                <Route path="/admin/database" element={<DatabaseSwitcherPage />} />
+                <Route path="/admin/jobs" element={<JobsManagerPage />} />
+                <Route path="/admin/newsletter" element={<NewsletterManagerPage />} />
+                <Route path="/admin/*" element={<AdminPanelPage />} />
+              </Route>
+            </Route>
+
+            {/* 7. Dedicated 404 Catch-All Route */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </EditorialErrorBoundary>
       </Suspense>
     </BrowserRouter>
   );

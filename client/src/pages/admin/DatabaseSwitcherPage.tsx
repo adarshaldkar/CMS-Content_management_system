@@ -12,9 +12,11 @@ import {
   Server,
   ShieldCheck,
   Zap,
+  Compass,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { tourService } from '../../services/tour.service';
 
 export type DatabaseEngine =
   | 'postgres'
@@ -241,6 +243,14 @@ export const DatabaseSwitcherPage: React.FC = () => {
   const databasesList = dbStatus?.databases || [];
   const healthyCount = dbStatus?.healthyCount ?? 6;
 
+  // Auto-launch guided admin DB mesh tour on first visit
+  React.useEffect(() => {
+    const tourTimer = setTimeout(() => {
+      tourService.startAdminDbTour(false);
+    }, 600);
+    return () => clearTimeout(tourTimer);
+  }, []);
+
   return (
     <div className="space-y-6 font-sans">
       {/* Header */}
@@ -258,19 +268,32 @@ export const DatabaseSwitcherPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-border-subtle text-xs font-medium text-ink-secondary hover:text-ink-primary hover:border-ink-primary transition-all self-start sm:self-auto font-mono shadow-xs"
-          style={{ borderRadius: 2 }}
-        >
-          <RefreshCw size={12} className={isFetching ? 'animate-spin text-accent-crimson' : ''} />
-          <span>{isFetching ? 'Probing Mesh...' : 'Refresh Health'}</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => tourService.startAdminDbTour(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-border-subtle hover:border-ink-primary text-xs font-mono font-medium text-ink-secondary hover:text-ink-primary transition-all shadow-xs"
+            style={{ borderRadius: 2 }}
+            title="Take Database Mesh Tour"
+          >
+            <Compass size={13} className="text-accent-crimson" />
+            <span>Take Tour</span>
+          </button>
+
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-border-subtle text-xs font-medium text-ink-secondary hover:text-ink-primary hover:border-ink-primary transition-all font-mono shadow-xs"
+            style={{ borderRadius: 2 }}
+          >
+            <RefreshCw size={12} className={isFetching ? 'animate-spin text-accent-crimson' : ''} />
+            <span>{isFetching ? 'Probing Mesh...' : 'Refresh Health'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Mesh Telemetry Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div id="tour-db-health" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="p-4 bg-white border border-border-subtle flex items-center gap-3" style={{ borderRadius: 2 }}>
           <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
             <ShieldCheck size={18} />
@@ -435,7 +458,7 @@ export const DatabaseSwitcherPage: React.FC = () => {
       ) : (
         <div className="space-y-6">
           {/* 6-Engine Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div id="tour-db-topology" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {DATABASE_CONFIGS.map((cfg) => {
               const isActive = activeDb === cfg.engine;
               const liveData = databasesList.find((d: any) => d.engine === cfg.engine);
@@ -446,6 +469,7 @@ export const DatabaseSwitcherPage: React.FC = () => {
               return (
                 <div
                   key={cfg.engine}
+                  id={isActive ? 'tour-db-active' : undefined}
                   className={`p-5 border transition-all bg-white flex flex-col justify-between relative ${
                     isActive
                       ? `${cfg.colorScheme.border} shadow-sm ring-1 ring-offset-1 ring-ink-primary/10 border-l-4`
@@ -506,28 +530,30 @@ export const DatabaseSwitcherPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => switchMutation.mutate(cfg.engine)}
-                      disabled={isActive || (switchState !== 'IDLE' && switchState !== 'SUCCESS')}
-                      className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono font-medium transition-all ${
-                        isActive
-                          ? 'bg-slate-100 text-ink-secondary cursor-default'
-                          : 'bg-white hover:bg-ink-primary hover:text-white border border-border-subtle hover:border-ink-primary text-ink-primary'
-                      }`}
-                      style={{ borderRadius: 2 }}
-                    >
-                      {isActive ? (
-                        <>
-                          <CheckCircle2 size={12} className="text-emerald-600" />
-                          <span>Currently Active Engine</span>
-                        </>
-                      ) : (
-                        <>
-                          <ArrowRightLeft size={12} />
-                          <span>Set as Active Engine</span>
-                        </>
-                      )}
-                    </button>
+                    <div id={!isActive ? 'tour-db-switcher' : undefined} className="pt-2">
+                      <button
+                        onClick={() => switchMutation.mutate(cfg.engine)}
+                        disabled={isActive || (switchState !== 'IDLE' && switchState !== 'SUCCESS')}
+                        className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-mono font-medium transition-all ${
+                          isActive
+                            ? 'bg-slate-100 text-ink-secondary cursor-default'
+                            : 'bg-white hover:bg-ink-primary hover:text-white border border-border-subtle hover:border-ink-primary text-ink-primary'
+                        }`}
+                        style={{ borderRadius: 2 }}
+                      >
+                        {isActive ? (
+                          <>
+                            <CheckCircle2 size={12} className="text-emerald-600" />
+                            <span>Currently Active Engine</span>
+                          </>
+                        ) : (
+                          <>
+                            <ArrowRightLeft size={12} />
+                            <span>Set as Active Engine</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -7,6 +7,7 @@ export function sanitizeArticleContent(rawHtml: string): string {
 
   const clean = sanitizeHtml(rawHtml, {
     allowedTags: [
+      'h1',
       'h2',
       'h3',
       'h4',

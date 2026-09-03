@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import NumberFlow from '@number-flow/react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -58,20 +59,31 @@ export const UserDashboardPage: React.FC = () => {
           </p>
         </div>
 
-        <Link
-          to="/editor"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-ink-primary hover:bg-slate-800 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-sm self-start sm:self-auto"
-        >
-          <PenTool size={14} />
-          <span>Write New Story</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/stories"
+            className="px-3.5 py-1.5 border border-border-subtle hover:border-ink-primary text-xs font-medium text-ink-secondary hover:text-ink-primary transition-colors flex items-center gap-1.5"
+            style={{ borderRadius: 2 }}
+          >
+            <FileText size={14} />
+            <span>Manage Stories</span>
+          </Link>
+          <Link
+            to="/editor"
+            className="px-4 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors shadow-xs"
+            style={{ borderRadius: 2 }}
+          >
+            <Plus size={14} />
+            <span>New Story</span>
+          </Link>
+        </div>
       </div>
 
       {/* Typographic Metrics Bar (Rules over Box Cards) */}
       <div className="py-6 border-b border-border-subtle grid grid-cols-2 md:grid-cols-4 gap-6 text-left font-sans">
         <div className="space-y-1 border-r border-border-subtle/60 pr-4 last:border-r-0">
           <div className="text-3xl font-editorial font-bold text-ink-primary">
-            {isLoading ? '...' : publishedCount}
+            {isLoading ? '...' : <NumberFlow value={publishedCount} />}
           </div>
           <div className="text-xs font-mono uppercase tracking-wider text-emerald-700 font-semibold flex items-center gap-1">
             <CheckCircle2 size={12} />
@@ -82,7 +94,7 @@ export const UserDashboardPage: React.FC = () => {
 
         <div className="space-y-1 border-r border-border-subtle/60 pr-4 last:border-r-0">
           <div className="text-3xl font-editorial font-bold text-ink-primary">
-            {isLoading ? '...' : reviewCount}
+            {isLoading ? '...' : <NumberFlow value={reviewCount} />}
           </div>
           <div className="text-xs font-mono uppercase tracking-wider text-amber-700 font-semibold flex items-center gap-1">
             <Clock size={12} />
@@ -93,7 +105,7 @@ export const UserDashboardPage: React.FC = () => {
 
         <div className="space-y-1 border-r border-border-subtle/60 pr-4 last:border-r-0">
           <div className="text-3xl font-editorial font-bold text-ink-primary">
-            {isLoading ? '...' : draftCount}
+            {isLoading ? '...' : <NumberFlow value={draftCount} />}
           </div>
           <div className="text-xs font-mono uppercase tracking-wider text-ink-secondary font-semibold flex items-center gap-1">
             <Edit3 size={12} />
@@ -104,7 +116,7 @@ export const UserDashboardPage: React.FC = () => {
 
         <div className="space-y-1">
           <div className="text-3xl font-editorial font-bold text-ink-primary">
-            {isLoading ? '...' : totalCount}
+            {isLoading ? '...' : <NumberFlow value={totalCount} />}
           </div>
           <div className="text-xs font-mono uppercase tracking-wider text-ink-secondary font-semibold flex items-center gap-1">
             <FileText size={12} />

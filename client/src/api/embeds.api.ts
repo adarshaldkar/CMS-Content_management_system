@@ -11,6 +11,12 @@ export type EmbedProvider =
 
 export type EmbedDisplayMode = 'embed' | 'card' | 'link';
 
+export interface TranscriptLine {
+  time?: string;
+  seconds?: number;
+  text: string;
+}
+
 export interface EmbedMetadataResponse {
   url: string;
   provider: EmbedProvider;
@@ -29,6 +35,9 @@ export interface EmbedMetadataResponse {
   caption?: string;
   displayMode: EmbedDisplayMode;
   snapshottedAt: string;
+  transcript?: string;
+  transcriptLines?: TranscriptLine[];
+  hasTranscript?: boolean;
 }
 
 export const embedsApi = {
@@ -40,3 +49,4 @@ export const embedsApi = {
     return data;
   },
 };
+

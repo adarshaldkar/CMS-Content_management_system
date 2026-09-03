@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { UploadCloud, Image as ImageIcon, X, Trash2, Loader2, Link2, Check } from 'lucide-react';
 import { listMediaAssets, uploadMediaAsset, deleteMediaAsset } from '../../api/media.api';
 import type { Media } from '../../types';
@@ -21,11 +22,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [customUrl, setCustomUrl] = useState('');
   const [urlPreviewError, setUrlPreviewError] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchMedia = async () => {
     try {
       setLoading(true);
-      const res = await listMediaAssets(1, 40);
+      const res = await listMediaAssets(1, 40, 'own');
       setMediaList(res.items);
     } catch {
       // safe ignore
@@ -43,7 +46,16 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Escape key listener for accessible dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,15 +84,28 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteConfirm = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this media asset?')) return;
+    setDeletingId(id);
     try {
       await deleteMediaAsset(id);
       setMediaList((prev) => prev.filter((m) => m.id !== id));
     } catch {
-      alert('Failed to delete asset.');
+      // silent — user can retry
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
     }
+  };
+
+  const handleDeleteRequest = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDeleteId(id);
+  };
+
+  const handleDeleteCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDeleteId(null);
   };
 
   const handleApplyCustomUrl = (e: React.FormEvent) => {
@@ -91,29 +116,52 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 font-sans animate-fade-in">
-      <div
-        className="bg-white border border-border-subtle w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
-        style={{ borderRadius: 2 }}
-      >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-canvas-paper">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-crimson font-semibold mb-0.5">
-              Editorial Media Library
-            </p>
-            <h2 className="font-editorial text-lg font-semibold text-ink-primary">
-              Select or Insert Image
-            </h2>
-          </div>
-          <button
+    <AnimatePresence>
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="media-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans"
+        >
+          {/* Backdrop with pointer-only dismiss */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
             onClick={onClose}
-            className="text-ink-secondary hover:text-ink-primary p-1.5 transition-colors"
-            title="Close modal"
+          />
+
+          {/* Modal Dialog Card with Micro-Spring Motion */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 6 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            className="bg-white border border-border-subtle w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden relative z-10"
+            style={{ borderRadius: 2 }}
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-canvas-paper">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-crimson font-semibold mb-0.5">
+                  Editorial Media Library
+                </p>
+                <h2 id="media-modal-title" className="font-editorial text-lg font-semibold text-ink-primary">
+                  Select or Insert Image
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-ink-secondary hover:text-ink-primary p-1.5 transition-colors"
+                title="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-0 px-6 border-b border-border-subtle bg-white">
@@ -305,18 +353,42 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </div>
-                      <div className="p-2 flex items-center justify-between border-t border-border-subtle bg-white">
-                        <p className="text-[11px] font-mono text-ink-primary truncate max-w-[120px]">
-                          {media.originalName}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={(e) => handleDelete(media.id, e)}
-                          className="text-ink-secondary hover:text-rose-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Delete asset"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                      <div className="p-2 border-t border-border-subtle bg-white">
+                        {confirmDeleteId === media.id ? (
+                          // Inline confirmation row
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[10px] font-mono text-rose-600 shrink-0">Delete?</span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteConfirm(media.id, e)}
+                              disabled={deletingId === media.id}
+                              className="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-mono rounded-sm hover:bg-rose-700 disabled:opacity-60 shrink-0"
+                            >
+                              {deletingId === media.id ? '...' : 'Yes'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleDeleteCancel}
+                              className="px-2 py-0.5 border border-border-subtle text-[10px] font-mono rounded-sm hover:bg-slate-50 shrink-0"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-mono text-ink-primary truncate max-w-[100px]">
+                              {media.originalName}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteRequest(media.id, e)}
+                              className="text-ink-secondary hover:text-rose-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Delete asset"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -325,7 +397,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
+  )}
+</AnimatePresence>
   );
 };

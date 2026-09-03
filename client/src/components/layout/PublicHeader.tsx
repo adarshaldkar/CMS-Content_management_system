@@ -16,10 +16,18 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
+import { EditorialAvatar } from '../common/EditorialAvatar';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../api/auth.api';
 import { notificationsApi } from '../../api/notifications.api';
 import { NotificationDrawer } from '../notifications/NotificationDrawer';
+
+const headerDateFormatter = new Intl.DateTimeFormat('en-US', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
 
 export const PublicHeader: React.FC = () => {
   const { user, isAuthenticated, clearAuth, hasRole } = useAuthStore();
@@ -58,12 +66,7 @@ export const PublicHeader: React.FC = () => {
     }
   };
 
-  const todayFormatted = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date());
+  const todayFormatted = headerDateFormatter.format(new Date());
 
   return (
     <header className="border-b border-border-subtle bg-white/80 backdrop-blur-md sticky top-0 z-40">
@@ -117,22 +120,12 @@ export const PublicHeader: React.FC = () => {
                 <div className="relative">
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center gap-2 p-1.5 rounded-full hover:bg-slate-100 transition-colors focus:outline-none"
+                    className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 transition-colors focus:outline-none"
+                    aria-expanded={dropdownOpen}
+                    aria-haspopup="true"
+                    aria-label="User navigation menu"
                   >
-                    <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-medium uppercase font-mono overflow-hidden">
-                      {user.avatarUrl ? (
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.name}
-                          className="w-full h-full rounded-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        user.name.charAt(0)
-                      )}
-                    </div>
+                    <EditorialAvatar name={user.name} avatarUrl={user.avatarUrl} size="md" />
                     <ChevronDown size={14} className="text-ink-secondary" />
                   </button>
 

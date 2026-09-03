@@ -8,6 +8,15 @@ import { PublicFooter } from './PublicFooter';
 export const PublicLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-canvas-paper flex flex-col font-sans text-ink-primary">
+      {/* Skip to Content for keyboard screen reader accessibility (WCAG 2.2 AA) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-ink-primary focus:text-white focus:font-semibold focus:shadow-md focus:outline-none"
+        style={{ borderRadius: 2 }}
+      >
+        Skip to main content
+      </a>
+
       {/* Top Editorial Bar & Search */}
       <PublicHeader />
 
@@ -18,7 +27,7 @@ export const PublicLayout: React.FC = () => {
       <TrendingTicker />
 
       {/* Main Editorial Content Outlet */}
-      <main className="flex-1">
+      <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
         <Outlet />
       </main>
 

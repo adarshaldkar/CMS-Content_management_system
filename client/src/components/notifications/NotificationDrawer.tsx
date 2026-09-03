@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
@@ -82,6 +83,18 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     setMounted(true);
   }, []);
 
+  // Keyboard accessibility: Escape key to dismiss drawer
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // 1. Fetch Inbox Items
   const { data: inboxData, isLoading, refetch } = useQuery({
     queryKey: ['notificationsInbox', filterUnread],
@@ -142,15 +155,33 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 overflow-hidden font-sans">
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        className="absolute inset-0 bg-ink-primary/30 backdrop-blur-xs transition-opacity animate-fade-in"
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="notification-drawer-title"
+          className="fixed inset-0 z-50 overflow-hidden font-sans"
+        >
+          {/* Backdrop with fade motion */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 w-full h-full bg-ink-primary/30 backdrop-blur-xs cursor-pointer"
+            onClick={onClose}
+          />
 
-      <div className="absolute inset-y-0 right-0 max-w-full flex">
-        <div className="w-screen max-w-md bg-white border-l border-border-subtle shadow-2xl flex flex-col animate-slide-left z-10">
+          <div className="absolute inset-y-0 right-0 max-w-full flex">
+            {/* Drawer Body with Spring Motion */}
+            <motion.aside
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 1.0 }}
+              className="w-screen max-w-md bg-white border-l border-border-subtle shadow-2xl flex flex-col z-10"
+            >
           {/* Header */}
           <div className="p-5 border-b border-border-subtle bg-canvas-paper flex items-center justify-between">
             <div>
@@ -158,7 +189,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                 <Bell size={12} />
                 <span>The Gazette Desk</span>
               </div>
-              <h2 className="text-lg font-editorial font-bold text-ink-primary mt-0.5">
+              <h2 id="notification-drawer-title" className="text-lg font-editorial font-bold text-ink-primary mt-0.5">
                 Notification Center
               </h2>
             </div>
@@ -350,8 +381,16 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
               items.map((item) => (
                 <div
                   key={item.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleItemClick(item)}
-                  className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer flex gap-3 relative group ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleItemClick(item);
+                    }
+                  }}
+                  className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer flex gap-3 relative group focus:outline-none focus:bg-slate-100 ${
                     !item.isRead ? 'bg-amber-50/40' : 'bg-white'
                   }`}
                 >
@@ -402,9 +441,11 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
           <div className="p-3 bg-canvas-paper border-t border-border-subtle text-center text-[10px] font-mono text-ink-secondary">
             The Gazette Editorial Network &middot; Live Dispatches
           </div>
+            </motion.aside>
+          </div>
         </div>
-      </div>
-    </div>,
+      )}
+    </AnimatePresence>,
     document.body,
   );
 };

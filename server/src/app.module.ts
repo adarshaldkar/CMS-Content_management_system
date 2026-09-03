@@ -21,6 +21,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { JobsModule } from './modules/jobs/jobs.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { EmbedsModule } from './modules/embeds/embeds.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { EmbedsModule } from './modules/embeds/embeds.module';
     JobsModule,
     NewsletterModule,
     EmbedsModule,
+    DocumentsModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

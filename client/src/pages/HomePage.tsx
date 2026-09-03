@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, TrendingUp, ArrowRight, Send, BookOpen, Flame, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { newsletterApi, type SubscribeResponse } from '../api/newsletter.api';
@@ -12,13 +12,15 @@ import type { Article, PaginatedResult } from '../types';
 /* ─── helpers ─────────────────────────────────────────────────────── */
 const cleanTitle = (t: string) => t.replace(/\s\d{10,}/g, '').trim();
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 const fmtDate = (iso?: string | null) => {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(iso));
+  return dateFormatter.format(new Date(iso));
 };
 
 const CAT_MAP: Record<string, string> = {
@@ -71,6 +73,44 @@ const TrendItem: React.FC<{ article: Article; idx: number }> = ({ article, idx }
     </div>
   </Link>
 );
+/* ─── Col1Card ─────────────────────────────────────────────────────── */
+const Col1Card: React.FC<{ article: Article }> = ({ article }) => {
+  const [imgErr, setImgErr] = useState(false);
+  return (
+    <div className="lg:col-span-3 pr-0 lg:pr-6 pb-6 lg:pb-0 mb-6 lg:mb-0 border-b lg:border-b-0 lg:border-r border-border-subtle">
+      <Link to={`/articles/${article.slug}`} className="group block space-y-3">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-accent-crimson">
+          {catLabel(article.categorySlug)}
+        </span>
+        {article.coverImage && !imgErr ? (
+          <div className="aspect-[4/3] overflow-hidden bg-slate-100">
+            <img
+              src={article.coverImage}
+              alt={cleanTitle(article.title)}
+              loading="lazy"
+              onError={() => setImgErr(true)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          </div>
+        ) : (
+          <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center">
+            <BookOpen size={24} className="text-slate-300" />
+          </div>
+        )}
+        <h2 className="font-serif text-[18px] font-bold text-ink-primary leading-snug group-hover:text-accent-crimson transition-colors">
+          {cleanTitle(article.title)}
+        </h2>
+        <p className="text-[12px] text-ink-secondary leading-relaxed line-clamp-3">
+          {article.description}
+        </p>
+        <span className="flex items-center gap-1.5 text-[11px] font-mono text-ink-secondary">
+          <Clock size={11} />
+          {article.readingTimeMinutes || 3} min &middot; {fmtDate(article.publishedAt)}
+        </span>
+      </Link>
+    </div>
+  );
+};
 
 /* ─── StripCard ────────────────────────────────────────────────────── */
 const StripCard: React.FC<{ article: Article }> = ({ article }) => {
@@ -152,6 +192,7 @@ const FeedRow: React.FC<{ article: Article }> = ({ article }) => {
 
 /* ─── HomePage ─────────────────────────────────────────────────────── */
 export const HomePage: React.FC = () => {
+  const queryClient = useQueryClient();
   const [heroImgErr, setHeroImgErr] = useState(false);
   const [email, setEmail] = useState('');
   const [selectedTopics, setSelectedTopics] = useState<string[]>(['technology', 'ai']);
@@ -163,6 +204,7 @@ export const HomePage: React.FC = () => {
     },
     onSuccess: (data) => {
       setSubscribeResult(data);
+      queryClient.invalidateQueries({ queryKey: ['adminNewsletterSubscribers'] });
     },
   });
 
@@ -262,33 +304,7 @@ export const HomePage: React.FC = () => {
 
           {/* Left col – secondary story */}
           {col1 && (
-            <div className="lg:col-span-3 pr-0 lg:pr-6 pb-6 lg:pb-0 mb-6 lg:mb-0 border-b lg:border-b-0 lg:border-r border-border-subtle">
-              <Link to={`/articles/${col1.slug}`} className="group block space-y-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-crimson">
-                  {catLabel(col1.categorySlug)}
-                </span>
-                {col1.coverImage && (
-                  <div className="aspect-[4/3] overflow-hidden bg-slate-100">
-                    <img
-                      src={col1.coverImage}
-                      alt={cleanTitle(col1.title)}
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                )}
-                <h2 className="font-serif text-[18px] font-bold text-ink-primary leading-snug group-hover:text-accent-crimson transition-colors">
-                  {cleanTitle(col1.title)}
-                </h2>
-                <p className="text-[12px] text-ink-secondary leading-relaxed line-clamp-3">
-                  {col1.description}
-                </p>
-                <span className="flex items-center gap-1.5 text-[11px] font-mono text-ink-secondary">
-                  <Clock size={11} />
-                  {col1.readingTimeMinutes || 3} min &middot; {fmtDate(col1.publishedAt)}
-                </span>
-              </Link>
-            </div>
+            <Col1Card article={col1} />
           )}
 
           {/* Center – main hero */}

@@ -49,6 +49,7 @@ export const ArticleReaderPage: React.FC = () => {
 
   // Timed Paywall Lock State for Unauthenticated Guests
   const [isPaywallLocked, setIsPaywallLocked] = useState(false);
+  const [coverImgErr, setCoverImgErr] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -91,7 +92,7 @@ export const ArticleReaderPage: React.FC = () => {
           },
           ...filtered,
         ].slice(0, 50);
-        localStorage.setItem('gazette_reading_history', JSON.stringify(updated));
+        localStorage.setItem('gazette_reading_history_v1', JSON.stringify(updated));
       } catch {}
     }
   }, [article?.id, article?.title, article?.slug, article?.description, article?.categorySlug, article?.readingTimeMinutes]);
@@ -271,7 +272,7 @@ export const ArticleReaderPage: React.FC = () => {
         // Fall back to menu
       }
     }
-    setShareDropdownOpen(!shareDropdownOpen);
+    setShareDropdownOpen(prev => !prev);
   };
 
   const handleCopyLink = () => {
@@ -485,24 +486,29 @@ export const ArticleReaderPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Hero Visual Image */}
-        {article.coverImage && (
-          <figure className="my-6">
+        {/* 3. Hero Visual Image with CLS prevention */}
+        {article.coverImage && !coverImgErr ? (
+          <figure className="my-6 aspect-video overflow-hidden border border-border-subtle bg-slate-100" style={{ borderRadius: 2 }}>
             <img
               src={article.coverImage}
               alt={article.title}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&auto=format&fit=crop&q=80';
-              }}
-              className="w-full object-cover max-h-[460px] border border-border-subtle"
-              style={{ borderRadius: 2 }}
+              loading="lazy"
+              decoding="async"
+              onError={() => setCoverImgErr(true)}
+              className="w-full h-full object-cover"
             />
-            <figcaption className="text-center text-[11px] font-mono text-ink-secondary mt-2 italic">
-              Editorial visual reference · EditorialHub Archives
-            </figcaption>
           </figure>
-        )}
+        ) : article.coverImage && coverImgErr ? (
+          // Graceful placeholder when cover image has been deleted
+          <div
+            className="my-6 w-full aspect-video max-h-[360px] bg-slate-100 border border-border-subtle flex flex-col items-center justify-center p-6 text-center"
+            style={{ borderRadius: 2 }}
+          >
+            <span className="font-mono text-[11px] uppercase tracking-widest text-ink-muted">
+              Cover image unavailable
+            </span>
+          </div>
+        ) : null}
 
         {/* 4. Sanitized Content Body */}
         <div

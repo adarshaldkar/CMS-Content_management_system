@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
+@import 'driver.js/dist/driver.css';
 
 @tailwind base;
 @tailwind components;
@@ -29,10 +30,29 @@
     --radius: 0.375rem;
 
     --color-canvas-paper: #fafaf8;
+    --color-canvas-subtle: #f4f4f2;
     --color-ink-primary: #18181b;
     --color-ink-secondary: #52525b;
+    --color-ink-muted: #71717a;
     --color-border-subtle: #e4e4e7;
+    --color-border-strong: #d4d4d8;
     --color-accent-crimson: #881337;
+    --color-accent-crimson-hover: #9f1239;
+
+    /* Semantic Typography Roles */
+    --type-display: clamp(2rem, 5vw, 3.75rem);
+    --type-section: clamp(1.5rem, 3.5vw, 2.5rem);
+    --type-story: clamp(1.2rem, 2.2vw, 1.65rem);
+    --type-body: 1.05rem;
+    --type-meta: 0.75rem;
+    --type-caption: 0.8rem;
+
+    /* Editorial Spacing Scale */
+    --space-editorial-xs: 0.25rem;
+    --space-editorial-sm: 0.5rem;
+    --space-editorial-md: 1rem;
+    --space-editorial-lg: 1.5rem;
+    --space-editorial-xl: 3rem;
   }
 
   * {
@@ -173,5 +193,93 @@
   text-align: center;
   margin-top: 0.5rem;
 }
+
+/* Accessibility: Differentiated Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-ticker {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* Keyboard Focus Ring Utility (WCAG 2.2 AA non-text contrast >= 3:1) */
+:focus-visible {
+  outline: 2px solid var(--color-accent-crimson) !important;
+  outline-offset: 2px !important;
+}
+
+/* ─── Driver.js Editorial Gazette Popover Theme ──────────────────────────── */
+.driver-popover.gazette-driver-popover {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08) !important;
+  padding: 18px !important;
+  max-width: 340px !important;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+}
+
+.gazette-driver-popover .driver-popover-title {
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 6px !important;
+}
+
+.gazette-driver-popover .driver-popover-description {
+  font-size: 0.825rem !important;
+  line-height: 1.55 !important;
+  color: #475569 !important;
+  margin-bottom: 14px !important;
+}
+
+.gazette-driver-popover .driver-popover-progress-text {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.72rem !important;
+  color: #8b0000 !important;
+  font-weight: 600 !important;
+}
+
+.gazette-driver-popover .driver-popover-footer button {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 2px !important;
+  padding: 6px 12px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.gazette-driver-popover .driver-popover-next-btn {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.gazette-driver-popover .driver-popover-next-btn:hover {
+  background-color: #8b0000 !important;
+}
+
+.gazette-driver-popover .driver-popover-prev-btn {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.gazette-driver-popover .driver-popover-close-btn {
+  color: #94a3b8 !important;
+}
+
 
 

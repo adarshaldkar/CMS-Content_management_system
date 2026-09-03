@@ -299,7 +299,7 @@ export const OnboardingPage: React.FC = () => {
         <div className="flex-1 px-8 pt-6 space-y-0 overflow-hidden">
           {previewArticles.map((article, idx) => (
             <div
-              key={idx}
+              key={article.title}
               className="py-5 border-b border-white/10 group"
               style={{ opacity: 1 - idx * 0.12 }}
             >

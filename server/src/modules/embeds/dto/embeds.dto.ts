@@ -26,6 +26,12 @@ export class ScrapeEmbedDto {
   url!: string;
 }
 
+export interface TranscriptLineDto {
+  time?: string;
+  seconds?: number;
+  text: string;
+}
+
 export interface EmbedMetadataResponseDto {
   url: string;
   provider: EmbedProvider;
@@ -44,4 +50,7 @@ export interface EmbedMetadataResponseDto {
   caption?: string;
   displayMode: EmbedDisplayMode;
   snapshottedAt: string;
+  transcript?: string;
+  transcriptLines?: TranscriptLineDto[];
+  hasTranscript?: boolean;
 }

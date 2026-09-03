@@ -13,12 +13,16 @@ import {
   Link as LinkIcon,
   Image as ImageIcon,
   Video,
+  Film,
+  FileText,
   Undo,
   Redo,
   RemoveFormatting,
 } from 'lucide-react';
 import { MediaPickerModal } from './MediaPickerModal';
 import { RichEmbedModal } from './RichEmbedModal';
+import { VideoUploadModal } from './VideoUploadModal';
+import { DocumentImportModal } from './DocumentImportModal';
 import { embedsApi, type EmbedMetadataResponse } from '../../api/embeds.api';
 import { formatEmbedHtml } from '../../utils/embedFormatter';
 import { isValidUrl, detectEmbedInfo } from '../../utils/embedParser';
@@ -38,6 +42,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [embedModalOpen, setEmbedModalOpen] = useState(false);
   const [embedModalUrl, setEmbedModalUrl] = useState('');
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [docImportModalOpen, setDocImportModalOpen] = useState(false);
   const lastHtmlRef = useRef<string>('');
 
   // Synchronize incoming external value changes (async load from API, revision restores, initial mount)
@@ -123,6 +129,56 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     executeCommand('insertHTML', embedHtml + '<p><br></p>');
   };
 
+  const handleNativeVideoInsert = (videoData: {
+    url: string;
+    posterUrl?: string;
+    caption?: string;
+    width: 'standard' | 'wide' | 'full';
+    autoplay: boolean;
+    loop: boolean;
+  }) => {
+    // Bug #3 fix: add inline styles for critical layout rules (aspect-ratio, border-radius,
+    // max-width) so the video still renders correctly in non-Tailwind contexts
+    // (email templates, RSS, third-party embeds). Tailwind classes are kept for progressive
+    // enhancement within the CMS reader.
+    const widthStyle =
+      videoData.width === 'full'
+        ? 'width:100%;max-width:100%;margin:2rem 0;'
+        : videoData.width === 'wide'
+        ? 'max-width:56rem;margin:1.75rem auto;'
+        : 'max-width:42rem;margin:1.5rem auto;';
+
+    const widthClass =
+      videoData.width === 'full'
+        ? 'w-full max-w-full my-8'
+        : videoData.width === 'wide'
+        ? 'max-w-4xl mx-auto my-7'
+        : 'max-w-2xl mx-auto my-6';
+
+    const captionHtml = videoData.caption
+      ? `<figcaption class="cms-embed-caption text-center text-xs font-serif text-ink-secondary italic mt-2">${videoData.caption}</figcaption>`
+      : '';
+
+    const videoHtml = `
+<figure class="cms-native-video-block ${widthClass} clear-both select-none" style="${widthStyle}" data-video-url="${videoData.url}" data-width="${videoData.width}" data-autoplay="${videoData.autoplay}" data-loop="${videoData.loop}">
+  <div class="cms-native-video-wrapper aspect-video w-full rounded-md overflow-hidden bg-slate-950 border border-slate-800 shadow-md relative" style="position:relative;aspect-ratio:16/9;width:100%;border-radius:0.375rem;overflow:hidden;background:#020617;">
+    <video
+      src="${videoData.url}"
+      ${videoData.posterUrl ? `poster="${videoData.posterUrl}"` : ''}
+      ${videoData.autoplay ? 'autoplay muted' : ''}
+      ${videoData.loop ? 'loop' : ''}
+      controls
+      class="w-full h-full object-contain"
+      style="width:100%;height:100%;object-fit:contain;"
+    ></video>
+  </div>
+  ${captionHtml}
+</figure>
+    `.trim();
+
+    executeCommand('insertHTML', videoHtml + '<p><br></p>');
+  };
+
   const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
     const pastedText = e.clipboardData.getData('text/plain')?.trim();
     if (pastedText && isValidUrl(pastedText)) {
@@ -170,13 +226,17 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     </button>
   );
 
+  const handleDocumentImported = (importedData: { htmlContent: string; title?: string }) => {
+    executeCommand('insertHTML', importedData.htmlContent + '<p><br></p>');
+  };
+
   return (
     <div
       className="flex flex-col bg-white border border-border-subtle focus-within:border-ink-primary transition-colors"
       style={{ borderRadius: 2 }}
     >
       {/* Editorial Minimalist Toolbar — strictly placed at the top of the box */}
-      <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-canvas-paper border-b border-border-subtle">
+      <div id="tour-editor-toolbar" className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-canvas-paper border-b border-border-subtle">
         {renderFormatButton('Heading 2', <Heading2 className="w-3.5 h-3.5" />, () =>
           executeCommand('formatBlock', '<h2>'),
         )}
@@ -217,13 +277,27 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         <div className="w-[1px] h-3.5 bg-border-subtle mx-1" />
 
         {renderFormatButton('Insert Link', <LinkIcon className="w-3.5 h-3.5" />, handleLinkInsert)}
+        <div id="tour-editor-media" className="flex items-center gap-0.5">
+          {renderFormatButton(
+            'Insert Image Asset',
+            <ImageIcon className="w-3.5 h-3.5 text-accent-crimson" />,
+            () => setMediaPickerOpen(true),
+          )}
+          {renderFormatButton(
+            'Upload Self-Hosted Video (.mp4, .webm, .mov)',
+            <Film className="w-3.5 h-3.5 text-emerald-600" />,
+            () => setVideoModalOpen(true),
+          )}
+        </div>
+        <div id="tour-editor-doc-import" className="inline-flex">
+          {renderFormatButton(
+            'Import External Document (.docx, .md, .txt, .pdf)',
+            <FileText className="w-3.5 h-3.5 text-amber-600" />,
+            () => setDocImportModalOpen(true),
+          )}
+        </div>
         {renderFormatButton(
-          'Insert Image Asset',
-          <ImageIcon className="w-3.5 h-3.5 text-accent-crimson" />,
-          () => setMediaPickerOpen(true),
-        )}
-        {renderFormatButton(
-          'Embed Video or Rich Link (YouTube, Vimeo, Loom, Spotify, X)',
+          'Embed Media or Rich Link (YouTube, Vimeo, Loom, Spotify, X)',
           <Video className="w-3.5 h-3.5 text-indigo-600" />,
           () => {
             setEmbedModalUrl('');
@@ -271,6 +345,18 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         initialUrl={embedModalUrl}
         onClose={() => setEmbedModalOpen(false)}
         onInsert={handleEmbedInsert}
+      />
+
+      <VideoUploadModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        onInsert={handleNativeVideoInsert}
+      />
+
+      <DocumentImportModal
+        isOpen={docImportModalOpen}
+        onClose={() => setDocImportModalOpen(false)}
+        onConfirmImport={handleDocumentImported}
       />
     </div>
   );

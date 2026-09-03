@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { BrandLogo } from '../common/BrandLogo';
+import { EditorialAvatar } from '../common/EditorialAvatar';
 import { useAuthStore } from '../../stores/authStore';
 import { authApi } from '../../api/auth.api';
 import { apiClient, fetchHealth } from '../../api/client';
@@ -97,6 +98,15 @@ export const AdminLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-canvas-paper text-ink-primary flex flex-col lg:flex-row font-sans">
+      {/* Skip to Content for keyboard screen reader accessibility (WCAG 2.2 AA) */}
+      <a
+        href="#admin-main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-ink-primary focus:text-white focus:font-semibold focus:shadow-md focus:outline-none"
+        style={{ borderRadius: 2 }}
+      >
+        Skip to main content
+      </a>
+
       {/* Mobile Top App Bar for Admin */}
       <header className="lg:hidden h-14 bg-white border-b border-border-subtle px-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
@@ -239,20 +249,11 @@ export const AdminLayout: React.FC = () => {
         {/* Admin Footer / User Profile */}
         <div className="p-4 border-t border-border-subtle bg-canvas-paper">
           <div className="flex items-center gap-3 mb-3">
-            <div
-              className="w-8 h-8 bg-ink-primary text-white flex items-center justify-center text-xs font-mono font-bold uppercase shrink-0 overflow-hidden"
-              style={{ borderRadius: 2 }}
-            >
-              {user?.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                user?.name?.charAt(0) || 'A'
-              )}
-            </div>
+            <EditorialAvatar
+              name={user?.name}
+              avatarUrl={user?.avatarUrl}
+              size="md"
+            />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-ink-primary truncate font-sans">{user?.name}</p>
               <span className="font-mono text-[10px] uppercase text-accent-crimson tracking-wider font-semibold">
@@ -321,7 +322,7 @@ export const AdminLayout: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0">
+        <main id="admin-main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0 focus:outline-none">
           <Outlet />
         </main>
       </div>

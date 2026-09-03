@@ -6,6 +6,7 @@ import type {
   EmbedMetadataResponseDto,
   EmbedProvider,
   EmbedDisplayMode,
+  TranscriptLineDto,
 } from './dto/embeds.dto';
 
 @Injectable()
@@ -148,6 +149,10 @@ export class EmbedsService {
       // oEmbed failed, fallback to defaults
     }
 
+    // Extract Transcript / Captions
+    const { transcript, transcriptLines, hasTranscript } =
+      await this.extractYouTubeTranscript(videoId, title);
+
     return {
       url,
       provider: 'youtube',
@@ -163,6 +168,9 @@ export class EmbedsService {
       startTime,
       displayMode: 'embed',
       snapshottedAt,
+      transcript,
+      transcriptLines,
+      hasTranscript,
     };
   }
 
@@ -378,6 +386,7 @@ export class EmbedsService {
       parsed.hostname.replace(/^www\./, '');
 
     const faviconUrl = this.extractFavicon(htmlText, url, parsed);
+    const { transcript, transcriptLines, hasTranscript } = this.extractArticleScrape(htmlText);
 
     return {
       url,
@@ -392,6 +401,9 @@ export class EmbedsService {
       aspectRatio: '16:9',
       displayMode: 'card',
       snapshottedAt,
+      transcript,
+      transcriptLines,
+      hasTranscript,
     };
   }
 
@@ -523,6 +535,191 @@ export class EmbedsService {
       aspectRatio: '16:9',
       displayMode: provider === 'youtube' || provider === 'vimeo' || provider === 'loom' ? 'embed' : 'card',
       snapshottedAt,
+    };
+  }
+
+  /**
+   * Helper: Extracts YouTube transcript from timedtext tracks or fallback chapters/descriptions
+   */
+  private async extractYouTubeTranscript(
+    videoId: string,
+    fallbackTitle: string,
+  ): Promise<{ transcript?: string; transcriptLines?: TranscriptLineDto[]; hasTranscript: boolean }> {
+    try {
+      const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const pageRes = await safeFetch(watchUrl, {
+        timeoutMs: 3500,
+      });
+
+      const html = pageRes.text;
+
+      // 1. Look for captionTracks in player response
+      const captionMatch = html.match(/"captionTracks":\s*(\[[^\]]+\])/);
+      if (captionMatch && captionMatch[1]) {
+        try {
+          const captionTracks = JSON.parse(captionMatch[1]);
+          const track =
+            captionTracks.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('.en')) ||
+            captionTracks[0];
+
+          if (track && track.baseUrl) {
+            const timedTextUrl = track.baseUrl;
+            const captionRes = await safeFetch(timedTextUrl, { timeoutMs: 3500 });
+            const xml = captionRes.text;
+
+            const cueRegex = /<text\s+start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>([\s\S]*?)<\/text>/gi;
+            const lines: TranscriptLineDto[] = [];
+            let match: RegExpExecArray | null;
+
+            while ((match = cueRegex.exec(xml)) !== null) {
+              const seconds = parseFloat(match[1]);
+              const rawText = match[3];
+              const text = this.sanitizeText(rawText).replace(/\n/g, ' ').trim();
+              if (text) {
+                const timeStr = this.formatTimestamp(seconds);
+                lines.push({
+                  time: timeStr,
+                  seconds,
+                  text,
+                });
+              }
+            }
+
+            if (lines.length > 0) {
+              const formattedTranscript = lines.map((l) => `${l.time} ${l.text}`).join('\n');
+              return {
+                transcript: formattedTranscript,
+                transcriptLines: lines,
+                hasTranscript: true,
+              };
+            }
+          }
+        } catch (captionErr: any) {
+          this.logger.debug(`Failed parsing captionTracks: ${captionErr?.message}`);
+        }
+      }
+
+      // 2. Fallback: extract shortDescription or chapters from YouTube page
+      const descMatch = html.match(/"shortDescription":\s*"((?:\\"|[^"])*)"/);
+      if (descMatch && descMatch[1]) {
+        try {
+          const unescapedDesc = JSON.parse(`"${descMatch[1]}"`);
+          if (unescapedDesc && unescapedDesc.trim().length > 20) {
+            const descLines = unescapedDesc
+              .split('\n')
+              .map((line: string) => line.trim())
+              .filter((line: string) => line.length > 0);
+
+            const lines: TranscriptLineDto[] = descLines.map((line: string) => {
+              const timeMatch = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*(.*)$/);
+              if (timeMatch) {
+                return {
+                  time: `[${timeMatch[1]}]`,
+                  text: timeMatch[2] || line,
+                };
+              }
+              return { text: line };
+            });
+
+            return {
+              transcript: unescapedDesc,
+              transcriptLines: lines,
+              hasTranscript: true,
+            };
+          }
+        } catch {
+          // Ignore JSON parse error on description
+        }
+      }
+    } catch (err: any) {
+      this.logger.debug(`YouTube transcript extraction skipped: ${err.message}`);
+    }
+
+    return {
+      transcript: undefined,
+      transcriptLines: undefined,
+      hasTranscript: false,
+    };
+  }
+
+  /**
+   * Helper: Formats seconds into [MM:SS] or [HH:MM:SS]
+   */
+  private formatTimestamp(seconds: number): string {
+    const s = Math.floor(seconds);
+    const m = Math.floor(s / 60);
+    const remainingSecs = s % 60;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      const remMins = m % 60;
+      return `[${pad(h)}:${pad(remMins)}:${pad(remainingSecs)}]`;
+    }
+    return `[${pad(m)}:${pad(remainingSecs)}]`;
+  }
+
+  /**
+   * Helper: Extracts article paragraphs / transcript from generic HTML page
+   */
+  private extractArticleScrape(htmlText: string): {
+    transcript?: string;
+    transcriptLines?: TranscriptLineDto[];
+    hasTranscript: boolean;
+  } {
+    try {
+      const cleanHtml = htmlText
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '')
+        .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '')
+        .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '');
+
+      const pMatches = cleanHtml.match(/<p\b[^>]*>([\s\S]*?)<\/p>/gi);
+      if (pMatches && pMatches.length > 0) {
+        const paragraphs = pMatches
+          .map((p) => this.sanitizeText(p))
+          .filter(
+            (text) =>
+              text.length > 25 &&
+              !/cookie|privacy policy|terms of service|all rights reserved|subscribe to newsletter/i.test(
+                text,
+              ),
+          );
+
+        if (paragraphs.length > 0) {
+          const selected = paragraphs.slice(0, 20);
+          const fullText = selected.join('\n\n');
+          const lines: TranscriptLineDto[] = selected.map((p) => ({ text: p }));
+          return {
+            transcript: fullText,
+            transcriptLines: lines,
+            hasTranscript: true,
+          };
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return { hasTranscript: false };
+  }
+
+  /**
+   * Public standalone transcript fetcher with caching
+   */
+  async fetchTranscript(rawUrl: string): Promise<{
+    transcript: string;
+    transcriptLines: TranscriptLineDto[];
+    hasTranscript: boolean;
+    provider: string;
+    title: string;
+  }> {
+    const meta = await this.scrapeUrl(rawUrl);
+    return {
+      transcript: meta.transcript || '',
+      transcriptLines: meta.transcriptLines || [],
+      hasTranscript: !!meta.hasTranscript,
+      provider: meta.providerName,
+      title: meta.title,
     };
   }
 }

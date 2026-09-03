@@ -21,6 +21,10 @@ import {
   type PaginatedResult,
 } from '../../domain/models';
 import { validateImageBuffer } from '../../common/utils/image-validator.util';
+import {
+  validateVideoMagicBytes,
+  parseRangeHeader,
+} from './utils/video-validator.util';
 import { AuditService } from '../audit/audit.service';
 import { OwnershipHelper } from '../../common/guards/ownership.guard';
 
@@ -103,13 +107,16 @@ export class MediaService {
     user: AuthUser,
     page = 1,
     limit = 24,
+    forceOwn = false,
   ): Promise<PaginatedResult<Media>> {
-    // If user has MEDIA_READ_ALL or is ADMIN/EDITOR, view all. Otherwise view own.
+    // forceOwn=true means: always show only this user's uploads (used by editor media picker)
+    // forceOwn=false: admins/editors can see all (used by admin media library page)
     const canReadAll =
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.ADMIN ||
-      user.role === UserRole.EDITOR ||
-      user.permissions.includes(Permission.MEDIA_READ_ALL);
+      !forceOwn &&
+      (user.role === UserRole.SUPER_ADMIN ||
+        user.role === UserRole.ADMIN ||
+        user.role === UserRole.EDITOR ||
+        user.permissions.includes(Permission.MEDIA_READ_ALL));
 
     return this.mediaRepo.findMany({
       uploadedBy: canReadAll ? undefined : user.id,
@@ -145,5 +152,98 @@ export class MediaService {
     }
 
     return { success: true };
+  }
+
+  async uploadVideo(
+    file: Express.Multer.File,
+    user: AuthUser,
+  ): Promise<Media> {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('No video file provided for upload.');
+    }
+
+    // 100 MB Limit
+    const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+    if (file.size > MAX_VIDEO_SIZE) {
+      throw new BadRequestException('Video exceeds maximum allowable limit of 100 MB.');
+    }
+
+    // Magic-byte binary header validation
+    const validation = validateVideoMagicBytes(file.buffer);
+    if (!validation.isValid) {
+      throw new BadRequestException(
+        'Invalid or corrupted video container. Only MP4, WebM, and MOV formats are allowed.',
+      );
+    }
+
+    const ext = validation.format || 'mp4';
+    const randomizedName = `video-${crypto.randomUUID()}.${ext}`;
+    const filePath = path.join(this.uploadDir, randomizedName);
+
+    // Save video binary safely
+    await fs.promises.writeFile(filePath, file.buffer);
+
+    const media = await this.mediaRepo.create({
+      filename: randomizedName,
+      originalName: path.basename(file.originalname).slice(0, 150),
+      mimeType: file.mimetype || `video/${ext}`,
+      size: file.size,
+      url: `/uploads/${randomizedName}`,
+      uploadedBy: user.id,
+    });
+
+    const streamUrl = `/api/media/stream/${media.id}`;
+    const resultMedia = { ...media, url: streamUrl };
+
+    await this.auditService.log({
+      actorId: user.id,
+      action: AuditEventType.MEDIA_UPLOADED,
+      resource: `Media:${media.id}`,
+      result: 'SUCCESS',
+      metadata: {
+        filename: randomizedName,
+        size: file.size,
+        mimeType: media.mimeType,
+        isVideo: true,
+      },
+    });
+
+    return resultMedia;
+  }
+
+  async getMediaStreamInfo(
+    mediaId: string,
+    rangeHeader: string | undefined,
+  ): Promise<{
+    filePath: string;
+    fileSize: number;
+    mimeType: string;
+    rangeInfo: ReturnType<typeof parseRangeHeader>;
+    filename: string;
+  }> {
+    const media = await this.mediaRepo.findById(mediaId);
+    if (!media) {
+      throw new NotFoundException('Video media asset not found.');
+    }
+
+    // Path Traversal Security: sanitize basename
+    const safeFilename = path.basename(media.filename);
+    const filePath = path.join(this.uploadDir, safeFilename);
+
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('Video file does not exist on storage disk.');
+    }
+
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const rangeInfo = parseRangeHeader(rangeHeader, fileSize);
+
+    return {
+      filePath,
+      fileSize,
+      mimeType: media.mimeType || 'video/mp4',
+      rangeInfo,
+      filename: safeFilename,
+    };
   }
 }

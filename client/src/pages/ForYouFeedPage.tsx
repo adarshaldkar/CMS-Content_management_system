@@ -21,13 +21,15 @@ import type { Article, PaginatedResult, User } from '../types';
 
 const cleanTitle = (t: string) => t.replace(/\s\d{10,}/g, '').trim();
 
+const feedDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 const fmtDate = (iso?: string | null) => {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(iso));
+  return feedDateFormatter.format(new Date(iso));
 };
 
 const CAT_LABELS: Record<string, string> = {

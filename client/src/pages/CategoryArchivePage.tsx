@@ -96,13 +96,15 @@ const CAT_LABELS: Record<string, { title: string; tagline: string }> = {
 
 const cleanTitle = (t: string) => t.replace(/\s\d{10,}/g, '').trim();
 
+const categoryDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 const fmtDate = (iso?: string | null) => {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(iso));
+  return categoryDateFormatter.format(new Date(iso));
 };
 
 /* ─── Lead story card (large, left-aligned) ──── */

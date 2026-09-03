@@ -59,13 +59,15 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 const cleanTitle = (t?: string | null) => (t || 'Untitled Dispatch').replace(/\s\d{10,}/g, '').trim();
 
+const profileDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 const fmtDate = (iso?: string | null) => {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(iso));
+  return profileDateFormatter.format(new Date(iso));
 };
 
 export const UserProfilePage: React.FC = () => {

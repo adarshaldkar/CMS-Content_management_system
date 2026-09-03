@@ -8,7 +8,7 @@ import { BrandLogo } from '../../components/common/BrandLogo';
 import { authApi } from '../../api/auth.api';
 
 const forgotSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.email('Please enter a valid email address'),
 });
 
 type ForgotFormData = z.infer<typeof forgotSchema>;

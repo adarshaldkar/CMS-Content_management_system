@@ -20,4 +20,14 @@ export class EmbedsController {
   async scrape(@Body() dto: ScrapeEmbedDto): Promise<EmbedMetadataResponseDto> {
     return await this.embedsService.scrapeUrl(dto.url);
   }
+
+  @Post('transcript')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async transcript(
+    @Body() dto: ScrapeEmbedDto,
+  ): Promise<{ transcript: string; transcriptLines: any[]; hasTranscript: boolean; provider: string; title: string }> {
+    return await this.embedsService.fetchTranscript(dto.url);
+  }
 }
+

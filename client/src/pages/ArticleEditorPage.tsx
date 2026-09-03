@@ -11,6 +11,7 @@ import {
   Sparkles,
   ExternalLink,
   User,
+  Compass,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import {
@@ -24,6 +25,7 @@ import { RichTextEditor } from '../components/editor/RichTextEditor';
 import { WorkflowActionBar } from '../components/editor/WorkflowActionBar';
 import { MediaPickerModal } from '../components/editor/MediaPickerModal';
 import { RevisionHistoryModal } from '../components/editor/RevisionHistoryModal';
+import { tourService } from '../services/tour.service';
 import { apiClient } from '../api/client';
 import type { Article, ArticleStatus, Category } from '../types';
 
@@ -80,6 +82,13 @@ export const ArticleEditorPage: React.FC = () => {
     if (id) {
       void fetchArticle(id);
     }
+
+    // Auto-launch guided author studio tour on first visit
+    const tourTimer = setTimeout(() => {
+      tourService.startEditorTour(false);
+    }, 600);
+
+    return () => clearTimeout(tourTimer);
   }, [id]);
 
   const fetchArticle = async (articleId: string) => {
@@ -248,6 +257,17 @@ export const ArticleEditorPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => tourService.startEditorTour(true)}
+            className="px-2.5 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono flex items-center gap-1.5 transition-colors bg-white"
+            style={{ borderRadius: 2 }}
+            title="Take Author Studio Tour"
+          >
+            <Compass className="w-3.5 h-3.5 text-accent-crimson" />
+            <span className="hidden sm:inline">Guided Tour</span>
+          </button>
+
           {id && (
             <button
               onClick={() => setRevisionModalOpen(true)}
@@ -273,10 +293,12 @@ export const ArticleEditorPage: React.FC = () => {
           )}
 
           <button
+            id="tour-editor-publish"
             onClick={handleSaveDraft}
             disabled={saving}
             className="px-4 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide flex items-center gap-1.5 transition-colors"
             style={{ borderRadius: 2 }}
+            aria-live="polite"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             <span>
@@ -289,6 +311,11 @@ export const ArticleEditorPage: React.FC = () => {
                     : 'Save Draft'}
             </span>
           </button>
+        </div>
+
+        {/* Screen Reader Status Announcement */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {saving ? 'Saving manuscript draft...' : successMessage || ''}
         </div>
       </header>
 
@@ -356,7 +383,7 @@ export const ArticleEditorPage: React.FC = () => {
           )}
 
           {/* Title Input */}
-          <div>
+          <div id="tour-editor-title">
             <input
               type="text"
               value={article.title || ''}

@@ -144,5 +144,15 @@ describe('Embeds Module & SSRF Defense', () => {
       expect(result.embedUrl).toBe('https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT');
       expect(result.aspectRatio).toBe('compact');
     });
+
+    it('should provide fetchTranscript endpoint logic with structured return', async () => {
+      const result = await service.fetchTranscript('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+      expect(result).toHaveProperty('transcript');
+      expect(result).toHaveProperty('transcriptLines');
+      expect(result).toHaveProperty('hasTranscript');
+      expect(result).toHaveProperty('provider', 'YouTube');
+      expect(Array.isArray(result.transcriptLines)).toBe(true);
+    });
   });
 });

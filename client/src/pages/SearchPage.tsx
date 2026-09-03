@@ -177,8 +177,8 @@ export const SearchPage: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search stories by headline, topic, author, or keyword..."
+            aria-label="Search stories by headline, topic, author, or keyword"
             className="w-full pl-11 pr-10 py-3 text-sm bg-white border border-border-subtle rounded-xl text-ink-primary placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800 shadow-xs transition-all"
-            autoFocus
           />
           <SearchIcon
             size={18}

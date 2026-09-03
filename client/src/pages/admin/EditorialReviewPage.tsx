@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -137,27 +138,37 @@ export const EditorialReviewPage: React.FC = () => {
             { id: 'approved', label: 'Approved' },
             { id: 'scheduled', label: 'Scheduled' },
             { id: 'published', label: 'Published' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id as any);
-                setSelectedArticle(null);
-              }}
-              className={`px-3.5 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-ink-primary text-ink-primary'
-                  : 'border-transparent text-ink-secondary hover:text-ink-primary'
-              }`}
-            >
-              <span>{tab.label}</span>
-              {tab.id === 'pending_review' && articles.length > 0 && (
-                <span className="font-mono text-[10px] text-accent-crimson font-bold">
-                  ({articles.length})
-                </span>
-              )}
-            </button>
-          ))}
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id as any);
+                  setSelectedArticle(null);
+                }}
+                className={`relative px-3.5 py-2 text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                  isActive
+                    ? 'text-ink-primary font-semibold'
+                    : 'text-ink-secondary hover:text-ink-primary'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {tab.id === 'pending_review' && articles.length > 0 && (
+                  <span className="font-mono text-[10px] text-accent-crimson font-bold">
+                    ({articles.length})
+                  </span>
+                )}
+                {isActive && (
+                  <motion.span
+                    layoutId="activeReviewTab"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-ink-primary"
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
