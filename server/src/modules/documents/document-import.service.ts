@@ -215,8 +215,21 @@ export class DocumentImportService {
 
   private async parsePdf(buffer: Buffer): Promise<string> {
     try {
-      const data = await pdfParse(buffer);
-      const rawText = data.text || '';
+      let rawText = '';
+      if (typeof pdfParse === 'function') {
+        const data = await pdfParse(buffer);
+        rawText = data?.text || '';
+      } else if (pdfParse && pdfParse.PDFParse) {
+        const parser = new pdfParse.PDFParse({ data: buffer });
+        const result = await parser.getText();
+        rawText = result?.text || '';
+      } else if (typeof pdfParse?.default === 'function') {
+        const data = await pdfParse.default(buffer);
+        rawText = data?.text || '';
+      } else {
+        throw new Error('PDF parser engine initialization failed.');
+      }
+
       if (!rawText.trim()) return '';
 
       const lines = rawText.split('\n');
