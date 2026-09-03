@@ -139,6 +139,7 @@ export interface SafeFetchOptions {
   timeoutMs?: number;
   maxBytes?: number;
   allowedContentTypes?: string[];
+  headers?: Record<string, string>;
 }
 
 /**
@@ -154,8 +155,8 @@ export async function safeFetch(
   options: SafeFetchOptions = {},
 ): Promise<{ text: string; contentType: string; finalUrl: string; statusCode: number }> {
   const maxRedirects = options.maxRedirects ?? 3;
-  const timeoutMs = options.timeoutMs ?? 3500;
-  const maxBytes = options.maxBytes ?? 2 * 1024 * 1024; // 2MB
+  const timeoutMs = options.timeoutMs ?? 5000;
+  const maxBytes = options.maxBytes ?? 3 * 1024 * 1024; // 3MB
   const allowedContentTypes = options.allowedContentTypes ?? [
     'text/html',
     'application/json',
@@ -192,15 +193,21 @@ export async function safeFetch(
         }
       }, timeoutMs);
 
+      const defaultHeaders = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml,application/json;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      };
+
       // Create request with custom lookup returning the pinned safe IP
       const req = transport.request(
         currentUrl,
         {
           method: 'GET',
           headers: {
-            'User-Agent': 'TheGazetteBot/1.0 (+https://thegazette.com; editorial-embed-scraper)',
-            Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            ...defaultHeaders,
+            ...(options.headers || {}),
           },
           lookup: (_hostname, _opts, callback) => {
             callback(null, safeIp, net.isIPv6(safeIp) ? 6 : 4);

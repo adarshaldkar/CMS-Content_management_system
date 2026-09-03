@@ -38,7 +38,10 @@ export class EmbedsService {
     ]);
 
     if (cachedEnvelope?.payload) {
-      return cachedEnvelope.payload;
+      // If cached object has valid transcript or is not YouTube, return it
+      if (cachedEnvelope.payload.hasTranscript || provider !== 'youtube') {
+        return cachedEnvelope.payload;
+      }
     }
 
     if (cachedNegativeEnvelope?.payload) {
@@ -546,35 +549,52 @@ export class EmbedsService {
     fallbackTitle: string,
   ): Promise<{ transcript?: string; transcriptLines?: TranscriptLineDto[]; hasTranscript: boolean }> {
     try {
-      const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const watchUrl = `https://www.youtube.com/watch?v=${videoId}&hl=en`;
       const pageRes = await safeFetch(watchUrl, {
-        timeoutMs: 3500,
+        timeoutMs: 6000,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+          Cookie: 'CONSENT=PENDING+999; SOCS=CAESEwgDEgk2MTQ1NzU4MTIaAmVuIAEaBgiA_LyaBg',
+        },
       });
 
       const html = pageRes.text;
 
       // 1. Look for captionTracks in player response
-      const captionMatch = html.match(/"captionTracks":\s*(\[[^\]]+\])/);
+      const captionMatch = html.match(/"captionTracks":\s*(\[\{.*?\}\])/);
       if (captionMatch && captionMatch[1]) {
         try {
           const captionTracks = JSON.parse(captionMatch[1]);
           const track =
-            captionTracks.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('.en')) ||
-            captionTracks[0];
+            captionTracks.find(
+              (t: any) =>
+                t.languageCode === 'en' ||
+                t.vssId?.includes('.en') ||
+                t.vssId?.includes('a.en'),
+            ) || captionTracks[0];
 
           if (track && track.baseUrl) {
-            const timedTextUrl = track.baseUrl;
-            const captionRes = await safeFetch(timedTextUrl, { timeoutMs: 3500 });
+            const timedTextUrl = track.baseUrl.replace(/\\u0026/g, '&');
+            const captionRes = await safeFetch(timedTextUrl, {
+              timeoutMs: 5000,
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              },
+            });
             const xml = captionRes.text;
 
-            const cueRegex = /<text\s+start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>([\s\S]*?)<\/text>/gi;
+            const cueRegex =
+              /<text\s+start="([\d\.]+)"(?:\s+dur="([\d\.]+)")?[^>]*>([\s\S]*?)<\/text>/gi;
             const lines: TranscriptLineDto[] = [];
             let match: RegExpExecArray | null;
 
             while ((match = cueRegex.exec(xml)) !== null) {
               const seconds = parseFloat(match[1]);
               const rawText = match[3];
-              const text = this.sanitizeText(rawText).replace(/\n/g, ' ').trim();
+              const text = this.decodeXmlEntities(rawText).replace(/\n/g, ' ').trim();
               if (text) {
                 const timeStr = this.formatTimestamp(seconds);
                 lines.push({
@@ -656,6 +676,18 @@ export class EmbedsService {
       return `[${pad(h)}:${pad(remMins)}:${pad(remainingSecs)}]`;
     }
     return `[${pad(m)}:${pad(remainingSecs)}]`;
+  }
+
+  private decodeXmlEntities(str: string): string {
+    return (str || '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+      .replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
   }
 
   /**
