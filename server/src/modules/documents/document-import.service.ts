@@ -20,11 +20,20 @@ export interface ExtractedImageAsset {
   sizeBytes: number;
 }
 
+export interface DocumentPage {
+  pageNumber: number;
+  title?: string;
+  htmlContent: string;
+  wordCount: number;
+}
+
 export interface DocumentImportResult {
   filename: string;
   format: 'docx' | 'md' | 'txt' | 'pdf';
   title?: string;
   htmlContent: string;
+  pages: DocumentPage[];
+  totalPages: number;
   wordCount: number;
   readingTimeMinutes: number;
   headingsCount: number;
@@ -59,7 +68,9 @@ export class DocumentImportService {
     const warnings: string[] = [];
 
     if (format === 'pdf') {
-      warnings.push('PDF layout extraction uses text heuristics. Complex multi-column layouts may require manual editorial review.');
+      warnings.push(
+        'PDF layout extraction uses structured page heuristics. You can inspect and select individual pages before importing.',
+      );
     }
 
     switch (format) {
@@ -76,11 +87,16 @@ export class DocumentImportService {
         extractedRawHtml = await this.parsePdf(file.buffer);
         break;
       default:
-        throw new BadRequestException('Unsupported document format. Allowed formats: .docx, .md, .txt, .pdf');
+        throw new BadRequestException(
+          'Unsupported document format. Allowed formats: .docx, .md, .txt, .pdf',
+        );
     }
 
     // Server-side XSS Sanitization
     const cleanHtml = sanitizeArticleContent(extractedRawHtml);
+
+    // Split into discrete pages by page-break delimiters or major section blocks
+    const pages = this.extractPages(cleanHtml, file.originalname);
 
     // Compute document analytics
     const wordCount = this.calculateWordCount(cleanHtml);
@@ -94,6 +110,8 @@ export class DocumentImportService {
       format,
       title: detectedTitle,
       htmlContent: cleanHtml,
+      pages,
+      totalPages: pages.length,
       wordCount,
       readingTimeMinutes,
       headingsCount,
@@ -101,6 +119,63 @@ export class DocumentImportService {
       extractedImages,
       warnings: warnings.length > 0 ? warnings : undefined,
     };
+  }
+
+  private extractPages(html: string, fallbackFilename: string): DocumentPage[] {
+    if (!html || !html.trim()) {
+      return [
+        {
+          pageNumber: 1,
+          title: 'Page 1',
+          htmlContent: '',
+          wordCount: 0,
+        },
+      ];
+    }
+
+    // Split on explicit page break horizontal rules or page comments
+    const rawChunks = html
+      .split(
+        /<hr[^>]*class="[^"]*cms-page-break[^"]*"[^>]*>|<!--\s*CMS_PAGE_BREAK\s*-->/gi,
+      )
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
+
+    if (rawChunks.length > 1) {
+      return rawChunks.map((chunkHtml, idx) => {
+        const pageTitle = this.extractTitle(chunkHtml, `Page ${idx + 1}`);
+        return {
+          pageNumber: idx + 1,
+          title: pageTitle,
+          htmlContent: chunkHtml,
+          wordCount: this.calculateWordCount(chunkHtml),
+        };
+      });
+    }
+
+    // If no explicit page breaks found, check if there are multiple H2 major sections to create logical pages
+    const sectionSplit = html.split(/(?=<h2[^>]*>)/i).filter((s) => s.trim().length > 0);
+    if (sectionSplit.length > 1 && sectionSplit.length <= 15) {
+      return sectionSplit.map((sectionHtml, idx) => {
+        const pageTitle = this.extractTitle(sectionHtml, `Section ${idx + 1}`);
+        return {
+          pageNumber: idx + 1,
+          title: pageTitle,
+          htmlContent: sectionHtml,
+          wordCount: this.calculateWordCount(sectionHtml),
+        };
+      });
+    }
+
+    // Single unified page
+    return [
+      {
+        pageNumber: 1,
+        title: this.extractTitle(html, fallbackFilename.replace(/\.[^/.]+$/, '')),
+        htmlContent: html,
+        wordCount: this.calculateWordCount(html),
+      },
+    ];
   }
 
   private detectFormat(file: Express.Multer.File): 'docx' | 'md' | 'txt' | 'pdf' {
@@ -245,16 +320,32 @@ export class DocumentImportService {
 
   private async parsePdf(buffer: Buffer): Promise<string> {
     try {
+      const renderPage = (pageData: any) => {
+        return pageData.getTextContent().then((textContent: any) => {
+          let lastY: any,
+            text = '';
+          for (const item of textContent.items) {
+            if (lastY === item.transform[5] || !lastY) {
+              text += item.str;
+            } else {
+              text += '\n' + item.str;
+            }
+            lastY = item.transform[5];
+          }
+          return '\n\n<<<CMS_PAGE_BREAK>>>\n\n' + text;
+        });
+      };
+
       let rawText = '';
       if (typeof pdfParse === 'function') {
-        const data = await pdfParse(buffer);
+        const data = await pdfParse(buffer, { pagerender: renderPage });
         rawText = data?.text || '';
       } else if (pdfParse && pdfParse.PDFParse) {
         const parser = new pdfParse.PDFParse({ data: buffer });
         const result = await parser.getText();
         rawText = result?.text || '';
       } else if (typeof pdfParse?.default === 'function') {
-        const data = await pdfParse.default(buffer);
+        const data = await pdfParse.default(buffer, { pagerender: renderPage });
         rawText = data?.text || '';
       } else {
         throw new Error('PDF parser engine initialization failed.');
@@ -357,6 +448,20 @@ export class DocumentImportService {
           flushList();
           if (inCodeBlock) flushCodeBlock();
           if (inTable) flushTable();
+          continue;
+        }
+
+        // 0. Explicit Page Break delimiter between PDF pages
+        if (line.includes('<<<CMS_PAGE_BREAK>>>')) {
+          flushParagraph();
+          flushList();
+          if (inCodeBlock) flushCodeBlock();
+          if (inTable) flushTable();
+          if (htmlBlocks.length > 0) {
+            htmlBlocks.push(
+              '<hr class="cms-page-break my-8 border-t-2 border-dashed border-slate-300" data-page-break="true" />',
+            );
+          }
           continue;
         }
 

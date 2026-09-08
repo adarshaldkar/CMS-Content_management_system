@@ -8,11 +8,20 @@ export interface ExtractedImageAsset {
   sizeBytes: number;
 }
 
+export interface DocumentPage {
+  pageNumber: number;
+  title?: string;
+  htmlContent: string;
+  wordCount: number;
+}
+
 export interface DocumentImportResult {
   filename: string;
   format: 'docx' | 'md' | 'txt' | 'pdf';
   title?: string;
   htmlContent: string;
+  pages?: DocumentPage[];
+  totalPages?: number;
   wordCount: number;
   readingTimeMinutes: number;
   headingsCount: number;
