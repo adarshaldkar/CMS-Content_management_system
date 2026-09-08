@@ -42,6 +42,8 @@ import { PrePublishChecklistModal, type PrePublishAuditData } from '../component
 import { tourService } from '../services/tour.service';
 import { apiClient } from '../api/client';
 import { UnsavedChangesModal } from '../components/editor/UnsavedChangesModal';
+import { draftStorageService, type LocalDraftSnapshot } from '../services/draft-storage.service';
+import { multiTabService } from '../services/multi-tab.service';
 import type { Article, ArticleStatus, Category } from '../types';
 
 type WorkspaceMode = 'write' | 'review' | 'preview';
@@ -110,11 +112,11 @@ export const ArticleEditorPage: React.FC = () => {
   const [leaveConfirmModalOpen, setLeaveConfirmModalOpen] = useState(false);
   const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
 
+  // Multi-Tab Collision State
+  const [hasMultiTabConflict, setHasMultiTabConflict] = useState(false);
+
   // Recovered Local Draft State
-  const [recoveredDraft, setRecoveredDraft] = useState<{
-    data: any;
-    savedAt: string;
-  } | null>(null);
+  const [recoveredDraft, setRecoveredDraft] = useState<LocalDraftSnapshot | null>(null);
 
   // Autosave State Tracking
   const [autosaveStatus, setAutosaveStatus] = useState<
@@ -122,84 +124,90 @@ export const ArticleEditorPage: React.FC = () => {
   >('saved');
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(new Date());
   const [timeAgoText, setTimeAgoText] = useState('Saved just now');
+  const [clientSeq, setClientSeq] = useState(1);
 
-  const storageDraftKey = `gazette_draft_backup_${id || 'new'}`;
+  // ─── 1. Multi-Tab Session Probing via BroadcastChannel ───────────────────
+  useEffect(() => {
+    const cleanup = multiTabService.startProbing(id || 'new', (conflict) => {
+      setHasMultiTabConflict(conflict);
+    });
+    return cleanup;
+  }, [id]);
 
-  // ─── 1. Continuous LocalStorage Draft Auto-Backup (Debounced) ────────────
+  // ─── 2. Continuous IndexedDB Draft Auto-Backup (Debounced) ───────────────
   useEffect(() => {
     if (autosaveStatus !== 'dirty') return;
 
     const timer = setTimeout(() => {
-      try {
-        const payload = {
-          article: {
-            title: article.title,
-            slug: article.slug,
-            description: article.description,
-            content: article.content,
-            categoryId: article.categoryId,
-            tagIds: article.tagIds,
-            coverImage: article.coverImage,
-            seoTitle: article.seoTitle,
-            seoDescription: article.seoDescription,
-            status: article.status,
-            showAuthorName: article.showAuthorName,
-          },
-          tags,
-          savedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(storageDraftKey, JSON.stringify(payload));
-      } catch (e) {
-        console.warn('Draft localStorage auto-backup failed', e);
-      }
-    }, 1200);
+      const nextSeq = clientSeq + 1;
+      setClientSeq(nextSeq);
+
+      const snapshot: LocalDraftSnapshot = {
+        articleId: id || 'new',
+        baseVersion: article.version || 1,
+        seq: nextSeq,
+        title: article.title || '',
+        slug: article.slug || '',
+        description: article.description || '',
+        content: article.content || '',
+        categoryId: article.categoryId || '',
+        tagIds: article.tagIds || [],
+        tags,
+        coverImage: article.coverImage || null,
+        seoTitle: article.seoTitle || '',
+        seoDescription: article.seoDescription || '',
+        status: article.status || 'draft',
+        showAuthorName: article.showAuthorName,
+        wordCount: article.wordCount || 0,
+        readingTimeMinutes: article.readingTimeMinutes || 1,
+        savedAt: new Date().toISOString(),
+      };
+
+      void draftStorageService.saveSnapshot(snapshot);
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [article, tags, autosaveStatus, storageDraftKey]);
+  }, [article, tags, autosaveStatus, id, clientSeq]);
 
-  // ─── 2. Check for Recoverable Local Draft on Initial Mount ────────────────
+  // ─── 3. Check for Recoverable Local Draft on Initial Mount ────────────────
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageDraftKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.savedAt && (parsed.article?.title || parsed.article?.content)) {
-          const draftTime = new Date(parsed.savedAt).getTime();
-          const serverTime = lastSavedTime ? lastSavedTime.getTime() : 0;
-          if (!id || draftTime > serverTime + 2000) {
-            setRecoveredDraft({
-              data: parsed,
-              savedAt: parsed.savedAt,
-            });
-          }
+    void draftStorageService.getSnapshot(id || 'new').then((snapshot) => {
+      if (snapshot && snapshot.savedAt && (snapshot.title || snapshot.content)) {
+        const draftTime = new Date(snapshot.savedAt).getTime();
+        const serverTime = lastSavedTime ? lastSavedTime.getTime() : 0;
+        if (!id || draftTime > serverTime + 2000) {
+          setRecoveredDraft(snapshot);
         }
       }
-    } catch {
-      // ignore json parse error
-    }
-  }, [id, storageDraftKey, lastSavedTime]);
+    });
+  }, [id, lastSavedTime]);
 
   const handleRestoreLocalDraft = () => {
-    if (!recoveredDraft?.data) return;
-    const { article: recoveredArticle, tags: recoveredTags } = recoveredDraft.data;
-    if (recoveredArticle) {
-      setArticle((prev) => ({
-        ...prev,
-        ...recoveredArticle,
-      }));
-    }
-    if (Array.isArray(recoveredTags)) {
-      setTags(recoveredTags);
+    if (!recoveredDraft) return;
+    setArticle((prev) => ({
+      ...prev,
+      title: recoveredDraft.title,
+      slug: recoveredDraft.slug,
+      description: recoveredDraft.description,
+      content: recoveredDraft.content,
+      categoryId: recoveredDraft.categoryId,
+      tagIds: recoveredDraft.tagIds,
+      coverImage: recoveredDraft.coverImage,
+      seoTitle: recoveredDraft.seoTitle,
+      seoDescription: recoveredDraft.seoDescription,
+      status: (recoveredDraft.status as ArticleStatus) || prev.status,
+      showAuthorName: recoveredDraft.showAuthorName,
+    }));
+    if (Array.isArray(recoveredDraft.tags)) {
+      setTags(recoveredDraft.tags);
     }
     setAutosaveStatus('dirty');
     setRecoveredDraft(null);
-    setSuccessMessage('Restored unsaved manuscript backup from browser cache.');
+    setSuccessMessage('Restored unsaved manuscript backup from IndexedDB storage.');
   };
 
   const handleDiscardLocalDraft = () => {
-    try {
-      localStorage.removeItem(storageDraftKey);
-    } catch {}
+    void draftStorageService.deleteSnapshot(id || 'new');
     setRecoveredDraft(null);
   };
 
@@ -246,9 +254,7 @@ export const ArticleEditorPage: React.FC = () => {
   };
 
   const handleConfirmDiscardAndLeave = () => {
-    try {
-      localStorage.removeItem(storageDraftKey);
-    } catch {}
+    void draftStorageService.deleteSnapshot(id || 'new');
     setAutosaveStatus('saved');
     setLeaveConfirmModalOpen(false);
     const dest = pendingNavigationPath || '/stories';
@@ -258,9 +264,7 @@ export const ArticleEditorPage: React.FC = () => {
   const handleConfirmSaveAndLeave = async () => {
     const saved = await handleSaveDraft();
     if (saved) {
-      try {
-        localStorage.removeItem(storageDraftKey);
-      } catch {}
+      void draftStorageService.deleteSnapshot(id || 'new');
       setAutosaveStatus('saved');
       setLeaveConfirmModalOpen(false);
       const dest = pendingNavigationPath || '/stories';
@@ -426,9 +430,7 @@ export const ArticleEditorPage: React.FC = () => {
         setArticle(updated);
         setLastSavedTime(new Date());
         setAutosaveStatus('saved');
-        try {
-          localStorage.removeItem(storageDraftKey);
-        } catch {}
+        void draftStorageService.deleteSnapshot(id || 'new');
         setSuccessMessage(
           article.status === 'published'
             ? 'Story changes saved and updated successfully.'
@@ -440,9 +442,7 @@ export const ArticleEditorPage: React.FC = () => {
         setArticle(created);
         setLastSavedTime(new Date());
         setAutosaveStatus('saved');
-        try {
-          localStorage.removeItem(storageDraftKey);
-        } catch {}
+        void draftStorageService.deleteSnapshot('new');
         navigate(`/write/${created.id}`, { replace: true });
         setSuccessMessage('Story draft created.');
         return created;
@@ -501,9 +501,7 @@ export const ArticleEditorPage: React.FC = () => {
       setArticle(updated);
       setLastSavedTime(new Date());
       setAutosaveStatus('saved');
-      try {
-        localStorage.removeItem(storageDraftKey);
-      } catch {}
+      void draftStorageService.deleteSnapshot(targetId || 'new');
       setSuccessMessage(`Story successfully transitioned to ${targetStatus.replace('_', ' ')}.`);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Workflow transition failed.');
@@ -654,6 +652,17 @@ export const ArticleEditorPage: React.FC = () => {
           )}
 
           <button
+            type="button"
+            onClick={handleConfirmSaveAndLeave}
+            disabled={saving}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs transition-colors bg-white shadow-2xs cursor-pointer"
+            title="Save changes and return to stories overview"
+          >
+            <Save className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Save &amp; Exit</span>
+          </button>
+
+          <button
             onClick={handleSaveDraft}
             disabled={saving}
             className="px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold rounded-xs tracking-wide flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
@@ -785,6 +794,30 @@ export const ArticleEditorPage: React.FC = () => {
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left/Center Canvas (8 cols or 12 cols) */}
           <div className={`${inspectorOpen ? 'lg:col-span-8' : 'lg:col-span-12 max-w-4xl mx-auto w-full'} space-y-6 transition-all duration-200`}>
+            {/* Multi-Tab Conflict Alert Banner */}
+            {hasMultiTabConflict && (
+              <div className="p-3.5 bg-gradient-to-r from-purple-950 via-slate-900 to-purple-900 text-white rounded-sm border border-purple-500/40 shadow-xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-purple-800 text-purple-200 rounded-full shrink-0">
+                    <AlertCircle size={15} className="text-amber-300" />
+                  </div>
+                  <div className="text-xs">
+                    <span className="font-bold text-purple-200">Multi-Tab Session Active:</span> This manuscript is currently open in another browser tab. Simultaneous edits may collide.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    multiTabService.claimOwnership(id || 'new');
+                    setHasMultiTabConflict(false);
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-mono bg-purple-600 hover:bg-purple-500 text-white rounded cursor-pointer shrink-0 shadow-2xs"
+                >
+                  Take Over Session
+                </button>
+              </div>
+            )}
+
             {/* Recovered Unsaved Local Draft Banner */}
             {recoveredDraft && (
               <div className="p-4 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border border-amber-300 rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-200">
@@ -794,13 +827,18 @@ export const ArticleEditorPage: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-semibold text-xs text-amber-950 flex items-center gap-2">
-                      <span>Unsaved Manuscript Backup Recovered</span>
+                      <span>Unsaved Manuscript Backup Found</span>
                       <span className="font-mono text-[10px] text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded font-medium">
                         {new Date(recoveredDraft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      {recoveredDraft.wordCount > (article.wordCount || 0) && (
+                        <span className="font-mono text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">
+                          +{recoveredDraft.wordCount - (article.wordCount || 0)} words newer
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-amber-800 mt-0.5">
-                      We found uncommitted edits cached in your browser from an earlier session. Would you like to restore them to your canvas?
+                      We found uncommitted edits ({recoveredDraft.wordCount} words) cached in your browser IndexedDB from an earlier session. Would you like to restore them?
                     </p>
                   </div>
                 </div>
