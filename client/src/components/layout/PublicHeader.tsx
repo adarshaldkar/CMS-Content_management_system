@@ -82,10 +82,24 @@ export const PublicHeader: React.FC = () => {
 
           {/* Right: Search & Auth Actions */}
           <div className="flex items-center gap-3">
-            {/* Search Link */}
+            {/* Command Palette / Search Quick Trigger (Ctrl+K) */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 text-xs font-mono text-ink-secondary bg-canvas-subtle hover:bg-slate-200 border border-border-subtle rounded transition-colors"
+              title="Global Command Palette (Ctrl+K)"
+            >
+              <Search size={13} className="text-ink-muted" />
+              <span>Search...</span>
+              <kbd className="px-1.5 py-0.2 bg-white dark:bg-zinc-800 border border-border-subtle text-[10px] text-ink-muted rounded">
+                ⌘K
+              </kbd>
+            </button>
+
+            {/* Mobile Search Link */}
             <Link
               to="/search"
-              className="p-2 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded-full transition-colors"
+              className="sm:hidden p-2 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded-full transition-colors"
               title="Search & Filter Stories"
             >
               <Search size={19} />

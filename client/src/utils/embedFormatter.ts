@@ -2,6 +2,7 @@ import type { EmbedMetadataResponse, EmbedDisplayMode } from '../api/embeds.api'
 
 /**
  * Formats EmbedMetadataResponse into a rich, semantic editorial HTML element.
+ * Strictly decouples media players from transcripts, eliminating timestamp pollution.
  */
 export function formatEmbedHtml(
   data: EmbedMetadataResponse,
@@ -9,6 +10,7 @@ export function formatEmbedHtml(
     caption?: string;
     width?: 'standard' | 'wide' | 'full';
     displayMode?: EmbedDisplayMode;
+    includeTranscript?: boolean;
   } = {},
 ): string {
   const displayMode = options.displayMode || data.displayMode || 'embed';
@@ -36,13 +38,13 @@ export function formatEmbedHtml(
     const containerAspect = isAudio ? 'h-24 sm:h-32' : 'aspect-video w-full';
 
     innerContent = `
-      <div class="cms-embed-container ${containerAspect} rounded-md overflow-hidden bg-slate-950 border border-slate-800 shadow-md relative">
+      <div class="cms-embed-container ${containerAspect} rounded-sm overflow-hidden bg-slate-950 border border-slate-800 relative">
         <iframe
           src="${embedUrl}"
           title="${title}"
           loading="lazy"
           class="w-full h-full border-0 absolute inset-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowfullscreen
         ></iframe>
       </div>
@@ -53,12 +55,12 @@ export function formatEmbedHtml(
         href="${url}"
         target="_blank"
         rel="noopener noreferrer"
-        class="cms-embed-card group block bg-white hover:bg-slate-50 border border-border-subtle hover:border-slate-400 p-4 rounded transition-all shadow-xs text-left no-underline"
+        class="cms-embed-card group block bg-white hover:bg-slate-50 border border-border-subtle hover:border-slate-400 p-4 rounded-sm transition-all text-left no-underline"
       >
         <div class="flex flex-col sm:flex-row gap-4 items-start">
           ${
             thumbnailUrl
-              ? `<img src="${thumbnailUrl}" alt="" class="w-full sm:w-36 h-28 object-cover rounded bg-slate-100 shrink-0 border border-slate-200" />`
+              ? `<img src="${thumbnailUrl}" alt="" class="w-full sm:w-36 h-28 object-cover rounded-xs bg-slate-100 shrink-0 border border-slate-200" />`
               : ''
           }
           <div class="flex-1 min-w-0 space-y-1">
@@ -107,22 +109,27 @@ export function formatEmbedHtml(
   }
 
   const captionHtml = caption
-    ? `<figcaption class="cms-embed-caption text-center text-xs font-serif text-ink-secondary italic mt-2">${escapeHtml(
+    ? `<figcaption class="cms-embed-caption text-center text-xs font-serif text-ink-secondary italic mt-2.5">${escapeHtml(
         caption,
       )}</figcaption>`
     : '';
 
-  const includeTranscript = options.includeTranscript !== false;
-  const transcriptText = data.transcript?.trim();
+  // Transcripts are strictly opt-in and cleaned of raw bracketed timestamps
+  const includeTranscript = options.includeTranscript === true;
+  const rawTranscript = data.transcript?.trim();
+  const cleanedTranscript = rawTranscript
+    ? rawTranscript.replace(/\[\d{2}:\d{2}(?::\d{2})?\]\s*/g, '').trim()
+    : '';
+
   const transcriptHtml =
-    includeTranscript && transcriptText
+    includeTranscript && cleanedTranscript
       ? `
-    <details class="cms-embed-transcript mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded text-left select-text">
+    <details class="cms-embed-transcript mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-sm text-left select-text">
       <summary class="font-mono text-xs font-semibold text-accent-crimson cursor-pointer select-none flex items-center gap-2 hover:underline">
-        <span>📜 Extracted Transcript &amp; Content</span>
+        <span>📜 Editorial Transcript Reference</span>
       </summary>
-      <div class="cms-transcript-content mt-2.5 pt-2.5 border-t border-slate-200 text-xs font-mono text-ink-primary whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
-${escapeHtml(transcriptText)}
+      <div class="cms-transcript-content mt-2.5 pt-2.5 border-t border-slate-200 text-xs font-sans text-ink-primary whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+${escapeHtml(cleanedTranscript)}
       </div>
     </details>
   `.trim()

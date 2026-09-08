@@ -185,15 +185,20 @@ export class MultiDatabaseMeshService implements OnApplicationBootstrap {
     // 2. MongoDB
     const mongoStart = Date.now();
     try {
+      if (this.mongoConnection.readyState !== 1) {
+        try {
+          await this.mongoConnection.asPromise();
+        } catch {}
+      }
       if (this.mongoConnection.readyState === 1 && this.mongoConnection.db) {
         const collections = await this.mongoConnection.db.listCollections().toArray();
         dbs.push({
           engine: 'mongodb',
           name: 'MongoDB',
-          role: 'Document / Content Store (NoSQL)',
+          role: 'Document & Content Store (NoSQL)',
           port: 27017,
           status: 'healthy',
-          latencyMs: Date.now() - mongoStart,
+          latencyMs: Math.max(1, Date.now() - mongoStart),
           tablesCount: collections.length,
           lastChecked: new Date(),
         });
@@ -201,9 +206,9 @@ export class MultiDatabaseMeshService implements OnApplicationBootstrap {
         dbs.push({
           engine: 'mongodb',
           name: 'MongoDB',
-          role: 'Document / Content Store (NoSQL)',
+          role: 'Document & Content Store (NoSQL)',
           port: 27017,
-          status: 'degraded',
+          status: 'offline',
           latencyMs: Date.now() - mongoStart,
           lastChecked: new Date(),
           error: 'Connection state: ' + this.mongoConnection.readyState,
@@ -213,7 +218,7 @@ export class MultiDatabaseMeshService implements OnApplicationBootstrap {
       dbs.push({
         engine: 'mongodb',
         name: 'MongoDB',
-        role: 'Document / Content Store (NoSQL)',
+        role: 'Document & Content Store (NoSQL)',
         port: 27017,
         status: 'offline',
         latencyMs: Date.now() - mongoStart,

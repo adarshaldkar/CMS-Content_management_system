@@ -25,6 +25,7 @@ import {
   type NewsletterCampaign,
 } from '../../api/newsletter.api';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { CampaignPerformanceBar } from '../../components/analytics/CampaignPerformanceBar';
 
 const TEMPLATES = [
   {
@@ -81,7 +82,7 @@ const TEMPLATES = [
 export const NewsletterManagerPage: React.FC = () => {
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'subscribers' | 'compose' | 'campaigns'>('compose');
+  const [activeTab, setActiveTab] = useState<'subscribers' | 'compose' | 'campaigns' | 'analytics'>('compose');
   const [subStatusFilter, setSubStatusFilter] = useState<string>('ALL');
   const [subSearch, setSubSearch] = useState<string>('');
   const [subPage, setSubPage] = useState(1);
@@ -280,7 +281,26 @@ export const NewsletterManagerPage: React.FC = () => {
           <FileText size={13} />
           <span>Broadcast History</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`px-4 py-2 text-xs font-mono border-b-2 flex items-center gap-1.5 transition-colors ${
+            activeTab === 'analytics'
+              ? 'border-ink-primary text-ink-primary font-bold'
+              : 'border-transparent text-ink-secondary hover:text-ink-primary'
+          }`}
+        >
+          <Sparkles size={13} />
+          <span>Funnel &amp; Delivery Analytics</span>
+        </button>
       </div>
+
+      {/* ── TAB 4: FUNNEL & DELIVERABILITY ANALYTICS (UI Phase 3) ── */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          <CampaignPerformanceBar />
+        </div>
+      )}
 
       {/* ── TAB 1: COMPOSE & BROADCAST ────────────────────────────── */}
       {activeTab === 'compose' && (

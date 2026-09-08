@@ -213,6 +213,36 @@ export class DocumentImportService {
       .join('');
   }
 
+  private formatInlineContent(text: string): string {
+    if (!text) return '';
+
+    let formatted = text;
+
+    // 1. Convert Markdown links [Label](url) into Gazette styled anchor tags
+    formatted = formatted.replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-accent-crimson font-serif underline hover:text-rose-900 transition-colors">$1</a>',
+    );
+
+    // 2. Convert Raw URLs into clickable hyperlinks (avoid matching already linked hrefs)
+    formatted = formatted.replace(
+      /(?<!href=["'])(https?:\/\/[^\s<]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-accent-crimson font-serif underline hover:text-rose-900 transition-colors">$1</a>',
+    );
+
+    // 3. Inline LaTeX / Math Formulas: $x^2 + y^2 = r^2$ or \sqrt{x}
+    formatted = formatted.replace(
+      /\$([^\$\n]+)\$/g,
+      '<code class="cms-math-inline px-1.5 py-0.5 bg-slate-100 rounded text-xs font-mono text-ink-primary font-semibold">$1</code>',
+    );
+
+    // 4. Superscripts (e.g., x^2, m^3) and Subscripts (e.g., H_2O, CO_2)
+    formatted = formatted.replace(/(\w+)\^(\d+|\w+)/g, '$1<sup>$2</sup>');
+    formatted = formatted.replace(/(\b[A-Z][a-z]?|\w+)_(\d+)/g, '$1<sub>$2</sub>');
+
+    return formatted;
+  }
+
   private async parsePdf(buffer: Buffer): Promise<string> {
     try {
       let rawText = '';
@@ -232,35 +262,244 @@ export class DocumentImportService {
 
       if (!rawText.trim()) return '';
 
-      const lines = rawText.split('\n');
-      const htmlBlocks: string[] = [];
-      let currentParagraph: string[] = [];
+      // 1. Strip repetitive page numbers and header/footer noise
+      let sanitizedText = rawText
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        // Strip lines like "Page 1 of 5", "Page 2", "- 1 -", "1 of 4"
+        .replace(/^\s*(?:page\s+\d+(?:\s+of\s+\d+)?|-\s*\d+\s*-|\d+\s+of\s+\d+)\s*$/gim, '')
+        // If bullet character is inline, break it into a separate line
+        .replace(/([^\n])\s*([•\u2022\u2023\u25E6\u25AA\u25CF\u2219])\s*/g, '$1\n$2 ');
 
-      for (const line of lines) {
+      const rawLines = sanitizedText.split('\n');
+      const cleanLines: string[] = [];
+
+      for (const line of rawLines) {
         const trimmed = line.trim();
         if (!trimmed) {
-          if (currentParagraph.length > 0) {
-            htmlBlocks.push(`<p>${currentParagraph.join(' ')}</p>`);
-            currentParagraph = [];
+          cleanLines.push('');
+        } else {
+          cleanLines.push(trimmed);
+        }
+      }
+
+      const htmlBlocks: string[] = [];
+      let currentParagraph: string[] = [];
+      let currentListItems: string[] = [];
+      let currentListType: 'ul' | 'ol' | null = null;
+      let inCodeBlock = false;
+      let codeBlockLines: string[] = [];
+      let inTable = false;
+      let tableRows: string[][] = [];
+      let isFirstHeading = true;
+
+      const flushParagraph = () => {
+        if (currentParagraph.length > 0) {
+          const rawText = currentParagraph.join(' ').trim();
+          if (rawText) {
+            htmlBlocks.push(`<p>${this.formatInlineContent(rawText)}</p>`);
+          }
+          currentParagraph = [];
+        }
+      };
+
+      const flushList = () => {
+        if (currentListItems.length > 0 && currentListType) {
+          const items = currentListItems
+            .map((item) => `<li>${this.formatInlineContent(item)}</li>`)
+            .join('');
+          htmlBlocks.push(`<${currentListType}>${items}</${currentListType}>`);
+          currentListItems = [];
+          currentListType = null;
+        }
+      };
+
+      const flushCodeBlock = () => {
+        if (codeBlockLines.length > 0) {
+          const codeText = codeBlockLines.join('\n');
+          htmlBlocks.push(
+            `<pre class="cms-code-block my-5 p-4 bg-slate-900 text-slate-100 rounded text-xs font-mono overflow-x-auto leading-relaxed"><code>${codeText}</code></pre>`,
+          );
+          codeBlockLines = [];
+          inCodeBlock = false;
+        }
+      };
+
+      const flushTable = () => {
+        if (tableRows.length > 0) {
+          let tableHtml = `<div class="cms-table-container my-6 overflow-x-auto rounded border border-border-subtle shadow-xs"><table class="cms-table w-full border-collapse text-sm">`;
+          const headerRow = tableRows[0];
+          tableHtml += `<thead class="bg-slate-100/80 border-b-2 border-border-subtle text-ink-primary font-mono text-xs uppercase tracking-wider"><tr>`;
+          headerRow.forEach((cell) => {
+            tableHtml += `<th class="p-3 text-left font-semibold border-r border-border-subtle last:border-r-0">${this.formatInlineContent(cell)}</th>`;
+          });
+          tableHtml += `</tr></thead><tbody class="divide-y divide-border-subtle bg-white">`;
+
+          for (let r = 1; r < tableRows.length; r++) {
+            tableHtml += `<tr class="hover:bg-slate-50/80 transition-colors">`;
+            tableRows[r].forEach((cell) => {
+              tableHtml += `<td class="p-3 font-sans text-ink-primary border-r border-border-subtle last:border-r-0">${this.formatInlineContent(cell)}</td>`;
+            });
+            tableHtml += `</tr>`;
+          }
+          tableHtml += `</tbody></table></div>`;
+          htmlBlocks.push(tableHtml);
+          tableRows = [];
+          inTable = false;
+        }
+      };
+
+      for (let i = 0; i < cleanLines.length; i++) {
+        const line = cleanLines[i];
+
+        if (!line) {
+          flushParagraph();
+          flushList();
+          if (inCodeBlock) flushCodeBlock();
+          if (inTable) flushTable();
+          continue;
+        }
+
+        // 1. Math Display Equation Block ($$...$$ or \[...\])
+        if (/^\$\$(.+)\$\$$/.test(line) || /^\\\[(.+)\\\]$/.test(line)) {
+          flushParagraph();
+          flushList();
+          const mathContent = line.replace(/^\$\$|\$\$$|^\\\[|\\\]$/g, '').trim();
+          htmlBlocks.push(
+            `<div class="cms-math-block my-5 p-4 bg-slate-50 border border-border-subtle rounded text-center font-mono text-sm text-ink-primary select-all"><code>$$${mathContent}$$</code></div>`,
+          );
+          continue;
+        }
+
+        // 2. Code Block Markers (```...```) or Programming Constructs
+        if (line.startsWith('```')) {
+          flushParagraph();
+          flushList();
+          if (inCodeBlock) {
+            flushCodeBlock();
+          } else {
+            inCodeBlock = true;
           }
           continue;
         }
 
-        // Layout Heuristic: All-caps short lines become section headers
-        if (trimmed.length > 3 && trimmed.length < 60 && trimmed === trimmed.toUpperCase() && !trimmed.endsWith('.')) {
-          if (currentParagraph.length > 0) {
-            htmlBlocks.push(`<p>${currentParagraph.join(' ')}</p>`);
-            currentParagraph = [];
-          }
-          htmlBlocks.push(`<h2>${trimmed}</h2>`);
-        } else {
-          currentParagraph.push(trimmed);
+        if (inCodeBlock) {
+          codeBlockLines.push(line);
+          continue;
         }
+
+        // 3. Pipe-delimited Table Row (| Col 1 | Col 2 |)
+        if (line.startsWith('|') && line.endsWith('|') && line.includes('|')) {
+          // Ignore markdown separator row (|---|---|)
+          if (/^\|(?:\s*[-:]+[-| :]*)\|$/.test(line)) {
+            continue;
+          }
+          flushParagraph();
+          flushList();
+          inTable = true;
+          const cells = line
+            .slice(1, -1)
+            .split('|')
+            .map((c) => c.trim());
+          tableRows.push(cells);
+          continue;
+        } else if (inTable) {
+          flushTable();
+        }
+
+        // 4. Horizontal divider line
+        if (/^[-–—_*]{3,}$/.test(line)) {
+          flushParagraph();
+          flushList();
+          htmlBlocks.push('<hr class="cms-divider my-8 border-t border-border-subtle" />');
+          continue;
+        }
+
+        // 5. Bullet list item detection
+        const isBullet =
+          /^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219*·-–—]\s+/.test(line) ||
+          /^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219]/.test(line);
+
+        if (isBullet) {
+          flushParagraph();
+          if (currentListType !== 'ul') {
+            flushList();
+            currentListType = 'ul';
+          }
+          const itemText = line
+            .replace(/^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219*·-–—]\s*/, '')
+            .trim();
+          currentListItems.push(itemText);
+          continue;
+        }
+
+        // 6. Numbered Step / Major Section Heading (e.g. "1. Explore the 1Fi App", "2. Add 1Fi Marketplace")
+        const stepMatch = line.match(/^(\d+[\.\)])\s+(.*)$/);
+        if (stepMatch && line.length < 90 && !line.endsWith('.') && !line.endsWith(',')) {
+          flushParagraph();
+          flushList();
+          htmlBlocks.push(`<h3><strong>${this.formatInlineContent(line)}</strong></h3>`);
+          continue;
+        }
+
+        // 7. Alpha Sub-item (e.g. "A. Top Brands", "B. Nearby Stores", "C. 1Fi Marketplace")
+        const alphaMatch = line.match(/^([A-Z][\.\)])\s+(.*)$/);
+        if (alphaMatch && line.length < 70 && !line.endsWith(',')) {
+          flushParagraph();
+          flushList();
+          htmlBlocks.push(`<p><strong>${this.formatInlineContent(line)}</strong></p>`);
+          continue;
+        }
+
+        // 8. Figure / Image Label (e.g., "Figure 1: ...", "Image: ...")
+        if (/^(Figure|Fig\.|Illustration|Diagram|Screenshot)\s+\d*:/i.test(line)) {
+          flushParagraph();
+          flushList();
+          htmlBlocks.push(
+            `<div class="cms-figure-caption my-3 p-2 bg-slate-50 border-l-2 border-slate-400 text-xs font-serif italic text-ink-secondary">${this.formatInlineContent(line)}</div>`,
+          );
+          continue;
+        }
+
+        // 9. Section Heading Heuristics (Document Title, "Objective", "Assignment", "Requirements", etc.)
+        const isCommonHeadingWord =
+          /^(Objective|Assignment|Overview|Requirements|Deliverables|Summary|Background|Instructions|Guidelines|Evaluation Criteria|Scope|Milestones|Introduction|Conclusion|Key Findings|Features|Tech Stack|Submission)s?:?$/i.test(
+            line,
+          );
+        const isShortTitle = line.length > 2 && line.length < 65 && !/[.,;:!?]$/.test(line);
+
+        if ((isFirstHeading && i < 3 && isShortTitle) || isCommonHeadingWord) {
+          flushParagraph();
+          flushList();
+          if (isFirstHeading) {
+            htmlBlocks.push(`<h2>${this.formatInlineContent(line)}</h2>`);
+            isFirstHeading = false;
+          } else {
+            htmlBlocks.push(`<h3>${this.formatInlineContent(line)}</h3>`);
+          }
+          continue;
+        }
+
+        // 10. Numbered List item (e.g. "1. Item description that ends with a period.")
+        if (stepMatch && (line.endsWith('.') || line.length >= 90)) {
+          flushParagraph();
+          if (currentListType !== 'ol') {
+            flushList();
+            currentListType = 'ol';
+          }
+          currentListItems.push(stepMatch[2].trim());
+          continue;
+        }
+
+        // 11. Standard body text
+        flushList();
+        currentParagraph.push(line);
       }
 
-      if (currentParagraph.length > 0) {
-        htmlBlocks.push(`<p>${currentParagraph.join(' ')}</p>`);
-      }
+      flushParagraph();
+      flushList();
+      if (inCodeBlock) flushCodeBlock();
+      if (inTable) flushTable();
 
       return htmlBlocks.join('');
     } catch (err: any) {
@@ -282,6 +521,10 @@ export class DocumentImportService {
     const h2Match = html.match(/<h2[^>]*>(.*?)<\/h2>/i);
     if (h2Match && h2Match[1]) {
       return h2Match[1].replace(/<[^>]+>/g, '').trim();
+    }
+    const h3Match = html.match(/<h3[^>]*>(.*?)<\/h3>/i);
+    if (h3Match && h3Match[1]) {
+      return h3Match[1].replace(/<[^>]+>/g, '').trim();
     }
     return originalFilename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
   }

@@ -9,6 +9,7 @@ import { PublicOnlyRoute } from './routes/PublicOnlyRoute';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { EditorialErrorBoundary } from './components/common/EditorialErrorBoundary';
+import { CommandPaletteModal } from './components/common/CommandPaletteModal';
 import { useAuthStore } from './stores/authStore';
 
 // ─── Route Code-Splitting with React.lazy (Optimized Performance) ──
@@ -66,6 +67,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <CommandPaletteModal />
       <Suspense fallback={<PageLoaderFallback />}>
         <EditorialErrorBoundary fallbackTitle="Application Section Unavailable" fallbackMessage="An issue prevented this section of The Gazette from rendering properly.">
           <Routes>

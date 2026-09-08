@@ -281,5 +281,196 @@
   color: #94a3b8 !important;
 }
 
+/* ─── Editorial Text Alignment & Typography Invariants ─────────────────────── */
+.manuscript-editor [align="center"],
+.manuscript-editor [style*="text-align: center"],
+.manuscript-editor [style*="text-align:center"],
+.prose [align="center"],
+.prose [style*="text-align: center"],
+.prose [style*="text-align:center"],
+.prose .text-center {
+  text-align: center !important;
+}
 
+.manuscript-editor [align="right"],
+.manuscript-editor [style*="text-align: right"],
+.manuscript-editor [style*="text-align:right"],
+.prose [align="right"],
+.prose [style*="text-align: right"],
+.prose [style*="text-align:right"],
+.prose .text-right {
+  text-align: right !important;
+}
+
+.manuscript-editor [align="justify"],
+.manuscript-editor [style*="text-align: justify"],
+.manuscript-editor [style*="text-align:justify"],
+.prose [align="justify"],
+.prose [style*="text-align: justify"],
+.prose [style*="text-align:justify"],
+.prose .text-justify {
+  text-align: justify !important;
+}
+
+.manuscript-editor [align="left"],
+.manuscript-editor [style*="text-align: left"],
+.manuscript-editor [style*="text-align:left"],
+.prose [align="left"],
+.prose [style*="text-align: left"],
+.prose [style*="text-align:left"],
+.prose .text-left {
+  text-align: left !important;
+}
+
+/* ─── Reader Hyperlinks ─────────────────────────────────────────────────── */
+.prose a {
+  color: #881337 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.prose a:hover {
+  color: #4c0519 !important;
+}
+
+/* ─── Semantic Callouts in Reader ───────────────────────────────────────── */
+.prose .cms-callout-note {
+  background-color: rgba(254, 243, 199, 0.7) !important;
+  border-left: 3px solid #d97706 !important;
+  padding: 1rem !important;
+  margin: 1.5rem 0 !important;
+  border-radius: 2px !important;
+  font-size: 0.925rem !important;
+}
+
+.prose .cms-callout-warning {
+  background-color: #f4f4f5 !important;
+  border-left: 3px solid #3f3f46 !important;
+  padding: 1rem !important;
+  margin: 1.5rem 0 !important;
+  border-radius: 2px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.85rem !important;
+}
+
+.prose hr.cms-divider {
+  border: 0 !important;
+  border-top: 1px solid #e4e4e7 !important;
+  margin: 2rem auto !important;
+}
+
+/* ─── Reader Interactive Tables ─────────────────────────────────────────── */
+.prose .cms-table-container {
+  margin: 1.75rem 0 !important;
+  overflow-x: auto !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.prose table.cms-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.875rem !important;
+  margin: 0 !important;
+}
+
+.prose table.cms-table caption {
+  padding: 0.5rem 0.75rem !important;
+  text-align: left !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.prose table.cms-table thead {
+  background-color: #f1f5f9 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+.prose table.cms-table th {
+  padding: 0.75rem 1rem !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #0f172a !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+.prose table.cms-table th:last-child {
+  border-right: 0 !important;
+}
+
+.prose table.cms-table td {
+  padding: 0.75rem 1rem !important;
+  color: #1e293b !important;
+  border-right: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.prose table.cms-table td:last-child {
+  border-right: 0 !important;
+}
+
+.prose table.cms-table[data-theme="matrix"] tbody tr:nth-child(even) {
+  background-color: rgba(248, 250, 252, 0.7) !important;
+}
+
+.prose table.cms-table[data-theme="compact"] td,
+.prose table.cms-table[data-theme="compact"] th {
+  padding: 0.5rem 0.75rem !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.75rem !important;
+}
+
+/* ─── Reader Mathematical Blocks & Code ─────────────────────────────────── */
+.prose .cms-math-block {
+  margin: 1.5rem 0 !important;
+  padding: 1rem 1.25rem !important;
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important;
+  text-align: center !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.9rem !important;
+  color: #0f172a !important;
+  user-select: all !important;
+}
+
+.prose .cms-math-inline {
+  padding: 0.15rem 0.4rem !important;
+  background-color: #f1f5f9 !important;
+  border-radius: 3px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.prose .cms-code-block {
+  margin: 1.5rem 0 !important;
+  padding: 1rem 1.25rem !important;
+  background-color: #090d16 !important;
+  color: #f8fafc !important;
+  border-radius: 4px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.8rem !important;
+  line-height: 1.6 !important;
+  overflow-x: auto !important;
+}
+
+.prose mark {
+  background-color: #ffe4e6 !important;
+  color: #881337 !important;
+  padding: 0.125rem 0.375rem !important;
+  border-radius: 2px !important;
+  font-weight: 500 !important;
+}
 

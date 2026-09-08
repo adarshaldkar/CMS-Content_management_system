@@ -11,10 +11,12 @@ import {
   Sparkles,
   User,
   XCircle,
+  GitCompare,
 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Skeleton } from '../../components/common/SkeletonLoader';
+import { RevisionDiffViewer } from '../../components/editor/RevisionDiffViewer';
 import { useAuthStore } from '../../stores/authStore';
 import type { Article, ArticleRevision, PaginatedResult } from '../../types';
 
@@ -32,6 +34,7 @@ export const EditorialReviewPage: React.FC = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showDiffModal, setShowDiffModal] = useState(false);
 
   // 1. Fetch Review Queue Articles
   const { data: articlesData, isLoading } = useQuery({
@@ -428,7 +431,19 @@ export const EditorialReviewPage: React.FC = () => {
                     <History size={13} />
                     <span>Manuscript Content (v{selectedArticle.version})</span>
                   </span>
-                  <span>{revisions.length} revision snapshots</span>
+                  <div className="flex items-center gap-3">
+                    <span>{revisions.length} snapshots</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiffModal(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono font-semibold bg-white border border-border-subtle hover:border-ink-primary text-ink-primary hover:text-accent-crimson transition-colors"
+                      style={{ borderRadius: 2 }}
+                      title="Inspect visual diff against previous revisions"
+                    >
+                      <GitCompare size={12} className="text-accent-crimson" />
+                      <span>Visual Diff</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div
@@ -537,6 +552,18 @@ export const EditorialReviewPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Revision Diff Viewer Modal */}
+      {selectedArticle && (
+        <RevisionDiffViewer
+          isOpen={showDiffModal}
+          articleId={selectedArticle.id}
+          articleTitle={selectedArticle.title}
+          currentContent={selectedArticle.content}
+          currentTitle={selectedArticle.title}
+          onClose={() => setShowDiffModal(false)}
+        />
       )}
     </div>
   );

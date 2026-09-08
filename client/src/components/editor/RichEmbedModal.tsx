@@ -16,6 +16,7 @@ import {
   Copy,
   CheckCheck,
   Clock,
+  Globe,
 } from 'lucide-react';
 import {
   embedsApi,
@@ -46,11 +47,11 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<EmbedMetadataResponse | null>(null);
 
-  // Transcript state
+  // Transcript state (Default strictly to OFF to prevent manuscript pollution)
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [transcriptSearch, setTranscriptSearch] = useState('');
-  const [includeTranscriptInEmbed, setIncludeTranscriptInEmbed] = useState(true);
+  const [includeTranscriptInEmbed, setIncludeTranscriptInEmbed] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,7 +61,7 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
       setErrorMsg(null);
       setTranscriptOpen(false);
       setTranscriptSearch('');
-      setIncludeTranscriptInEmbed(true);
+      setIncludeTranscriptInEmbed(false);
       if (initialUrl && isValidUrl(initialUrl)) {
         handleFetchPreview(initialUrl);
       } else {
@@ -160,37 +161,37 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
   const providerLabel = previewData?.provider === 'generic' ? 'Article' : 'Video';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white border border-border-subtle max-w-2xl w-full shadow-2xl rounded-sm flex flex-col max-h-[90vh]">
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-ink-primary">
-                <Video size={16} />
-              </div>
-              <div>
-                <h2 className="font-serif font-bold text-base text-ink-primary">
-                  Embed Media or Rich Web Link
-                </h2>
-                <p className="text-[11px] font-mono text-ink-secondary">
-                  Paste YouTube, Vimeo, Loom, Spotify, X, or any web article
-                </p>
-              </div>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-white border border-border-subtle max-w-2xl w-full shadow-2xl rounded-sm flex flex-col max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-[#FCFBF9]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xs bg-slate-100 flex items-center justify-center text-ink-primary">
+              <Video size={16} />
             </div>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-ink-primary transition-colors p-1"
-            >
-              <X size={18} />
-            </button>
+            <div>
+              <h2 className="font-serif font-bold text-base text-ink-primary">
+                Embed Media or Web Resource
+              </h2>
+              <p className="text-xs font-mono text-ink-secondary">
+                Embed YouTube, Vimeo, Loom, Spotify, or any web article
+              </p>
+            </div>
           </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-ink-primary transition-colors p-1.5 rounded-xs hover:bg-slate-100"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* URL Input */}
           <div className="space-y-2">
-            <label className="block text-[11px] font-mono uppercase tracking-wider text-ink-secondary">
-              Resource URL *
+            <label className="block text-[11px] font-mono uppercase tracking-wider text-ink-secondary font-bold">
+              Resource Destination URL <span className="text-accent-crimson">*</span>
             </label>
             <div className="flex gap-2">
               <input
@@ -207,19 +208,20 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
                   }
                 }}
                 placeholder="https://www.youtube.com/watch?v=... or https://..."
-                className="flex-1 px-3 py-2 text-xs border border-border-subtle focus:outline-none focus:border-ink-primary font-mono"
+                autoFocus
+                className="flex-1 px-3 py-2 text-xs font-mono border border-slate-200 rounded-xs focus:outline-none focus:border-accent-crimson bg-slate-50/50"
               />
               <button
                 type="button"
                 onClick={() => handleFetchPreview(url)}
                 disabled={isLoading || !url.trim()}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono font-medium rounded-sm disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono font-medium rounded-xs disabled:opacity-50 transition-colors flex items-center gap-1.5 shrink-0"
               >
                 {isLoading ? (
                   <LoadingSpinner size="sm" />
                 ) : (
                   <>
-                    <Sparkles size={12} />
+                    <Sparkles size={12} className="text-amber-300" />
                     <span>Inspect</span>
                   </>
                 )}
@@ -228,21 +230,16 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
 
             {/* Real-Time Detection Pill */}
             {detectedInfo && (
-              <div className="flex items-center gap-1.5 text-[11px] font-mono text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded">
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-indigo-800 bg-indigo-50/80 border border-indigo-100 px-3 py-1 rounded-xs">
                 {detectedInfo.provider === 'youtube' && <Play size={12} className="text-rose-600" />}
                 {detectedInfo.provider === 'spotify' && <Music size={12} className="text-emerald-600" />}
                 {detectedInfo.provider === 'twitter' && <Twitter size={12} className="text-sky-500" />}
-                <span>Detected: <strong>{detectedInfo.providerName}</strong></span>
-                {detectedInfo.startTime !== undefined && (
-                  <span className="text-[10px] text-indigo-500">
-                    (Starts at {detectedInfo.startTime}s)
-                  </span>
-                )}
+                <span>Detected Provider: <strong>{detectedInfo.providerName}</strong></span>
               </div>
             )}
 
             {errorMsg && (
-              <div className="flex items-center gap-1.5 text-xs font-mono text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded">
+              <div className="flex items-center gap-1.5 text-xs font-mono text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-xs">
                 <AlertCircle size={14} className="shrink-0" />
                 <span>{errorMsg}</span>
               </div>
@@ -251,17 +248,20 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
 
           {/* Live Preview Card */}
           {previewData && (
-            <div className="space-y-3 border-t border-border-subtle pt-4">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-ink-secondary block">
-                Live Preview &amp; Formatting
-              </span>
+            <div className="space-y-3.5 border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-ink-secondary font-bold">
+                  Display Formatting
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Select presentation layout</span>
+              </div>
 
               {/* Display Mode Selector */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'embed' as EmbedDisplayMode, label: 'Interactive Player', icon: Play },
-                  { id: 'card' as EmbedDisplayMode, label: 'Rich Link Card', icon: FileText },
-                  { id: 'link' as EmbedDisplayMode, label: 'Plain Link', icon: LinkIcon },
+                  { id: 'card' as EmbedDisplayMode, label: 'Editorial Card', icon: FileText },
+                  { id: 'link' as EmbedDisplayMode, label: 'Inline Link', icon: LinkIcon },
                 ].map((m) => {
                   const isSelected = displayMode === m.id;
                   const Icon = m.icon;
@@ -270,9 +270,9 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
                       key={m.id}
                       type="button"
                       onClick={() => setDisplayMode(m.id)}
-                      className={`px-3 py-1.5 text-xs font-mono rounded flex items-center gap-1.5 transition-colors ${
+                      className={`px-3 py-2 text-xs font-mono rounded-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-ink-primary text-white font-medium shadow-sm'
+                          ? 'bg-slate-900 text-white font-bold shadow-xs'
                           : 'bg-slate-100 text-ink-secondary hover:bg-slate-200'
                       }`}
                     >
@@ -283,11 +283,11 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
                 })}
               </div>
 
-              {/* Visual Card Display */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded">
+              {/* Visual Preview */}
+              <div className="p-3.5 bg-[#FCFBF9] border border-border-subtle rounded-sm">
                 {displayMode === 'embed' && previewData.embedUrl ? (
                   <div className="space-y-2">
-                    <div className="relative aspect-video w-full rounded bg-black overflow-hidden border border-slate-300">
+                    <div className="relative aspect-video w-full rounded-sm bg-slate-950 overflow-hidden border border-slate-800">
                       <iframe
                         src={previewData.embedUrl}
                         title={previewData.title}
@@ -301,12 +301,12 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
                     </div>
                   </div>
                 ) : displayMode === 'card' ? (
-                  <div className="flex gap-3 bg-white border border-slate-200 p-3 rounded shadow-sm">
+                  <div className="flex gap-3 bg-white border border-slate-200 p-3 rounded-xs shadow-2xs">
                     {previewData.thumbnailUrl && (
                       <img
                         src={previewData.thumbnailUrl}
                         alt=""
-                        className="w-24 h-20 object-cover rounded shrink-0 bg-slate-100"
+                        className="w-24 h-20 object-cover rounded-xs shrink-0 bg-slate-100 border border-slate-200"
                       />
                     )}
                     <div className="flex-1 min-w-0 space-y-1">
@@ -314,7 +314,7 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
                         {previewData.faviconUrl && (
                           <img src={previewData.faviconUrl} alt="" className="w-3 h-3 rounded-full" />
                         )}
-                        <span>{previewData.providerName}</span>
+                        <span className="font-bold text-accent-crimson uppercase">{previewData.providerName}</span>
                       </div>
                       <h4 className="font-serif font-bold text-xs text-ink-primary line-clamp-1">
                         {previewData.title}
@@ -328,197 +328,135 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-xs font-mono text-ink-primary">
-                    <LinkIcon size={13} className="text-slate-400" />
-                    <span className="underline truncate">{previewData.title || previewData.url}</span>
+                    <LinkIcon size={13} className="text-accent-crimson" />
+                    <span className="underline truncate font-serif text-accent-crimson">
+                      {previewData.title || previewData.url}
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* ─── TRANSCRIPT PANEL ─── */}
-              {hasTranscript && (
-                <div className="border border-slate-200 rounded overflow-hidden">
-                  {/* Transcript toggle header */}
-                  <button
-                    type="button"
-                    onClick={() => setTranscriptOpen((v) => !v)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <ScrollText size={13} className="text-indigo-500 shrink-0" />
-                      <span className="text-[11px] font-mono font-semibold text-ink-primary uppercase tracking-wider">
-                        {providerLabel} Transcript
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full">
-                        {previewData.transcriptLines!.length} lines
-                      </span>
-                      {previewData.provider === 'youtube' && (
-                        <span className="text-[10px] font-mono text-indigo-400 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                          <Clock size={9} />
-                          timestamped
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyTranscript();
-                        }}
-                        className="flex items-center gap-1 text-[10px] font-mono text-slate-500 hover:text-ink-primary transition-colors px-2 py-1 rounded hover:bg-slate-200"
-                        title="Copy full transcript"
-                      >
-                        {copied ? (
-                          <>
-                            <CheckCheck size={11} className="text-emerald-500" />
-                            <span className="text-emerald-600">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={11} />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-                      {transcriptOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                    </div>
-                  </button>
-
-                  {/* Expanded transcript body */}
-                  {transcriptOpen && (
-                    <div className="border-t border-slate-200">
-                      {/* Search bar */}
-                      <div className="px-3 py-2 border-b border-slate-100 bg-white">
-                        <input
-                          type="text"
-                          value={transcriptSearch}
-                          onChange={(e) => setTranscriptSearch(e.target.value)}
-                          placeholder="Search transcript..."
-                          className="w-full px-2 py-1 text-[11px] font-mono border border-border-subtle rounded focus:outline-none focus:border-indigo-400 bg-slate-50"
-                        />
-                      </div>
-
-                      {/* Lines */}
-                      <div
-                        ref={transcriptRef}
-                        className="max-h-52 overflow-y-auto divide-y divide-slate-50"
-                      >
-                        {filteredTranscriptLines().length === 0 ? (
-                          <div className="px-4 py-6 text-center text-[11px] font-mono text-slate-400">
-                            No matching lines found.
-                          </div>
-                        ) : (
-                          filteredTranscriptLines().map((line, idx) => (
-                            <div
-                              key={idx}
-                              className="flex gap-2.5 px-3 py-1.5 hover:bg-slate-50 transition-colors group"
-                            >
-                              {line.time && (
-                                <span className="shrink-0 text-[10px] font-mono text-indigo-400 mt-0.5 min-w-[48px] select-none">
-                                  {line.time}
-                                </span>
-                              )}
-                              <p className="text-[11px] text-ink-secondary leading-relaxed flex-1">
-                                {transcriptSearch.trim()
-                                  ? highlightText(line.text, transcriptSearch)
-                                  : line.text}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-
-                      {/* Controls row */}
-                      <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                        <label className="flex items-center gap-2 text-[11px] font-mono text-ink-primary cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={includeTranscriptInEmbed}
-                            onChange={(e) => setIncludeTranscriptInEmbed(e.target.checked)}
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-0"
-                          />
-                          <span>Attach transcript accordion in manuscript</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onInsert({
-                              ...previewData,
-                              displayMode: 'link',
-                              title: `${previewData.title} (Transcript)`,
-                              transcript: previewData.transcript,
-                            });
-                            onClose();
-                          }}
-                          className="px-2.5 py-1 text-[10px] font-mono text-slate-700 bg-slate-200 hover:bg-slate-300 rounded transition-colors font-medium"
-                        >
-                          Insert Transcript Only
-                        </button>
-                      </div>
-
-                      {/* Footer hint */}
-                      <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {previewData.provider === 'youtube'
-                            ? 'Sourced from YouTube auto-captions'
-                            : 'Extracted from article content'}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {filteredTranscriptLines().length} / {previewData.transcriptLines!.length} lines
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* No-transcript badge for scraped articles */}
-              {previewData && !hasTranscript && previewData.provider !== 'youtube' && (
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded">
-                  <ScrollText size={11} />
-                  <span>No transcript available for this resource.</span>
-                </div>
-              )}
-
-              {/* No-transcript for YouTube without captions */}
-              {previewData && !hasTranscript && previewData.provider === 'youtube' && (
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded">
-                  <ScrollText size={11} />
-                  <span>Auto-captions not available for this video — transcript could not be extracted.</span>
-                </div>
-              )}
-
-              {/* Optional Caption Field */}
+              {/* Caption Input */}
               <div>
-                <label className="block text-[11px] font-mono text-ink-secondary mb-1">
-                  Optional Editorial Caption
+                <label className="text-[11px] font-mono text-ink-secondary block mb-1">
+                  Editorial Caption (Optional)
                 </label>
                 <input
                   type="text"
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="e.g. Figure 1: Demonstration of distributed mesh replication..."
-                  className="w-full px-3 py-1.5 text-xs border border-border-subtle focus:outline-none focus:border-ink-primary font-sans"
+                  placeholder="e.g. Video courtesy of Imagine Dragons (Official)"
+                  className="w-full px-2.5 py-1.5 text-xs font-sans border border-slate-200 rounded-xs focus:outline-none focus:border-accent-crimson bg-slate-50/50"
                 />
               </div>
+
+              {/* ─── CLEAN TRANSCRIPT VIEWER & ATTACH TOGGLE ─── */}
+              {hasTranscript && (
+                <div className="border border-slate-200 rounded-sm overflow-hidden bg-white">
+                  {/* Transcript Header Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setTranscriptOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <ScrollText size={14} className="text-accent-crimson shrink-0" />
+                      <span className="text-xs font-mono font-bold text-ink-primary">
+                        {providerLabel} Transcript &amp; Lyrics ({previewData?.transcriptLines?.length || 0} lines)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {transcriptOpen ? 'Collapse' : 'Preview'}
+                      </span>
+                      {transcriptOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </div>
+                  </button>
+
+                  {transcriptOpen && (
+                    <div className="p-3.5 space-y-3 border-t border-slate-200 bg-[#FCFBF9]">
+                      {/* Search & Copy Bar */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={transcriptSearch}
+                          onChange={(e) => setTranscriptSearch(e.target.value)}
+                          placeholder="Search speech / lyric phrases…"
+                          className="flex-1 px-2.5 py-1 text-xs font-mono border border-slate-200 rounded-xs bg-white focus:outline-none focus:border-accent-crimson"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCopyTranscript}
+                          className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1 transition-colors shrink-0"
+                          title="Copy Clean Transcript"
+                        >
+                          {copied ? (
+                            <>
+                              <CheckCheck size={12} className="text-emerald-600" />
+                              <span className="text-emerald-700">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              <span>Copy Text</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Clean Transcript Lines Display (No bracketed timestamps) */}
+                      <div
+                        ref={transcriptRef}
+                        className="max-h-48 overflow-y-auto space-y-1.5 p-2 bg-white border border-slate-200 rounded-xs text-xs font-sans text-ink-primary leading-relaxed"
+                      >
+                        {filteredTranscriptLines().length > 0 ? (
+                          filteredTranscriptLines().map((line, idx) => (
+                            <div key={idx} className="hover:bg-slate-50 px-1.5 py-0.5 rounded-xs transition-colors">
+                              <span>{line.text}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs font-mono text-slate-400 py-3 text-center">
+                            No transcript lines match "{transcriptSearch}"
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Attach Transcript Toggle */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                        <label className="text-xs font-sans text-ink-primary cursor-pointer flex items-center gap-2 select-none">
+                          <input
+                            type="checkbox"
+                            checked={includeTranscriptInEmbed}
+                            onChange={(e) => setIncludeTranscriptInEmbed(e.target.checked)}
+                            className="rounded-xs text-accent-crimson focus:ring-accent-crimson w-3.5 h-3.5"
+                          />
+                          <span>Attach transcript section under video in manuscript</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-slate-400">Clean text format</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Footer Actions — always visible */}
-        <div className="border-t border-border-subtle px-6 py-4 flex items-center justify-end gap-2 bg-white">
+        {/* Footer */}
+        <div className="px-6 py-3.5 border-t border-slate-100 bg-[#FCFBF9] flex items-center justify-between">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-mono border border-border-subtle hover:bg-slate-50 text-ink-secondary rounded-sm transition-colors"
+            className="px-3.5 py-1.5 border border-slate-200 hover:border-slate-400 text-xs font-mono text-ink-secondary hover:text-ink-primary rounded-xs transition-colors bg-white"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleConfirmInsert}
-            disabled={!url.trim()}
-            className="px-5 py-2 bg-ink-primary hover:bg-slate-800 text-white text-xs font-mono font-medium rounded-sm disabled:opacity-50 transition-colors flex items-center gap-1.5"
+            disabled={!url.trim() || isLoading}
+            className="px-4 py-1.5 bg-accent-crimson hover:bg-rose-900 text-white text-xs font-mono font-medium rounded-xs transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
           >
             <Check size={13} />
             <span>Insert into Manuscript</span>
@@ -528,24 +466,3 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
     </div>
   );
 };
-
-/**
- * Highlights occurrences of `query` inside `text` with a yellow span.
- */
-function highlightText(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'gi'));
-  return parts.map((part, i) =>
-    part.toLowerCase() === query.toLowerCase() ? (
-      <mark key={i} className="bg-yellow-200 text-ink-primary rounded-sm px-0.5">
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
-  );
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}

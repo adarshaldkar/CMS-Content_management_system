@@ -23,6 +23,7 @@ import {
 import NumberFlow from '@number-flow/react';
 import { jobsApi, type QueueSummary, type JobDetail } from '../../api/jobs.api';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { QueueThroughputGraph } from '../../components/analytics/QueueThroughputGraph';
 
 const QUEUE_DISPLAY_NAMES: Record<string, { label: string; desc: string }> = {
   'scheduled-publishing': {
@@ -374,6 +375,12 @@ export const JobsManagerPage: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Real-Time Queue Throughput Telemetry Stream (UI Phase 3) */}
+      <QueueThroughputGraph
+        queueName={QUEUE_DISPLAY_NAMES[selectedQueue]?.label || selectedQueue}
+        isStreamLive={true}
+      />
 
       {/* ── Current Selected Queue Bar & Actions ──────────────────── */}
       {currentQueueSummary && (
