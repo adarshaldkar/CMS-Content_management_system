@@ -192,6 +192,7 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
   return (
     <div
       ref={ribbonRef}
+      id="tour-editor-ribbon"
       className="sticky top-0 z-30 w-full border-b border-border-subtle bg-white/95 backdrop-blur-md font-sans select-none"
     >
       {/* ─── Top Category Tabs ─────────────────────────────────────────── */}
@@ -452,6 +453,7 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
 
           <button
             type="button"
+            id="tour-editor-media"
             title="Insert Image"
             onClick={() => executionContext.openModal('mediaPicker')}
             className="p-1.5 rounded text-ink-secondary hover:text-accent-crimson hover:bg-rose-50 transition-colors cursor-pointer"
@@ -470,6 +472,7 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
 
           <button
             type="button"
+            id="tour-editor-doc-import"
             title="Import Document (.docx, .pdf)"
             onClick={() => executionContext.openModal('docImport')}
             className="p-1.5 rounded text-ink-secondary hover:text-accent-crimson hover:bg-rose-50 transition-colors cursor-pointer"

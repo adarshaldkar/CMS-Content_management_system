@@ -581,7 +581,7 @@ export const ArticleEditorPage: React.FC = () => {
         </div>
 
         {/* Center: Dynamic 3-Mode Workspace Switcher */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-md border border-border-subtle text-xs font-mono">
+        <div id="tour-editor-mode-switcher" className="flex items-center bg-slate-100 p-0.5 rounded-md border border-border-subtle text-xs font-mono">
           <button
             type="button"
             onClick={() => setWorkspaceMode('write')}
@@ -633,7 +633,7 @@ export const ArticleEditorPage: React.FC = () => {
           <button
             type="button"
             onClick={() => tourService.startEditorTour(true)}
-            className="px-2.5 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white shadow-2xs"
+            className="px-2.5 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white shadow-2xs cursor-pointer"
             title="Take Author Studio Tour"
           >
             <Compass className="w-3.5 h-3.5 text-accent-crimson" />
@@ -651,38 +651,41 @@ export const ArticleEditorPage: React.FC = () => {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleConfirmSaveAndLeave}
-            disabled={saving}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs transition-colors bg-white shadow-2xs cursor-pointer"
-            title="Save changes and return to stories overview"
-          >
-            <Save className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Save &amp; Exit</span>
-          </button>
+          <div id="tour-editor-save-exit" className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleConfirmSaveAndLeave}
+              disabled={saving}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs transition-colors bg-white shadow-2xs cursor-pointer"
+              title="Save changes and return to stories overview"
+            >
+              <Save className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Save &amp; Exit</span>
+            </button>
+
+            <button
+              onClick={handleSaveDraft}
+              disabled={saving}
+              className="px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold rounded-xs tracking-wide flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+            >
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {saving
+                  ? 'Saving…'
+                  : article.status === 'published'
+                  ? 'Save Changes'
+                  : 'Save Draft'}
+              </span>
+            </button>
+          </div>
 
           <button
-            onClick={handleSaveDraft}
-            disabled={saving}
-            className="px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold rounded-xs tracking-wide flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-          >
-            {saving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Save className="w-3.5 h-3.5" />
-            )}
-            <span>
-              {saving
-                ? 'Saving…'
-                : article.status === 'published'
-                ? 'Save Changes'
-                : 'Save Draft'}
-            </span>
-          </button>
-
-          <button
             type="button"
+            id="tour-editor-publish"
             onClick={() => setPrePublishModalOpen(true)}
             className="flex items-center gap-1 px-3.5 py-1.5 bg-accent-crimson hover:bg-accent-crimson/90 text-white text-xs font-semibold rounded-xs transition-colors shadow-2xs cursor-pointer"
           >
@@ -935,35 +938,39 @@ export const ArticleEditorPage: React.FC = () => {
             </div>
 
             {/* Workflow Action Bar */}
-            <WorkflowActionBar
-              status={article.status || 'draft'}
-              version={article.version || 1}
-              wordCount={article.wordCount || 0}
-              readingTimeMinutes={article.readingTimeMinutes || 1}
-              loading={saving}
-              onTransition={handleWorkflowTransition}
-            />
+            <div id="tour-editor-workflow">
+              <WorkflowActionBar
+                status={article.status || 'draft'}
+                version={article.version || 1}
+                wordCount={article.wordCount || 0}
+                readingTimeMinutes={article.readingTimeMinutes || 1}
+                loading={saving}
+                onTransition={handleWorkflowTransition}
+              />
+            </div>
 
             {/* Rich Manuscript Writing Canvas */}
-            <RichTextEditor
-              value={article.content || ''}
-              onChange={handleContentChange}
-              onTitleDetected={(detectedTitle) => {
-                if (!article.title || article.title === 'Untitled Manuscript') {
-                  handleTitleChange(detectedTitle);
-                }
-              }}
-              isInspectorOpen={inspectorOpen}
-              onToggleInspector={() => setInspectorOpen((prev) => !prev)}
-              onSetWorkspaceMode={(mode) => setWorkspaceMode(mode)}
-              onOpenRevisionHistory={() => setRevisionModalOpen(true)}
-              onOpenDiffViewer={() => setDiffViewerOpen(true)}
-            />
+            <div id="tour-editor-canvas">
+              <RichTextEditor
+                value={article.content || ''}
+                onChange={handleContentChange}
+                onTitleDetected={(detectedTitle) => {
+                  if (!article.title || article.title === 'Untitled Manuscript') {
+                    handleTitleChange(detectedTitle);
+                  }
+                }}
+                isInspectorOpen={inspectorOpen}
+                onToggleInspector={() => setInspectorOpen((prev) => !prev)}
+                onSetWorkspaceMode={(mode) => setWorkspaceMode(mode)}
+                onOpenRevisionHistory={() => setRevisionModalOpen(true)}
+                onOpenDiffViewer={() => setDiffViewerOpen(true)}
+              />
+            </div>
           </div>
 
           {/* ─── CONTEXTUAL ACCORDION INSPECTOR (4 cols) ───────────────────── */}
           {inspectorOpen && (
-            <aside className="lg:col-span-4 space-y-4 animate-in fade-in slide-in-from-right-2 duration-150 font-sans select-none">
+            <aside id="tour-editor-inspector" className="lg:col-span-4 space-y-4 animate-in fade-in slide-in-from-right-2 duration-150 font-sans select-none">
               {/* 1. Story Publishing & Taxonomy */}
               <div className="bg-white border border-border-subtle rounded-md shadow-xs overflow-hidden">
                 <button
