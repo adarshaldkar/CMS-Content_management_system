@@ -353,26 +353,18 @@ export class DocumentImportService {
 
       if (!rawText.trim()) return '';
 
-      // 1. Strip repetitive page numbers and header/footer noise
+      // 1. Clean noise & separate inline bullet characters
       let sanitizedText = rawText
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
-        // Strip lines like "Page 1 of 5", "Page 2", "- 1 -", "1 of 4"
-        .replace(/^\s*(?:page\s+\d+(?:\s+of\s+\d+)?|-\s*\d+\s*-|\d+\s+of\s+\d+)\s*$/gim, '')
+        // Strip lines like "Page 1 of 5", "Page 2", "- 1 -", "1 of 4", "-- 1 of 3 --"
+        .replace(/^\s*(?:page\s+\d+(?:\s+of\s+\d+)?|-+\s*\d+\s*(?:of\s*\d+)?\s*-+|\d+\s+of\s+\d+)\s*$/gim, '')
         // If bullet character is inline, break it into a separate line
         .replace(/([^\n])\s*([•\u2022\u2023\u25E6\u25AA\u25CF\u2219])\s*/g, '$1\n$2 ');
 
       const rawLines = sanitizedText.split('\n');
-      const cleanLines: string[] = [];
-
-      for (const line of rawLines) {
-        const trimmed = line.trim();
-        if (!trimmed) {
-          cleanLines.push('');
-        } else {
-          cleanLines.push(trimmed);
-        }
-      }
+      // Reconstruct wrapped PDF lines into complete semantic sentences
+      const cleanLines = this.reconstructPdfLines(rawLines);
 
       const htmlBlocks: string[] = [];
       let currentParagraph: string[] = [];
@@ -495,7 +487,6 @@ export class DocumentImportService {
 
         // 3. Pipe-delimited Table Row (| Col 1 | Col 2 |)
         if (line.startsWith('|') && line.endsWith('|') && line.includes('|')) {
-          // Ignore markdown separator row (|---|---|)
           if (/^\|(?:\s*[-:]+[-| :]*)\|$/.test(line)) {
             continue;
           }
@@ -520,7 +511,7 @@ export class DocumentImportService {
           continue;
         }
 
-        // 5. Bullet list item detection
+        // 5. Bullet list item detection (•, -, *, etc.)
         const isBullet =
           /^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219*·-–—]\s+/.test(line) ||
           /^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219]/.test(line);
@@ -538,18 +529,33 @@ export class DocumentImportService {
           continue;
         }
 
-        // 6. Numbered Step / Major Section Heading (e.g. "1. Explore the 1Fi App", "2. Add 1Fi Marketplace")
-        const stepMatch = line.match(/^(\d+[\.\)])\s+(.*)$/);
-        if (stepMatch && line.length < 90 && !line.endsWith('.') && !line.endsWith(',')) {
+        // 6. Numbered List or Numbered Step (e.g. "1. Explore the 1Fi App", "1. Product understanding – ...", "4. Functionality – ...")
+        const numberedMatch = line.match(/^(\d+[\.\)])\s+(.*)$/);
+        if (numberedMatch) {
+          const itemNumber = numberedMatch[1];
+          const itemContent = numberedMatch[2].trim();
+
+          // If it's a short step header without sentence punctuation (e.g. "1. Explore the 1Fi App")
+          if (line.length < 50 && !/[.,;:!?]$/.test(line) && !itemContent.includes('–') && !itemContent.includes('-')) {
+            flushParagraph();
+            flushList();
+            htmlBlocks.push(`<h3><strong>${this.formatInlineContent(line)}</strong></h3>`);
+            continue;
+          }
+
+          // Otherwise it is a structured numbered item or criteria (e.g. "1. Product understanding – ...", "4. Functionality – ...")
           flushParagraph();
-          flushList();
-          htmlBlocks.push(`<h3><strong>${this.formatInlineContent(line)}</strong></h3>`);
+          if (currentListType !== 'ol') {
+            flushList();
+            currentListType = 'ol';
+          }
+          currentListItems.push(itemContent);
           continue;
         }
 
         // 7. Alpha Sub-item (e.g. "A. Top Brands", "B. Nearby Stores", "C. 1Fi Marketplace")
         const alphaMatch = line.match(/^([A-Z][\.\)])\s+(.*)$/);
-        if (alphaMatch && line.length < 70 && !line.endsWith(',')) {
+        if (alphaMatch && line.length < 70) {
           flushParagraph();
           flushList();
           htmlBlocks.push(`<p><strong>${this.formatInlineContent(line)}</strong></p>`);
@@ -566,9 +572,9 @@ export class DocumentImportService {
           continue;
         }
 
-        // 9. Section Heading Heuristics (Document Title, "Objective", "Assignment", "Requirements", etc.)
+        // 9. Section Heading Heuristics (e.g. "1Fi SDE Intern Assignment", "Objective", "Assignment", "Technical Requirements", "Evaluation Criteria")
         const isCommonHeadingWord =
-          /^(Objective|Assignment|Overview|Requirements|Deliverables|Summary|Background|Instructions|Guidelines|Evaluation Criteria|Scope|Milestones|Introduction|Conclusion|Key Findings|Features|Tech Stack|Submission)s?:?$/i.test(
+          /^(Objective|Assignment|Overview|Requirements|Deliverables|Summary|Background|Instructions|Guidelines|Evaluation Criteria|Code Quality|Technical Requirements|Frontend|Data & APIs|Scope|Milestones|Introduction|Conclusion|Key Findings|Features|Tech Stack|Submission)s?:?$/i.test(
             line,
           );
         const isShortTitle = line.length > 2 && line.length < 65 && !/[.,;:!?]$/.test(line);
@@ -585,18 +591,17 @@ export class DocumentImportService {
           continue;
         }
 
-        // 10. Numbered List item (e.g. "1. Item description that ends with a period.")
-        if (stepMatch && (line.endsWith('.') || line.length >= 90)) {
+        // 10. Note or Special Highlight (e.g. "Note: You are not expected...")
+        if (/^Note\s*:/i.test(line)) {
           flushParagraph();
-          if (currentListType !== 'ol') {
-            flushList();
-            currentListType = 'ol';
-          }
-          currentListItems.push(stepMatch[2].trim());
+          flushList();
+          htmlBlocks.push(
+            `<p class="my-4 p-3 bg-slate-50 border-l-3 border-accent-crimson text-sm font-sans text-ink-primary italic">${this.formatInlineContent(line)}</p>`,
+          );
           continue;
         }
 
-        // 11. Standard body text
+        // 11. Standard body paragraph
         flushList();
         currentParagraph.push(line);
       }
@@ -610,6 +615,60 @@ export class DocumentImportService {
     } catch (err: any) {
       throw new BadRequestException(`Failed to parse PDF document: ${err.message}`);
     }
+  }
+
+  private reconstructPdfLines(rawLines: string[]): string[] {
+    const output: string[] = [];
+    let currentLine = '';
+
+    const isExplicitBreak = (line: string) =>
+      !line ||
+      line.includes('<<<CMS_PAGE_BREAK>>>') ||
+      line.startsWith('```') ||
+      line.startsWith('|') ||
+      /^[-–—_*]{3,}$/.test(line);
+
+    const isItemStarter = (line: string) =>
+      /^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219*·-–—]\s+/.test(line) ||
+      /^[•\u2022\u2023\u25E6\u25AA\u25CF\u2219]/.test(line) ||
+      /^(\d+[\.\)])\s+/.test(line) ||
+      /^([A-Z][\.\)])\s+/.test(line) ||
+      /^(Objective|Assignment|Overview|Requirements|Deliverables|Summary|Background|Instructions|Guidelines|Evaluation Criteria|Code Quality|Technical Requirements|Frontend|Data & APIs|Scope|Milestones|Introduction|Conclusion|Key Findings|Features|Tech Stack|Submission)s?:?$/i.test(line) ||
+      /^Note\s*:/i.test(line);
+
+    for (const raw of rawLines) {
+      const trimmed = raw.trim();
+
+      if (isExplicitBreak(trimmed)) {
+        if (currentLine) {
+          output.push(currentLine);
+          currentLine = '';
+        }
+        output.push(trimmed);
+        continue;
+      }
+
+      if (isItemStarter(trimmed)) {
+        if (currentLine) {
+          output.push(currentLine);
+        }
+        currentLine = trimmed;
+      } else {
+        if (!currentLine) {
+          currentLine = trimmed;
+        } else {
+          // If previous line didn't end with sentence terminator, merge with a space
+          // e.g. "1. Product understanding – How well you understand and extend the existing 1Fi" + "experience." -> single complete line!
+          currentLine += ' ' + trimmed;
+        }
+      }
+    }
+
+    if (currentLine) {
+      output.push(currentLine);
+    }
+
+    return output;
   }
 
   private calculateWordCount(html: string): number {
