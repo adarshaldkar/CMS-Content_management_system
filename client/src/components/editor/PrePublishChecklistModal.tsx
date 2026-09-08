@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
   Sparkles,
-  ArrowRight,
   X,
   Send,
+  Info,
+  Clock,
+  FileText,
+  ShieldCheck,
 } from 'lucide-react';
+import { EditorialValidationEngine } from '../../services/editorial-validation.service';
 
 export interface PrePublishAuditData {
   title: string;
@@ -28,13 +32,6 @@ interface PrePublishChecklistModalProps {
   isPublishing?: boolean;
 }
 
-interface CheckItem {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pass' | 'warn' | 'fail';
-}
-
 export const PrePublishChecklistModal: React.FC<PrePublishChecklistModalProps> = ({
   isOpen,
   onClose,
@@ -42,175 +39,166 @@ export const PrePublishChecklistModal: React.FC<PrePublishChecklistModalProps> =
   data,
   isPublishing = false,
 }) => {
+  const auditReport = useMemo(() => {
+    return EditorialValidationEngine.audit({
+      title: data.title,
+      description: data.excerpt,
+      content: data.content,
+      slug: data.slug,
+      categoryId: data.categoryIds[0] || '',
+      coverImage: data.featuredImageUrl,
+    });
+  }, [data]);
+
   if (!isOpen) return null;
-
-  // Dynamic checks evaluation
-  const checks: CheckItem[] = [
-    {
-      id: 'title',
-      title: 'Article Headline',
-      description:
-        data.title.trim().length > 10
-          ? `Strong headline (${data.title.trim().length} chars)`
-          : data.title.trim().length > 0
-          ? 'Headline is somewhat short'
-          : 'Headline is missing',
-      status: data.title.trim().length > 10 ? 'pass' : data.title.trim().length > 0 ? 'warn' : 'fail',
-    },
-    {
-      id: 'cover',
-      title: 'Featured Cover Visual',
-      description: data.featuredImageUrl ? 'Lead visual asset attached' : 'No lead image assigned (recommended for social cards)',
-      status: data.featuredImageUrl ? 'pass' : 'warn',
-    },
-    {
-      id: 'content',
-      title: 'Manuscript Length',
-      description:
-        data.wordCount >= 100
-          ? `Comprehensive story length (${data.wordCount} words)`
-          : data.wordCount > 20
-          ? `Short piece (${data.wordCount} words)`
-          : 'Manuscript has very little or no content',
-      status: data.wordCount >= 100 ? 'pass' : data.wordCount > 20 ? 'warn' : 'fail',
-    },
-    {
-      id: 'excerpt',
-      title: 'SEO Excerpt & Social Deck',
-      description:
-        data.excerpt && data.excerpt.length >= 50
-          ? `SEO summary configured (${data.excerpt.length} chars)`
-          : data.excerpt
-          ? 'SEO summary is brief (<50 chars)'
-          : 'No custom excerpt provided (will fallback to auto-slice)',
-      status: data.excerpt && data.excerpt.length >= 50 ? 'pass' : 'warn',
-    },
-    {
-      id: 'taxonomy',
-      title: 'Category & Story Taxonomy',
-      description:
-        data.categoryIds.length > 0
-          ? `Assigned to ${data.categoryIds.length} editorial category`
-          : 'No category assigned (will default to General)',
-      status: data.categoryIds.length > 0 ? 'pass' : 'warn',
-    },
-    {
-      id: 'tags',
-      title: 'Topic Tags & Indexing',
-      description:
-        data.tags.length > 0
-          ? `${data.tags.length} topic tags attached`
-          : 'No tags attached (recommended for related story discovery)',
-      status: data.tags.length > 0 ? 'pass' : 'warn',
-    },
-  ];
-
-  const passCount = checks.filter((c) => c.status === 'pass').length;
-  const failCount = checks.filter((c) => c.status === 'fail').length;
-  const canPublish = failCount === 0;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150 font-sans"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 font-sans"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg border border-border-subtle bg-white shadow-2xl overflow-hidden"
+        className="w-full max-w-xl rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4 bg-slate-50">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-rose-100 text-accent-crimson">
-              <Sparkles className="h-4 w-4" />
+        {/* Header with Quality Score */}
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4 bg-slate-50 dark:bg-slate-900/50">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+              auditReport.isPublishable ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400'
+            }`}>
+              <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-serif text-base font-bold text-ink-primary">Pre-Publish Quality Gate</h3>
-              <p className="text-xs text-ink-secondary">
-                {passCount} of {checks.length} quality standards passed
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif text-base font-bold text-slate-900 dark:text-white">
+                  Pre-Publish Editorial Gate
+                </h3>
+                <span className="text-xs px-2 py-0.5 rounded-full font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  {auditReport.score}% Quality Score
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {auditReport.isPublishable
+                  ? 'All mandatory journalistic requirements passed'
+                  : `${auditReport.blockingCount} blocking item(s) require resolution before publishing`}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1.5 text-ink-secondary hover:bg-slate-200 hover:text-ink-primary transition-colors cursor-pointer"
+            className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Dynamic Checklist */}
-        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-          {checks.map((check) => (
+        {/* Telemetry Strip */}
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-2.5 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-600 dark:text-slate-400 font-mono">
+          <div className="flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5 text-slate-400" />
+            <span>{auditReport.metrics.wordCount} words</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 text-slate-400" />
+            <span>~{auditReport.metrics.readingTimeMinutes} min read</span>
+          </div>
+          <div>
+            <span>{auditReport.metrics.headingsCount} headings</span>
+          </div>
+          <div>
+            <span>{auditReport.metrics.imagesCount} images</span>
+          </div>
+        </div>
+
+        {/* Validation Items List */}
+        <div className="p-6 space-y-3 overflow-y-auto flex-1">
+          {auditReport.items.map((item) => (
             <div
-              key={check.id}
-              className={`flex items-start gap-3 p-3 rounded-md border transition-colors ${
-                check.status === 'pass'
-                  ? 'bg-emerald-50/40 border-emerald-200'
-                  : check.status === 'warn'
-                  ? 'bg-amber-50/40 border-amber-200'
-                  : 'bg-rose-50/40 border-rose-200'
+              key={item.id}
+              className={`flex items-start gap-3 p-3.5 rounded-lg border transition-all ${
+                item.passed
+                  ? 'bg-emerald-50/30 border-emerald-200/80 dark:bg-emerald-950/20 dark:border-emerald-900/40'
+                  : item.severity === 'BLOCKING'
+                  ? 'bg-rose-50/50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-900/50'
+                  : item.severity === 'WARNING'
+                  ? 'bg-amber-50/40 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/40'
+                  : 'bg-slate-50/50 border-slate-200 dark:bg-slate-800/40 dark:border-slate-700'
               }`}
             >
               <div className="mt-0.5 shrink-0">
-                {check.status === 'pass' ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                ) : check.status === 'warn' ? (
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                {item.passed ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                ) : item.severity === 'BLOCKING' ? (
+                  <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                ) : item.severity === 'WARNING' ? (
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 ) : (
-                  <XCircle className="h-4 w-4 text-rose-600" />
+                  <Info className="h-4 w-4 text-slate-400" />
                 )}
               </div>
+
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-ink-primary">{check.title}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    {item.title}
+                  </span>
                   <span
-                    className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-medium ${
-                      check.status === 'pass'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : check.status === 'warn'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-rose-100 text-rose-800'
+                    className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded font-semibold ${
+                      item.passed
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        : item.severity === 'BLOCKING'
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                        : item.severity === 'WARNING'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                        : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                     }`}
                   >
-                    {check.status}
+                    {item.passed ? 'PASSED' : item.severity}
                   </span>
                 </div>
-                <p className="text-[11px] text-ink-secondary mt-0.5">{check.description}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  {item.description}
+                </p>
+                {!item.passed && item.remediation && (
+                  <p className="text-[11px] text-rose-700 dark:text-rose-400 font-medium mt-1">
+                    → {item.remediation}
+                  </p>
+                )}
               </div>
             </div>
           ))}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-border-subtle px-5 py-3.5 bg-slate-50">
+        <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 px-6 py-4 bg-slate-50 dark:bg-slate-900/50">
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-1.5 text-xs font-medium text-ink-secondary hover:text-ink-primary cursor-pointer"
+            className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer"
           >
             Back to Manuscript
           </button>
 
           <button
             type="button"
-            disabled={!canPublish || isPublishing}
+            disabled={!auditReport.isPublishable || isPublishing}
             onClick={() => {
               onConfirmPublish();
               onClose();
             }}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded shadow-xs transition-colors cursor-pointer ${
-              canPublish
-                ? 'bg-accent-crimson text-white hover:bg-accent-crimson/90'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+            className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold rounded-md shadow-sm transition-all cursor-pointer ${
+              auditReport.isPublishable
+                ? 'bg-rose-800 text-white hover:bg-rose-900 dark:bg-rose-700 dark:hover:bg-rose-800'
+                : 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed'
             }`}
           >
             {isPublishing ? (
-              <span>Publishing...</span>
+              <span>Publishing…</span>
             ) : (
               <>
                 <Send className="h-3.5 w-3.5" />
-                <span>Confirm & Publish Dispatch</span>
+                <span>Confirm &amp; Publish Dispatch</span>
               </>
             )}
           </button>

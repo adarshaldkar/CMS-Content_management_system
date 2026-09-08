@@ -540,4 +540,183 @@ mark,
   border-color: rgba(244, 63, 94, 0.3) !important;
 }
 
+/* ─── Gazette Semantic Editorial Nodes ───────────────────────────────── */
+/* 1. Pull Quote with Attribution */
+.cms-pull-quote,
+.prose .cms-pull-quote {
+  margin: 2.5rem 0 !important;
+  padding: 1.25rem 2rem !important;
+  border-left: 4px solid #8b0000 !important;
+  background: linear-gradient(to right, rgba(139, 0, 0, 0.04), transparent) !important;
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-style: italic !important;
+  font-size: 1.35rem !important;
+  line-height: 1.6 !important;
+  color: #0f172a !important;
+}
+
+.cms-pull-quote cite,
+.prose .cms-pull-quote cite {
+  display: block !important;
+  margin-top: 0.75rem !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-style: normal !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+}
+
+/* 2. Themed Callout Aside */
+.cms-callout,
+.prose .cms-callout {
+  margin: 2rem 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-left: 4px solid #3b82f6 !important;
+  background-color: #f8fafc !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+.cms-callout[data-theme='editorial'] {
+  border-left-color: #8b0000 !important;
+  background: #fffdfd !important;
+  border-color: #fecdd3 !important;
+}
+
+.cms-callout[data-theme='tip'] {
+  border-left-color: #10b981 !important;
+  background: #f0fdf4 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.cms-callout[data-theme='warning'] {
+  border-left-color: #f59e0b !important;
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+}
+
+.cms-callout-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  margin-bottom: 0.5rem !important;
+  color: #0f172a !important;
+}
+
+.cms-callout-content {
+  font-size: 0.875rem !important;
+  line-height: 1.6 !important;
+  color: #334155 !important;
+}
+
+/* 3. Official Journalistic Correction Notice */
+.cms-editorial-correction,
+.prose .cms-editorial-correction {
+  margin: 2rem 0 !important;
+  padding: 1rem 1.25rem !important;
+  border-left: 3px solid #0f172a !important;
+  background-color: #f1f5f9 !important;
+  border-radius: 4px !important;
+  font-size: 0.85rem !important;
+  color: #1e293b !important;
+}
+
+.cms-correction-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  margin-bottom: 0.4rem !important;
+}
+
+.cms-correction-badge .badge-text {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.7rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  background: #0f172a !important;
+  color: #ffffff !important;
+  padding: 0.15rem 0.4rem !important;
+  border-radius: 2px !important;
+}
+
+.cms-correction-badge time {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+}
+
+/* 4. Sources & References Footnotes */
+.cms-source-note,
+.prose .cms-source-note {
+  margin-top: 3rem !important;
+  padding-top: 1.5rem !important;
+  border-top: 1px solid #e2e8f0 !important;
+  font-size: 0.8rem !important;
+  color: #64748b !important;
+}
+
+.cms-source-note-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  font-family: 'Newsreader', serif !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #0f172a !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.cms-source-note ol {
+  padding-left: 1.25rem !important;
+  margin: 0 !important;
+}
+
+.cms-source-note li {
+  margin-bottom: 0.35rem !important;
+}
+
+/* 5. Editorial Asterism Divider */
+.cms-editorial-divider {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 2.5rem 0 !important;
+  color: #8b0000 !important;
+  font-size: 1.4rem !important;
+  letter-spacing: 0.4em !important;
+  user-select: none !important;
+}
+
+/* 6. Magazine-Grade Drop Cap */
+p.cms-drop-cap::first-letter,
+.prose p.cms-drop-cap::first-letter {
+  float: left !important;
+  font-family: 'Newsreader', Georgia, serif !important;
+  font-size: 3.75rem !important;
+  line-height: 0.85 !important;
+  font-weight: 700 !important;
+  margin-right: 0.65rem !important;
+  margin-top: 0.2rem !important;
+  color: #8b0000 !important;
+}
+
+/* 7. Inline Code & Page Breaks */
+.cms-inline-code {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.85em !important;
+}
+
+.cms-page-break {
+  border: 0 !important;
+  border-top: 1px dashed #cbd5e1 !important;
+  margin: 2rem 0 !important;
+}
+
+
 

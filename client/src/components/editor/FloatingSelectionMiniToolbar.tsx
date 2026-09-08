@@ -3,19 +3,19 @@ import {
   Bold,
   Italic,
   Underline,
-  Strikethrough,
   Highlighter,
   Link as LinkIcon,
   Quote,
-  Heading1,
   Heading2,
   Heading3,
-  List,
-  ListOrdered,
+  HelpCircle,
+  FileCheck2,
   RemoveFormatting,
+  Sparkles,
 } from 'lucide-react';
 import type { CommandExecutionContext } from './commandRegistry';
 import { toggleSemanticHighlight } from './commandRegistry';
+import { editorialNodes } from './editorialNodes';
 
 interface FloatingSelectionMiniToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
@@ -33,6 +33,7 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
 }) => {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<ToolbarPosition>({ top: 0, left: 0 });
+  const [selectedText, setSelectedText] = useState('');
   const [activeFormats, setActiveFormats] = useState({
     bold: false,
     italic: false,
@@ -68,8 +69,9 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
       // Position above selected text
       const toolbarHeight = 44;
       const top = Math.max(10, rect.top - toolbarHeight - 8);
-      const left = Math.max(10, Math.min(window.innerWidth - 320, rect.left + rect.width / 2 - 140));
+      const left = Math.max(10, Math.min(window.innerWidth - 440, rect.left + rect.width / 2 - 200));
 
+      setSelectedText(text);
       setPosition({ top, left });
       setVisible(true);
 
@@ -99,6 +101,27 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [editorRef]);
 
+  const handleMakePullQuote = () => {
+    if (!selectedText) return;
+    const pullQuoteHtml = editorialNodes.createPullQuote(selectedText);
+    executionContext.executeCommand('insertHTML', pullQuoteHtml);
+    setVisible(false);
+  };
+
+  const handleConvertToCallout = () => {
+    if (!selectedText) return;
+    const calloutHtml = editorialNodes.createCallout('Editorial Brief', selectedText, 'editorial');
+    executionContext.executeCommand('insertHTML', calloutHtml);
+    setVisible(false);
+  };
+
+  const handleConvertToCorrection = () => {
+    if (!selectedText) return;
+    const correctionHtml = editorialNodes.createCorrection(selectedText);
+    executionContext.executeCommand('insertHTML', correctionHtml);
+    setVisible(false);
+  };
+
   if (!visible) return null;
 
   return (
@@ -108,23 +131,23 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
       onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
       className="fixed z-50 flex items-center gap-0.5 p-1 bg-slate-900/95 text-white backdrop-blur-md border border-slate-700 rounded-md shadow-2xl animate-in fade-in zoom-in-95 duration-100 select-none font-sans"
     >
-      {/* Quick Style Selector */}
+      {/* Quick Heading Selector */}
       <button
         type="button"
-        title="Heading 1 (H1)"
+        title="Heading 2 (H2)"
         onClick={() => executionContext.executeCommand('formatBlock', '<h2>')}
         className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
       >
-        <Heading1 size={14} />
+        <Heading2 size={13} />
       </button>
 
       <button
         type="button"
-        title="Heading 2 (H2)"
+        title="Heading 3 (H3)"
         onClick={() => executionContext.executeCommand('formatBlock', '<h3>')}
         className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
       >
-        <Heading2 size={14} />
+        <Heading3 size={13} />
       </button>
 
       <div className="w-px h-4 bg-slate-700 mx-0.5" />
@@ -135,10 +158,10 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         title="Bold (Ctrl+B)"
         onClick={() => executionContext.executeCommand('bold')}
         className={`p-1.5 rounded-xs transition-colors cursor-pointer ${
-          activeFormats.bold ? 'bg-accent-crimson text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+          activeFormats.bold ? 'bg-rose-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
         }`}
       >
-        <Bold size={14} />
+        <Bold size={13} />
       </button>
 
       <button
@@ -146,10 +169,10 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         title="Italic (Ctrl+I)"
         onClick={() => executionContext.executeCommand('italic')}
         className={`p-1.5 rounded-xs transition-colors cursor-pointer ${
-          activeFormats.italic ? 'bg-accent-crimson text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+          activeFormats.italic ? 'bg-rose-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
         }`}
       >
-        <Italic size={14} />
+        <Italic size={13} />
       </button>
 
       <button
@@ -157,15 +180,15 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         title="Underline (Ctrl+U)"
         onClick={() => executionContext.executeCommand('underline')}
         className={`p-1.5 rounded-xs transition-colors cursor-pointer ${
-          activeFormats.underline ? 'bg-accent-crimson text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+          activeFormats.underline ? 'bg-rose-800 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
         }`}
       >
-        <Underline size={14} />
+        <Underline size={13} />
       </button>
 
       <button
         type="button"
-        title="Semantic Highlight (Toggle)"
+        title="Semantic Highlight (Ctrl+Shift+H)"
         onClick={() => {
           toggleSemanticHighlight(executionContext);
           setActiveFormats((prev) => ({ ...prev, highlight: !prev.highlight }));
@@ -173,31 +196,43 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         className={`p-1.5 rounded-xs transition-colors cursor-pointer ${
           activeFormats.highlight
             ? 'bg-rose-900 text-rose-200 ring-1 ring-rose-400/50'
-            : 'text-slate-300 hover:text-accent-crimson hover:bg-slate-800'
+            : 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
         }`}
       >
-        <Highlighter size={14} />
+        <Highlighter size={13} />
       </button>
 
       <div className="w-px h-4 bg-slate-700 mx-0.5" />
 
-      {/* Lists & Quote */}
+      {/* Selection-Powered Contextual Editorial Actions */}
       <button
         type="button"
-        title="Bullet List"
-        onClick={() => executionContext.executeCommand('insertUnorderedList')}
-        className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
+        title="Make Pull Quote from Selection"
+        onClick={handleMakePullQuote}
+        className="px-2 py-1 text-[11px] font-semibold text-rose-300 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 rounded-xs flex items-center gap-1 transition-colors cursor-pointer"
       >
-        <List size={14} />
+        <Quote size={11} />
+        <span>Pull Quote</span>
       </button>
 
       <button
         type="button"
-        title="Blockquote"
-        onClick={() => executionContext.executeCommand('formatBlock', '<blockquote>')}
-        className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
+        title="Convert Selection to Editorial Callout"
+        onClick={handleConvertToCallout}
+        className="px-2 py-1 text-[11px] font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900 border border-amber-800/80 rounded-xs flex items-center gap-1 transition-colors cursor-pointer"
       >
-        <Quote size={14} />
+        <HelpCircle size={11} />
+        <span>Callout</span>
+      </button>
+
+      <button
+        type="button"
+        title="Convert Selection to Journalistic Correction"
+        onClick={handleConvertToCorrection}
+        className="px-2 py-1 text-[11px] font-semibold text-sky-300 bg-sky-950/60 hover:bg-sky-900 border border-sky-800/80 rounded-xs flex items-center gap-1 transition-colors cursor-pointer"
+      >
+        <FileCheck2 size={11} />
+        <span>Correction</span>
       </button>
 
       <div className="w-px h-4 bg-slate-700 mx-0.5" />
@@ -207,9 +242,9 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         type="button"
         title="Hyperlink (Ctrl+K)"
         onClick={() => executionContext.openModal('link')}
-        className="p-1.5 text-slate-300 hover:text-accent-crimson hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
+        className="p-1.5 text-slate-300 hover:text-rose-400 hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
       >
-        <LinkIcon size={14} />
+        <LinkIcon size={13} />
       </button>
 
       {/* Clear Formatting */}
@@ -219,7 +254,7 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         onClick={() => executionContext.executeCommand('removeFormat')}
         className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
       >
-        <RemoveFormatting size={14} />
+        <RemoveFormatting size={13} />
       </button>
     </div>
   );

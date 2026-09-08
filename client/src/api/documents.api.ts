@@ -17,7 +17,7 @@ export interface DocumentPage {
 
 export interface DocumentImportResult {
   filename: string;
-  format: 'docx' | 'md' | 'txt' | 'pdf';
+  format: 'docx' | 'md' | 'txt' | 'pdf' | 'gutenberg';
   title?: string;
   htmlContent: string;
   pages?: DocumentPage[];
@@ -28,6 +28,13 @@ export interface DocumentImportResult {
   paragraphsCount: number;
   extractedImages: ExtractedImageAsset[];
   warnings?: string[];
+}
+
+export interface GutenbergParseResult {
+  title: string;
+  html: string;
+  blocksCount: number;
+  unsupportedBlocksCount: number;
 }
 
 export const documentsApi = {
@@ -45,6 +52,22 @@ export const documentsApi = {
       },
     );
 
+    return data;
+  },
+
+  parseGutenberg: async (gutenbergHtml: string): Promise<GutenbergParseResult> => {
+    const { data } = await apiClient.post<GutenbergParseResult>(
+      '/documents/gutenberg/parse',
+      { gutenbergHtml },
+    );
+    return data;
+  },
+
+  serializeGutenberg: async (gazetteHtml: string): Promise<{ gutenbergHtml: string }> => {
+    const { data } = await apiClient.post<{ gutenbergHtml: string }>(
+      '/documents/gutenberg/serialize',
+      { gazetteHtml },
+    );
     return data;
   },
 };

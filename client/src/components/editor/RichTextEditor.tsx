@@ -42,6 +42,9 @@ interface RichTextEditorProps {
   onSetWorkspaceMode?: (mode: 'write' | 'review' | 'preview') => void;
   onOpenRevisionHistory?: () => void;
   onOpenDiffViewer?: () => void;
+  onOpenStoryTemplates?: () => void;
+  onOpenEditorialPatterns?: () => void;
+  onShowOutline?: () => void;
 }
 
 interface ActiveLinkBubble {
@@ -68,7 +71,11 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onSetWorkspaceMode,
   onOpenRevisionHistory,
   onOpenDiffViewer,
+  onOpenStoryTemplates,
+  onOpenEditorialPatterns,
+  onShowOutline,
 }) => {
+
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -171,8 +178,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       onOpenRevisionHistory && onOpenRevisionHistory();
     } else if (modalName === 'diffViewer') {
       onOpenDiffViewer && onOpenDiffViewer();
+    } else if (modalName === 'storyTemplates') {
+      onOpenStoryTemplates && onOpenStoryTemplates();
+    } else if (modalName === 'editorialPatterns') {
+      onOpenEditorialPatterns && onOpenEditorialPatterns();
     }
-  }, [onOpenRevisionHistory, onOpenDiffViewer]);
+  }, [onOpenRevisionHistory, onOpenDiffViewer, onOpenStoryTemplates, onOpenEditorialPatterns]);
 
   // Dynamic Command Execution Context
   const executionContext: CommandExecutionContext = {
@@ -182,7 +193,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     openModal,
     toggleInspector: onToggleInspector,
     setWorkspaceMode: onSetWorkspaceMode,
+    showOutline: onShowOutline,
   };
+
 
   // ─── Slash Command Caret Tracker ──────────────────────────────────────────
   const checkSlashCommand = () => {

@@ -23,6 +23,13 @@ import {
   Share2,
   Calendar,
   Compass,
+  Laptop,
+  Smartphone,
+  Mail,
+  Printer,
+  BookOpen,
+  Blocks,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import {
@@ -39,6 +46,10 @@ import { MediaPickerModal } from '../components/editor/MediaPickerModal';
 import { RevisionHistoryModal } from '../components/editor/RevisionHistoryModal';
 import { RevisionDiffViewer } from '../components/editor/RevisionDiffViewer';
 import { PrePublishChecklistModal, type PrePublishAuditData } from '../components/editor/PrePublishChecklistModal';
+import { StoryTemplatesModal } from '../components/editor/StoryTemplatesModal';
+import { EditorialPatternsModal } from '../components/editor/EditorialPatternsModal';
+import { DocumentMapDrawer, type DocumentSection } from '../components/editor/DocumentMapDrawer';
+import { type StoryTemplate } from '../components/editor/editorialPatterns';
 import { tourService } from '../services/tour.service';
 import { apiClient } from '../api/client';
 import { UnsavedChangesModal } from '../components/editor/UnsavedChangesModal';
@@ -47,6 +58,7 @@ import { multiTabService } from '../services/multi-tab.service';
 import type { Article, ArticleStatus, Category } from '../types';
 
 type WorkspaceMode = 'write' | 'review' | 'preview';
+type PreviewDevice = 'desktop' | 'mobile' | 'social' | 'newsletter' | 'print';
 
 interface HeadingItem {
   id: string;
@@ -58,6 +70,7 @@ export const ArticleEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, hasRole } = useAuthStore();
+
   const isAdminOrSuperAdmin =
     hasRole('admin') ||
     hasRole('super_admin') ||
@@ -104,13 +117,22 @@ export const ArticleEditorPage: React.FC = () => {
     toc: true,
   });
 
-  // Modals
+  // Modals & Drawers
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [diffViewerOpen, setDiffViewerOpen] = useState(false);
   const [prePublishModalOpen, setPrePublishModalOpen] = useState(false);
   const [leaveConfirmModalOpen, setLeaveConfirmModalOpen] = useState(false);
   const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+
+  // Journalistic Templates, Patterns & Document Map
+  const [storyTemplatesOpen, setStoryTemplatesOpen] = useState(false);
+  const [editorialPatternsOpen, setEditorialPatternsOpen] = useState(false);
+  const [documentMapOpen, setDocumentMapOpen] = useState(false);
+
+  // Multi-State Preview Mode Device
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
+
 
   // Multi-Tab Collision State
   const [hasMultiTabConflict, setHasMultiTabConflict] = useState(false);
@@ -210,6 +232,45 @@ export const ArticleEditorPage: React.FC = () => {
     void draftStorageService.deleteSnapshot(id || 'new');
     setRecoveredDraft(null);
   };
+
+  const handleApplyStoryTemplate = (template: StoryTemplate) => {
+    setArticle((prev) => ({
+      ...prev,
+      title: template.defaultTitle,
+      description: template.defaultDescription,
+      content: template.htmlContent,
+      readingTimeMinutes: template.readingEstimateMinutes,
+    }));
+    setAutosaveStatus('dirty');
+    setSuccessMessage(`Loaded ${template.title} story format into manuscript.`);
+  };
+
+  const handleInsertEditorialPattern = (patternHtml: string) => {
+    setArticle((prev) => ({
+      ...prev,
+      content: `${prev.content || ''}\n\n${patternHtml}\n\n<p><br></p>`,
+    }));
+    setAutosaveStatus('dirty');
+    setSuccessMessage('Inserted editorial component into manuscript.');
+  };
+
+  const handleJumpToSection = (section: DocumentSection) => {
+    const editorCanvas = document.querySelector('.manuscript-editor') as HTMLElement | null;
+    if (!editorCanvas) return;
+
+    const headingsAndBlocks = editorCanvas.querySelectorAll('h1, h2, h3, aside.cms-callout, blockquote.cms-pull-quote, table');
+    const targetElement = headingsAndBlocks[section.domIndex] as HTMLElement | undefined;
+
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetElement.classList.add('ring-2', 'ring-rose-500/60', 'transition-all');
+      setTimeout(() => {
+        targetElement.classList.remove('ring-2', 'ring-rose-500/60');
+      }, 2000);
+    }
+    setDocumentMapOpen(false);
+  };
+
 
   // ─── 3. Browser Back / Tab Close Native & PopState Guards ─────────────────
   useEffect(() => {
@@ -640,159 +701,389 @@ export const ArticleEditorPage: React.FC = () => {
             <span className="hidden lg:inline">Tour</span>
           </button>
 
-          {id && (
-            <button
-              type="button"
-              onClick={() => setRevisionModalOpen(true)}
-              className="px-2.5 py-1.5 border border-border-subtle text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white hover:bg-slate-50 shadow-2xs cursor-pointer"
-            >
-              <History className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">v{article.version || 1}</span>
-            </button>
-          )}
-
-          <div id="tour-editor-save-exit" className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleConfirmSaveAndLeave}
-              disabled={saving}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs transition-colors bg-white shadow-2xs cursor-pointer"
-              title="Save changes and return to stories overview"
-            >
-              <Save className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Save &amp; Exit</span>
-            </button>
-
-            <button
-              onClick={handleSaveDraft}
-              disabled={saving}
-              className="px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold rounded-xs tracking-wide flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-            >
-              {saving ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              <span>
-                {saving
-                  ? 'Saving…'
-                  : article.status === 'published'
-                  ? 'Save Changes'
-                  : 'Save Draft'}
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setStoryTemplatesOpen(true)}
+            className="px-2.5 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title="Choose Story Archetype Format"
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-rose-800" />
+            <span className="hidden md:inline">Templates</span>
+          </button>
 
           <button
             type="button"
-            id="tour-editor-publish"
-            onClick={() => setPrePublishModalOpen(true)}
-            className="flex items-center gap-1 px-3.5 py-1.5 bg-accent-crimson hover:bg-accent-crimson/90 text-white text-xs font-semibold rounded-xs transition-colors shadow-2xs cursor-pointer"
+            onClick={() => setEditorialPatternsOpen(true)}
+            className="px-2.5 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title="Insert Reusable Newsroom Pattern"
           >
-            <Send className="w-3.5 h-3.5" />
-            <span>Publish</span>
+            <Blocks className="w-3.5 h-3.5 text-slate-700" />
+            <span className="hidden md:inline">Patterns</span>
           </button>
 
-          {/* Toggle Inspector Panel */}
           <button
             type="button"
-            onClick={() => setInspectorOpen((prev) => !prev)}
-            className={`p-1.5 border border-border-subtle rounded-xs text-ink-secondary hover:text-ink-primary transition-colors cursor-pointer ${
-              inspectorOpen ? 'bg-slate-100 text-ink-primary' : 'bg-white'
-            }`}
-            title={inspectorOpen ? 'Hide Inspector (Ctrl+\\)' : 'Show Inspector (Ctrl+\\)'}
+            onClick={() => setDocumentMapOpen(true)}
+            className="px-2.5 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white hover:bg-slate-50 shadow-2xs cursor-pointer"
+            title="Open Document Map &amp; Outline Navigator (Ctrl+Shift+O)"
           >
-            {inspectorOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            <Compass className="w-3.5 h-3.5 text-rose-800" />
+            <span className="hidden sm:inline">Map</span>
           </button>
-        </div>
-      </header>
 
-      {/* ─── READER PREVIEW MODE SIMULATION ──────────────────────────────── */}
-      {workspaceMode === 'preview' ? (
-        <div className="flex-1 w-full max-w-4xl mx-auto px-6 py-12 space-y-8 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between pb-4 border-b border-border-subtle">
-            <span className="font-mono text-xs uppercase tracking-wider text-accent-crimson font-bold">
-              Reader Simulation Mode
-            </span>
-            <button
-              type="button"
-              onClick={() => setWorkspaceMode('write')}
-              className="flex items-center gap-1 px-3 py-1 text-xs font-mono bg-slate-900 text-white rounded cursor-pointer"
-            >
-              <PenTool size={12} />
-              <span>Back to Manuscript</span>
-            </button>
-          </div>
 
-          <article className="space-y-6">
-            {/* Category Tag */}
-            {article.categoryId && (
-              <span className="inline-block font-mono text-xs uppercase tracking-widest text-accent-crimson font-bold px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-xs">
-                {categories.find((c) => c.id === article.categoryId)?.name || 'Dispatch'}
-              </span>
+            {id && (
+              <button
+                type="button"
+                onClick={() => setRevisionModalOpen(true)}
+                className="px-2.5 py-1.5 border border-border-subtle text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs flex items-center gap-1.5 transition-colors bg-white hover:bg-slate-50 shadow-2xs cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">v{article.version || 1}</span>
+              </button>
             )}
 
-            {/* Headline */}
-            <h1 className="font-serif text-4xl sm:text-5xl font-bold text-ink-primary leading-tight tracking-tight">
-              {article.title || 'Untitled Dispatch'}
-            </h1>
+            <div id="tour-editor-save-exit" className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleConfirmSaveAndLeave}
+                disabled={saving}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-border-subtle hover:border-ink-primary text-ink-secondary hover:text-ink-primary text-xs font-mono rounded-xs transition-colors bg-white shadow-2xs cursor-pointer"
+                title="Save changes and return to stories overview"
+              >
+                <Save className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Save &amp; Exit</span>
+              </button>
 
-            {/* Subtitle / Dek */}
-            {article.description && (
-              <p className="font-serif italic text-xl text-ink-secondary leading-relaxed">
-                {article.description}
-              </p>
-            )}
-
-            {/* Byline & Metadata */}
-            <div className="flex items-center gap-4 py-3 border-y border-border-subtle font-mono text-xs text-ink-secondary">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-ink-primary">
-                  {article.showAuthorName !== false ? user?.name || 'Author' : 'The Gazette Editorial Desk'}
+              <button
+                onClick={handleSaveDraft}
+                disabled={saving}
+                className="px-3.5 py-1.5 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold rounded-xs tracking-wide flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              >
+                {saving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {saving
+                    ? 'Saving…'
+                    : article.status === 'published'
+                    ? 'Save Changes'
+                    : 'Save Draft'}
                 </span>
-              </div>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <Calendar size={13} />
-                <span>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-              <span>•</span>
-              <span>~{article.readingTimeMinutes || 1} min read</span>
+              </button>
             </div>
 
-            {/* Cover Visual */}
-            {article.coverImage && (
-              <figure className="my-8">
-                <img
-                  src={article.coverImage}
-                  alt={article.title || 'Cover'}
-                  className="w-full rounded border border-border-subtle max-h-[500px] object-cover"
+            <button
+              type="button"
+              id="tour-editor-publish"
+              onClick={() => setPrePublishModalOpen(true)}
+              className="flex items-center gap-1 px-3.5 py-1.5 bg-accent-crimson hover:bg-accent-crimson/90 text-white text-xs font-semibold rounded-xs transition-colors shadow-2xs cursor-pointer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Publish</span>
+            </button>
+
+            {/* Toggle Inspector Panel */}
+            <button
+              type="button"
+              onClick={() => setInspectorOpen((prev) => !prev)}
+              className={`p-1.5 border border-border-subtle rounded-xs text-ink-secondary hover:text-ink-primary transition-colors cursor-pointer ${
+                inspectorOpen ? 'bg-slate-100 text-ink-primary' : 'bg-white'
+              }`}
+              title={inspectorOpen ? 'Hide Inspector (Ctrl+\\)' : 'Show Inspector (Ctrl+\\)'}
+            >
+              {inspectorOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            </button>
+          </div>
+        </header>
+
+        {/* ─── MULTI-STATE EDITORIAL PREVIEW SIMULATOR ───────────────────────── */}
+        {workspaceMode === 'preview' ? (
+          <div className="flex-1 w-full mx-auto px-4 sm:px-6 py-8 space-y-6 animate-in fade-in duration-200 flex flex-col items-center">
+            {/* Viewport & Device Preset Bar */}
+            <div className="w-full max-w-5xl bg-white border border-slate-200 p-2.5 rounded-lg shadow-xs flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-md text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('desktop')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                    previewDevice === 'desktop'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Laptop size={13} />
+                  <span>Desktop (1200px)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('mobile')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                    previewDevice === 'mobile'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Smartphone size={13} />
+                  <span>Mobile (375px)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('social')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                    previewDevice === 'social'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Share2 size={13} />
+                  <span>Social Card (OG)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('newsletter')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                    previewDevice === 'newsletter'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Mail size={13} />
+                  <span>Newsletter (600px)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice('print')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                    previewDevice === 'print'
+                      ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Printer size={13} />
+                  <span>Print Press (A4)</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-slate-400">
+                  Shared Public Parity Renderer
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceMode('write')}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-mono bg-slate-900 hover:bg-slate-800 text-white rounded cursor-pointer shadow-2xs"
+                >
+                  <PenTool size={12} />
+                  <span>Back to Manuscript</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ─── 1. SOCIAL CARD (OG CARD) PREVIEW ────────────────────────── */}
+            {previewDevice === 'social' ? (
+              <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xl p-6 space-y-4">
+                <span className="text-xs font-mono uppercase font-bold text-rose-800 tracking-wider">
+                  OpenGraph Social Distribution Preview (1200 × 630 Simulation)
+                </span>
+                <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm bg-slate-900 text-white">
+                  {article.coverImage ? (
+                    <img src={article.coverImage} alt="Cover" className="w-full h-56 object-cover" />
+                  ) : (
+                    <div className="w-full h-56 bg-slate-800 flex items-center justify-center font-serif text-slate-400 text-xl font-bold">
+                      THE GAZETTE DISPATCH
+                    </div>
+                  )}
+                  <div className="p-5 space-y-1.5 bg-slate-900">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400 font-bold">
+                      GAZETTE.PRESS • {article.categoryId ? categories.find((c) => c.id === article.categoryId)?.name : 'GENERAL'}
+                    </span>
+                    <h3 className="font-serif text-lg font-bold leading-snug line-clamp-2">
+                      {article.seoTitle || article.title || 'Untitled Dispatch Headline'}
+                    </h3>
+                    <p className="text-xs text-slate-300 line-clamp-2">
+                      {article.seoDescription || article.description || 'Comprehensive investigative reporting and daily analysis from The Gazette newsroom.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : previewDevice === 'mobile' ? (
+              /* ─── 2. MOBILE SMARTPHONE PREVIEW (375px Frame) ─────────────── */
+              <div className="w-[375px] bg-white border-8 border-slate-900 rounded-[36px] shadow-2xl p-6 min-h-[680px] overflow-y-auto space-y-4 font-sans text-slate-900">
+                <div className="w-20 h-4 bg-slate-900 rounded-full mx-auto mb-3" />
+                <div className="border-b border-slate-200 pb-3 flex items-center justify-between text-xs font-mono">
+                  <span className="font-serif font-bold text-base text-rose-800 tracking-tight">THE GAZETTE</span>
+                  <span className="text-slate-400">MOBILE WEB</span>
+                </div>
+
+                <article className="space-y-4">
+                  {article.categoryId && (
+                    <span className="inline-block font-mono text-[10px] uppercase font-bold text-rose-800 px-2 py-0.5 bg-rose-50 rounded">
+                      {categories.find((c) => c.id === article.categoryId)?.name || 'News'}
+                    </span>
+                  )}
+
+                  <h1 className="font-serif text-2xl font-bold leading-tight text-slate-900">
+                    {article.title || 'Untitled Dispatch'}
+                  </h1>
+
+                  {article.description && (
+                    <p className="font-serif italic text-sm text-slate-600 leading-relaxed">
+                      {article.description}
+                    </p>
+                  )}
+
+                  <div className="text-[11px] font-mono text-slate-400 py-2 border-y border-slate-100 flex items-center justify-between">
+                    <span>By {article.showAuthorName !== false ? user?.name || 'Author' : 'The Gazette Desk'}</span>
+                    <span>~{article.readingTimeMinutes || 1} min read</span>
+                  </div>
+
+                  {article.coverImage && (
+                    <img src={article.coverImage} alt="Cover" className="w-full rounded-md object-cover" />
+                  )}
+
+                  <div
+                    className="prose prose-sm font-sans text-xs leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-slate-400">No story content yet.</p>' }}
+                  />
+                </article>
+              </div>
+            ) : previewDevice === 'newsletter' ? (
+              /* ─── 3. NEWSLETTER EMAIL DIGEST (600px) ─────────────────────── */
+              <div className="w-full max-w-[600px] bg-white border border-slate-200 rounded-lg shadow-xl p-8 space-y-6 font-sans">
+                <div className="text-center pb-4 border-b border-slate-200 space-y-1">
+                  <span className="font-serif text-2xl font-bold tracking-tight text-rose-800">THE GAZETTE</span>
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-slate-400">Morning Dispatch Newsletter Edition</p>
+                </div>
+
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-slate-900 leading-snug">
+                  {article.title || 'Untitled Dispatch'}
+                </h1>
+
+                {article.description && (
+                  <p className="font-serif italic text-base text-slate-600 leading-relaxed">
+                    {article.description}
+                  </p>
+                )}
+
+                {article.coverImage && (
+                  <img src={article.coverImage} alt="Cover" className="w-full rounded object-cover max-h-[300px]" />
+                )}
+
+                <div
+                  className="prose prose-slate max-w-none text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-slate-400">No content.</p>' }}
                 />
-              </figure>
-            )}
 
-            {/* Main Content Render */}
-            <div
-              className="prose prose-lg max-w-none font-sans text-ink-primary leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-ink-secondary">No story manuscript entered yet.</p>' }}
-            />
+                <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-400">
+                  <p>© 2026 The Gazette Publishing Guild. All rights reserved.</p>
+                </div>
+              </div>
+            ) : previewDevice === 'print' ? (
+              /* ─── 4. PRINT PRESS READY (A4) ──────────────────────────────── */
+              <div className="w-full max-w-[794px] bg-white border border-slate-300 shadow-2xl p-14 min-h-[1123px] font-serif text-slate-900 space-y-6 print:p-0 print:border-none print:shadow-none">
+                <div className="border-b-2 border-slate-900 pb-3 flex items-end justify-between">
+                  <span className="font-serif text-3xl font-extrabold tracking-tight">THE GAZETTE</span>
+                  <span className="font-mono text-xs text-slate-600 uppercase">PRESS PROOF • {new Date().toLocaleDateString()}</span>
+                </div>
 
-            {/* Tags */}
-            {tags.length > 0 && (
-              <div className="pt-8 border-t border-border-subtle flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="font-mono text-xs px-2.5 py-1 bg-slate-100 text-ink-primary rounded border border-border-subtle"
-                  >
-                    #{tag}
-                  </span>
-                ))}
+                <h1 className="font-serif text-4xl font-extrabold leading-tight">
+                  {article.title || 'Untitled Dispatch'}
+                </h1>
+
+                {article.description && (
+                  <p className="font-serif italic text-lg text-slate-700 leading-relaxed">
+                    {article.description}
+                  </p>
+                )}
+
+                <div className="font-mono text-xs text-slate-500 py-1.5 border-y border-slate-200">
+                  BYLINE: {article.showAuthorName !== false ? user?.name?.toUpperCase() || 'EDITORIAL STAFF' : 'THE GAZETTE DESK'}
+                </div>
+
+                {article.coverImage && (
+                  <img src={article.coverImage} alt="Cover" className="w-full max-h-[320px] object-cover grayscale" />
+                )}
+
+                <div
+                  className="prose prose-neutral max-w-none font-serif text-sm leading-relaxed columns-2 gap-8 text-justify"
+                  dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-slate-400">No content.</p>' }}
+                />
+              </div>
+            ) : (
+              /* ─── 5. DESKTOP PUBLIC ARTICLE PAGE SIMULATOR (1200px) ──────── */
+              <div className="w-full max-w-4xl bg-white border border-slate-200 rounded-lg shadow-xl p-8 sm:p-12 space-y-8">
+                <article className="space-y-6">
+                  {article.categoryId && (
+                    <span className="inline-block font-mono text-xs uppercase tracking-widest text-accent-crimson font-bold px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-xs">
+                      {categories.find((c) => c.id === article.categoryId)?.name || 'Dispatch'}
+                    </span>
+                  )}
+
+                  <h1 className="font-serif text-4xl sm:text-5xl font-bold text-ink-primary leading-tight tracking-tight">
+                    {article.title || 'Untitled Dispatch'}
+                  </h1>
+
+                  {article.description && (
+                    <p className="font-serif italic text-xl text-ink-secondary leading-relaxed">
+                      {article.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-4 py-3 border-y border-border-subtle font-mono text-xs text-ink-secondary">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-ink-primary">
+                        {article.showAuthorName !== false ? user?.name || 'Author' : 'The Gazette Editorial Desk'}
+                      </span>
+                    </div>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Calendar size={13} />
+                      <span>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                    <span>•</span>
+                    <span>~{article.readingTimeMinutes || 1} min read</span>
+                  </div>
+
+                  {article.coverImage && (
+                    <figure className="my-8">
+                      <img
+                        src={article.coverImage}
+                        alt={article.title || 'Cover'}
+                        className="w-full rounded border border-border-subtle max-h-[500px] object-cover"
+                      />
+                    </figure>
+                  )}
+
+                  <div
+                    className="prose prose-lg max-w-none font-sans text-ink-primary leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-ink-secondary">No story manuscript entered yet.</p>' }}
+                  />
+
+                  {tags.length > 0 && (
+                    <div className="pt-8 border-t border-border-subtle flex flex-wrap gap-2">
+                      {tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="font-mono text-xs px-2.5 py-1 bg-slate-100 text-ink-primary rounded border border-border-subtle"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </article>
               </div>
             )}
-          </article>
-        </div>
-      ) : (
+          </div>
+        ) : (
+
         /* ─── MAIN WRITE WORKSPACE CONTAINER ────────────────────────────── */
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left/Center Canvas (8 cols or 12 cols) */}
@@ -964,9 +1255,13 @@ export const ArticleEditorPage: React.FC = () => {
                 onSetWorkspaceMode={(mode) => setWorkspaceMode(mode)}
                 onOpenRevisionHistory={() => setRevisionModalOpen(true)}
                 onOpenDiffViewer={() => setDiffViewerOpen(true)}
+                onOpenStoryTemplates={() => setStoryTemplatesOpen(true)}
+                onOpenEditorialPatterns={() => setEditorialPatternsOpen(true)}
+                onShowOutline={() => setDocumentMapOpen(true)}
               />
             </div>
           </div>
+
 
           {/* ─── CONTEXTUAL ACCORDION INSPECTOR (4 cols) ───────────────────── */}
           {inspectorOpen && (
@@ -1282,7 +1577,7 @@ export const ArticleEditorPage: React.FC = () => {
         </main>
       )}
 
-      {/* ─── MODALS ──────────────────────────────────────────────────────── */}
+      {/* ─── MODALS & DRAWERS ────────────────────────────────────────────── */}
       <UnsavedChangesModal
         isOpen={leaveConfirmModalOpen}
         onKeepEditing={() => setLeaveConfirmModalOpen(false)}
@@ -1290,6 +1585,26 @@ export const ArticleEditorPage: React.FC = () => {
         onSaveAndLeave={handleConfirmSaveAndLeave}
         isSaving={saving}
         articleTitle={article.title || 'Untitled Manuscript'}
+      />
+
+      <StoryTemplatesModal
+        isOpen={storyTemplatesOpen}
+        onClose={() => setStoryTemplatesOpen(false)}
+        onApplyTemplate={handleApplyStoryTemplate}
+        hasExistingContent={Boolean(article.content && article.content.trim().length > 20)}
+      />
+
+      <EditorialPatternsModal
+        isOpen={editorialPatternsOpen}
+        onClose={() => setEditorialPatternsOpen(false)}
+        onInsertPattern={handleInsertEditorialPattern}
+      />
+
+      <DocumentMapDrawer
+        isOpen={documentMapOpen}
+        onClose={() => setDocumentMapOpen(false)}
+        contentHtml={article.content || ''}
+        onJumpToSection={handleJumpToSection}
       />
 
       <MediaPickerModal
@@ -1333,3 +1648,4 @@ export const ArticleEditorPage: React.FC = () => {
     </div>
   );
 };
+

@@ -1,3 +1,6 @@
+import React from 'react';
+import { editorialNodes } from './editorialNodes';
+
 export type CommandCategory =
   | 'text'
   | 'format'
@@ -99,7 +102,7 @@ export function toggleSemanticHighlight(ctx?: CommandExecutionContext) {
       mark.className = 'cms-semantic-highlight bg-rose-50 text-accent-crimson px-1.5 py-0.5 rounded-xs font-medium';
       range.surroundContents(mark);
     } catch {
-      document.execCommand('hiliteColor', false, '#ffe4e6');
+      // Fallback
     }
   }
 }
@@ -107,56 +110,64 @@ export function toggleSemanticHighlight(ctx?: CommandExecutionContext) {
 export const EDITORIAL_COMMANDS: EditorialCommand[] = [
   // ─── TEXT CATEGORY ────────────────────────────────────────────────────────
   {
-    id: 'text.paragraph',
-    title: 'Paragraph',
-    category: 'text',
-    shortcut: 'Ctrl+Alt+0',
-    icon: 'Pilcrow',
-    description: 'Standard body manuscript text',
-    keywords: ['paragraph', 'p', 'body', 'normal', 'text'],
-    execute: (ctx) => ctx.executeCommand('formatBlock', '<p>'),
-  },
-  {
     id: 'text.h1',
-    title: 'Heading 1 (H1)',
+    title: 'Headline (H1)',
     category: 'text',
     shortcut: 'Ctrl+Alt+1',
     icon: 'Heading1',
-    description: 'Primary major section headline',
-    keywords: ['heading 1', 'h1', 'title', 'section'],
-    execute: (ctx) => ctx.executeCommand('formatBlock', '<h2>'),
+    description: 'Major section headline for the article',
+    keywords: ['heading', 'h1', 'title', 'headline'],
+    execute: (ctx) => ctx.executeCommand('formatBlock', '<h1>'),
   },
   {
     id: 'text.h2',
-    title: 'Heading 2 (H2)',
+    title: 'Section Heading (H2)',
     category: 'text',
     shortcut: 'Ctrl+Alt+2',
     icon: 'Heading2',
-    description: 'Subsection header',
-    keywords: ['heading 2', 'h2', 'subsection', 'header'],
-    execute: (ctx) => ctx.executeCommand('formatBlock', '<h3>'),
+    description: 'Secondary division within the story',
+    keywords: ['heading', 'h2', 'subhead', 'section'],
+    execute: (ctx) => ctx.executeCommand('formatBlock', '<h2>'),
   },
   {
     id: 'text.h3',
-    title: 'Heading 3 (H3)',
+    title: 'Subsection (H3)',
     category: 'text',
     shortcut: 'Ctrl+Alt+3',
     icon: 'Heading3',
-    description: 'Minor subsection block header',
-    keywords: ['heading 3', 'h3', 'subheading'],
-    execute: (ctx) => ctx.executeCommand('formatBlock', '<h4>'),
+    description: 'Minor section or clause header',
+    keywords: ['heading', 'h3', 'minor', 'topic'],
+    execute: (ctx) => ctx.executeCommand('formatBlock', '<h3>'),
   },
   {
-    id: 'text.subtitle',
-    title: 'Subtitle / Editorial Deck',
+    id: 'text.paragraph',
+    title: 'Paragraph Body',
+    category: 'text',
+    shortcut: 'Ctrl+Alt+0',
+    icon: 'Pilcrow',
+    description: 'Standard editorial narrative body text',
+    keywords: ['paragraph', 'text', 'normal', 'body', 'p'],
+    execute: (ctx) => ctx.executeCommand('formatBlock', '<p>'),
+  },
+  {
+    id: 'text.dropCap',
+    title: 'Toggle Drop-Cap',
     category: 'text',
     icon: 'Type',
-    description: 'Lead-in summary paragraph',
-    keywords: ['subtitle', 'deck', 'lead', 'summary'],
-    execute: (ctx) =>
-      ctx.insertHtml(
-        '<p class="text-lg text-ink-secondary font-serif italic leading-relaxed my-4">Add story subtitle or editorial deck…</p><p><br></p>',
-      ),
+    description: 'Illuminated decorative first letter for opening paragraphs',
+    keywords: ['drop cap', 'large letter', 'opening', 'illuminated'],
+    execute: (ctx) => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      let node: Node | null = sel.anchorNode;
+      while (node && node !== ctx.editorRef.current) {
+        if (node instanceof HTMLElement && node.tagName === 'P') {
+          node.classList.toggle('cms-drop-cap');
+          break;
+        }
+        node = node.parentNode;
+      }
+    },
   },
   {
     id: 'text.quote',
@@ -164,25 +175,23 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     category: 'text',
     shortcut: 'Ctrl+Shift+Q',
     icon: 'Quote',
-    description: 'Standard quoted excerpt',
-    keywords: ['quote', 'blockquote', 'cite'],
+    description: 'Indented quotation block',
+    keywords: ['quote', 'blockquote', 'citation', 'indent'],
     execute: (ctx) => ctx.executeCommand('formatBlock', '<blockquote>'),
   },
   {
-    id: 'text.pullquote',
+    id: 'text.pullQuote',
     title: 'Editorial Pull Quote',
     category: 'text',
     icon: 'MessageSquareQuote',
-    description: 'High-impact display quote with crimson border',
-    keywords: ['pull quote', 'pullquote', 'featured quote'],
-    execute: (ctx) =>
-      ctx.insertHtml(`
-        <blockquote class="my-6 pl-4 border-l-3 border-accent-crimson font-serif italic text-lg sm:text-xl text-ink-primary leading-snug">
-          "Notable editorial quotation to feature prominently in the story."
-          <span class="block text-xs font-mono text-ink-secondary not-italic mt-2">— Source Citation or Attribution</span>
-        </blockquote>
-        <p><br></p>
-      `),
+    description: 'Styled pull quote with author attribution',
+    keywords: ['pull quote', 'callout quote', 'featured quote', 'cite'],
+    execute: (ctx) => {
+      const sel = window.getSelection();
+      const text = sel ? sel.toString().trim() : '';
+      const html = editorialNodes.createPullQuote(text || 'A compelling journalistic statement capturing the essence of the report.');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
   },
 
   // ─── FORMAT CATEGORY ──────────────────────────────────────────────────────
@@ -201,7 +210,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     category: 'format',
     shortcut: 'Ctrl+I',
     icon: 'Italic',
-    keywords: ['italic', 'emphasis', 'slant'],
+    keywords: ['italic', 'emphasis', 'em', 'slant'],
     execute: (ctx) => ctx.executeCommand('italic'),
   },
   {
@@ -210,7 +219,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     category: 'format',
     shortcut: 'Ctrl+U',
     icon: 'Underline',
-    keywords: ['underline'],
+    keywords: ['underline', 'score'],
     execute: (ctx) => ctx.executeCommand('underline'),
   },
   {
@@ -219,32 +228,45 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     category: 'format',
     shortcut: 'Ctrl+Shift+X',
     icon: 'Strikethrough',
-    keywords: ['strikethrough', 'strike', 'delete'],
+    keywords: ['strike', 'strikethrough', 'del', 'cross'],
     execute: (ctx) => ctx.executeCommand('strikeThrough'),
   },
   {
     id: 'format.highlight',
     title: 'Semantic Highlight',
     category: 'format',
+    shortcut: 'Ctrl+Shift+H',
     icon: 'Highlighter',
-    description: 'Highlight text in Gazette blush accent (toggleable)',
-    keywords: ['highlight', 'marker', 'color', 'blush'],
+    description: 'Mark important passage with soft Gazette crimson tint',
+    keywords: ['highlight', 'mark', 'yellow', 'crimson', 'color'],
     execute: (ctx) => toggleSemanticHighlight(ctx),
   },
   {
-    id: 'format.codeblock',
-    title: 'Code Block',
+    id: 'format.code',
+    title: 'Inline Code',
     category: 'format',
-    shortcut: 'Ctrl+Shift+C',
+    shortcut: 'Ctrl+`',
     icon: 'Code',
-    description: 'Preformatted code snippet',
-    keywords: ['code', 'pre', 'programming'],
-    execute: (ctx) => ctx.executeCommand('formatBlock', '<pre>'),
+    keywords: ['code', 'inline code', 'monospace'],
+    execute: (ctx) => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+      const range = sel.getRangeAt(0);
+      const code = document.createElement('code');
+      code.className = 'cms-inline-code px-1.5 py-0.5 rounded bg-slate-100 font-mono text-xs text-rose-800 dark:bg-slate-800 dark:text-rose-400';
+      try {
+        code.appendChild(range.extractContents());
+        range.insertNode(code);
+      } catch {
+        // Ignore
+      }
+    },
   },
   {
     id: 'format.align.left',
     title: 'Align Left',
     category: 'format',
+    shortcut: 'Ctrl+Shift+L',
     icon: 'AlignLeft',
     keywords: ['align', 'left'],
     execute: (ctx) => ctx.executeCommand('justifyLeft'),
@@ -253,6 +275,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     id: 'format.align.center',
     title: 'Align Center',
     category: 'format',
+    shortcut: 'Ctrl+Shift+E',
     icon: 'AlignCenter',
     keywords: ['align', 'center'],
     execute: (ctx) => ctx.executeCommand('justifyCenter'),
@@ -261,6 +284,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     id: 'format.align.right',
     title: 'Align Right',
     category: 'format',
+    shortcut: 'Ctrl+Shift+R',
     icon: 'AlignRight',
     keywords: ['align', 'right'],
     execute: (ctx) => ctx.executeCommand('justifyRight'),
@@ -269,6 +293,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     id: 'format.align.justify',
     title: 'Justify Text',
     category: 'format',
+    shortcut: 'Ctrl+Shift+J',
     icon: 'AlignJustify',
     keywords: ['align', 'justify'],
     execute: (ctx) => ctx.executeCommand('justifyFull'),
@@ -277,6 +302,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     id: 'format.list.bullet',
     title: 'Bullet List',
     category: 'format',
+    shortcut: 'Ctrl+Shift+8',
     icon: 'List',
     keywords: ['list', 'bullet', 'ul'],
     execute: (ctx) => ctx.executeCommand('insertUnorderedList'),
@@ -285,6 +311,7 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     id: 'format.list.numbered',
     title: 'Numbered List',
     category: 'format',
+    shortcut: 'Ctrl+Shift+7',
     icon: 'ListOrdered',
     keywords: ['list', 'numbered', 'ol'],
     execute: (ctx) => ctx.executeCommand('insertOrderedList'),
@@ -300,6 +327,24 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
   },
 
   // ─── INSERT CATEGORY ──────────────────────────────────────────────────────
+  {
+    id: 'insert.templates',
+    title: 'Story Templates (Archetypes)',
+    category: 'insert',
+    icon: 'Sparkles',
+    description: 'Load pre-structured newsroom formats (Investigation, Breaking, Interview, Opinion)',
+    keywords: ['template', 'story', 'archetype', 'investigation', 'interview', 'format'],
+    execute: (ctx) => ctx.openModal('storyTemplates'),
+  },
+  {
+    id: 'insert.patterns',
+    title: 'Editorial Patterns & Synced Blocks',
+    category: 'insert',
+    icon: 'Bookmark',
+    description: 'Insert pre-styled notices, corrections, disclosures, and CTAs',
+    keywords: ['pattern', 'reusable', 'synced block', 'disclaimer', 'bio', 'cta'],
+    execute: (ctx) => ctx.openModal('editorialPatterns'),
+  },
   {
     id: 'insert.link',
     title: 'Smart Hyperlink',
@@ -320,14 +365,40 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     execute: (ctx) => ctx.openModal('table'),
   },
   {
-    id: 'insert.divider',
-    title: 'Hairline Divider',
+    id: 'insert.callout',
+    title: 'Editorial Callout Box',
+    category: 'insert',
+    icon: 'MessageSquare',
+    description: 'Themed background context, key takeaways, or analytical brief',
+    keywords: ['callout', 'box', 'aside', 'note', 'takeaway'],
+    execute: (ctx) => {
+      const html = editorialNodes.createCallout('Editorial Brief', 'Provide crucial background context or key takeaways here.', 'info');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
+    id: 'insert.sources',
+    title: 'Sources & References Block',
+    category: 'insert',
+    icon: 'FileText',
+    description: 'Numbered citations and document bibliography',
+    keywords: ['sources', 'references', 'citations', 'bibliography', 'footnotes'],
+    execute: (ctx) => {
+      const html = editorialNodes.createSourceNote(['Primary reporting and institutional disclosures.', 'Independent public records survey.']);
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
+    id: 'insert.asterism',
+    title: 'Asterism Section Divider (⁂)',
     category: 'insert',
     icon: 'Minus',
-    description: 'Editorial section break line',
-    keywords: ['divider', 'hr', 'line', 'break', 'separator'],
-    execute: (ctx) =>
-      ctx.insertHtml('<hr class="cms-divider my-8 border-t border-border-subtle" /><p><br></p>'),
+    description: 'Ornate triple-asterisk editorial divider',
+    keywords: ['divider', 'asterism', 'ornament', 'break', 'separator', 'line'],
+    execute: (ctx) => {
+      const html = editorialNodes.createDivider('asterism');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
   },
 
   // ─── MEDIA CATEGORY ───────────────────────────────────────────────────────
@@ -360,11 +431,11 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
   },
   {
     id: 'media.document',
-    title: 'Import Manuscript (.docx, .pdf)',
+    title: 'Import Manuscript (.docx, .pdf, Gutenberg)',
     category: 'media',
     icon: 'FileText',
-    description: 'Ingest Word (.docx), PDF (.pdf), or Markdown files',
-    keywords: ['import', 'docx', 'pdf', 'word', 'document', 'markdown'],
+    description: 'Ingest Word (.docx), PDF, or WordPress Gutenberg blocks',
+    keywords: ['import', 'docx', 'pdf', 'word', 'document', 'markdown', 'gutenberg'],
     execute: (ctx) => ctx.openModal('docImport'),
   },
 
@@ -376,105 +447,47 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     icon: 'MessageSquare',
     description: 'Highlighted note providing editorial context or updates',
     keywords: ['note', 'editors note', 'callout', 'context'],
-    execute: (ctx) =>
-      ctx.insertHtml(`
-        <div class="cms-callout-note my-5 p-4 bg-amber-50/70 border-l-3 border-amber-600 rounded-xs text-sm font-sans text-ink-primary">
-          <p class="m-0 font-medium text-amber-950"><strong>Editor's Note:</strong> This dispatch was updated with confirmed findings on database replication latency.</p>
-        </div>
-        <p><br></p>
-      `),
+    execute: (ctx) => {
+      const html = editorialNodes.createCallout('Editor’s Note', 'This dispatch was updated with confirmed findings on database replication latency.', 'editorial');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
   },
   {
     id: 'editorial.correction',
     title: 'Correction / Errata',
     category: 'editorial',
     icon: 'AlertTriangle',
-    description: 'Formal transparent correction notice block',
+    description: 'Formal transparent correction notice block with timestamp',
     keywords: ['correction', 'errata', 'amendment', 'notice'],
-    execute: (ctx) =>
-      ctx.insertHtml(`
-        <div class="cms-callout-warning my-5 p-4 bg-slate-100 border-l-3 border-slate-700 rounded-xs text-xs font-mono text-ink-primary">
-          <p class="m-0 text-slate-800"><strong>Correction (Sept 8, 2026):</strong> An earlier version of this story referenced legacy connection strings. The parameters have been updated.</p>
-        </div>
-        <p><br></p>
-      `),
-  },
-  {
-    id: 'editorial.keyfact',
-    title: 'Key Fact / Fact Box',
-    category: 'editorial',
-    icon: 'Sparkles',
-    description: 'Structured summary card for key takeaways and stats',
-    keywords: ['fact', 'key fact', 'takeaway', 'stat', 'box'],
-    execute: (ctx) =>
-      ctx.insertHtml(`
-        <div class="my-6 p-4 bg-slate-50 border border-slate-200 rounded-xs space-y-2">
-          <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-accent-crimson block">
-            Key Takeaways
-          </span>
-          <ul class="text-xs font-sans text-ink-primary space-y-1 pl-4 list-disc">
-            <li>Primary mesh database latency reduced by 40% under production loads.</li>
-            <li>Multi-region replica failover completes in under 2.5 seconds.</li>
-          </ul>
-        </div>
-        <p><br></p>
-      `),
-  },
-  {
-    id: 'editorial.citation',
-    title: 'Source Attribution',
-    category: 'editorial',
-    icon: 'Bookmark',
-    description: 'Bibliographic reference and verified source disclosure',
-    keywords: ['source', 'citation', 'attribution', 'reference', 'bibliography'],
-    execute: (ctx) =>
-      ctx.insertHtml(`
-        <div class="my-5 p-3 bg-slate-50 border-t border-b border-slate-200 text-xs font-mono text-ink-secondary">
-          <span>Source: <strong>Gazette Systems Telemetry Laboratory</strong>. Data verified on Sept 8, 2026.</span>
-        </div>
-        <p><br></p>
-      `),
+    execute: (ctx) => {
+      const html = editorialNodes.createCorrection('An earlier version of this story referenced legacy connection strings. The parameters have been updated.');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
   },
 
-  // ─── REVIEW CATEGORY ──────────────────────────────────────────────────────
+  // ─── VIEW & REVIEW CATEGORY ───────────────────────────────────────────────
   {
-    id: 'review.revisions',
-    title: 'Revision History',
-    category: 'review',
-    icon: 'History',
-    description: 'Browse saved versions and restore historical states',
-    keywords: ['history', 'revisions', 'versions', 'restore'],
-    execute: (ctx) => ctx.openModal('revisionHistory'),
+    id: 'view.documentMap',
+    title: 'Document Map / Outline',
+    category: 'view',
+    shortcut: 'Ctrl+Shift+O',
+    icon: 'PanelRight',
+    description: 'Interactive section tree and outline navigator',
+    keywords: ['document map', 'outline', 'toc', 'navigator', 'structure'],
+    execute: (ctx) => {
+      if (ctx.showOutline) ctx.showOutline();
+    },
   },
-  {
-    id: 'review.diff',
-    title: 'Visual Diff Comparator',
-    category: 'review',
-    icon: 'GitCompare',
-    description: 'Compare current manuscript with previous revisions',
-    keywords: ['diff', 'compare', 'changes', 'additions', 'deletions'],
-    execute: (ctx) => ctx.openModal('diffViewer'),
-  },
-
-  // ─── VIEW CATEGORY ────────────────────────────────────────────────────────
   {
     id: 'view.inspector',
-    title: 'Toggle Inspector',
+    title: 'Metadata Inspector',
     category: 'view',
-    shortcut: 'Ctrl+\\',
+    shortcut: 'Ctrl+Shift+I',
     icon: 'PanelRight',
-    description: 'Show or hide the contextual metadata sidebar',
-    keywords: ['inspector', 'sidebar', 'panel', 'meta'],
-    execute: (ctx) => ctx.toggleInspector && ctx.toggleInspector(),
-  },
-  {
-    id: 'view.preview',
-    title: 'Reader Preview Mode',
-    category: 'view',
-    shortcut: 'Ctrl+P',
-    icon: 'Eye',
-    description: 'Simulate the public Gazette reader experience',
-    keywords: ['preview', 'reader', 'view'],
-    execute: (ctx) => ctx.setWorkspaceMode && ctx.setWorkspaceMode('preview'),
+    description: 'Toggle right-side article metadata & SEO inspector panel',
+    keywords: ['inspector', 'sidebar', 'metadata', 'seo', 'details'],
+    execute: (ctx) => {
+      if (ctx.toggleInspector) ctx.toggleInspector();
+    },
   },
 ];
