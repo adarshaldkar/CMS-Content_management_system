@@ -6,6 +6,10 @@ export interface ExtractedImageAsset {
   url: string;
   mimeType: string;
   sizeBytes: number;
+  sha256Hash?: string;
+  caption?: string;
+  credit?: string;
+  isVectorOrChart?: boolean;
 }
 
 export interface DocumentPage {
@@ -13,21 +17,69 @@ export interface DocumentPage {
   title?: string;
   htmlContent: string;
   wordCount: number;
+  isScanned?: boolean;
+}
+
+export interface ExtractedLinkDetail {
+  id: string;
+  pageNumber: number;
+  visibleText: string;
+  url: string;
+  isExternal: boolean;
+  isMalformed?: boolean;
+  needsReview?: boolean;
+}
+
+export interface ImportJobReport {
+  statusOutcome: 'SUCCESS' | 'WARNING' | 'REVIEW REQUIRED' | 'FAILED';
+  totalWords: number;
+  totalPages: number;
+  imagesExtracted: number;
+  duplicatesDeduplicated: number;
+  linksRecovered: number;
+  tablesReconstructed: number;
+  equationsPreserved: number;
+  scannedPagesOcrApplied: number;
+  warnings: string[];
+  reviewRequiredItems: string[];
+}
+
+export interface ImportJob {
+  id: string;
+  documentId: string;
+  userId: string;
+  filename: string;
+  fileSizeBytes: number;
+  status: 'queued' | 'inspecting' | 'processing' | 'completed' | 'warning' | 'review_required' | 'failed';
+  progressPercent: number;
+  pagesProcessed: number;
+  totalPages: number;
+  currentStage: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  report?: ImportJobReport;
+  generatedHtml?: string;
+  errorMessage?: string;
 }
 
 export interface DocumentImportResult {
   filename: string;
-  format: 'docx' | 'md' | 'txt' | 'pdf' | 'gutenberg';
+  format?: 'docx' | 'md' | 'txt' | 'pdf' | 'gutenberg';
+  detectedType?: string;
   title?: string;
   htmlContent: string;
   pages?: DocumentPage[];
   totalPages?: number;
   wordCount: number;
-  readingTimeMinutes: number;
-  headingsCount: number;
-  paragraphsCount: number;
-  extractedImages: ExtractedImageAsset[];
+  readingTimeMinutes?: number;
+  headingsCount?: number;
+  paragraphsCount?: number;
+  fileSizeBytes?: number;
+  extractedImages?: ExtractedImageAsset[];
+  links?: ExtractedLinkDetail[];
   warnings?: string[];
+  job?: ImportJob;
 }
 
 export interface GutenbergParseResult {
@@ -52,6 +104,11 @@ export const documentsApi = {
       },
     );
 
+    return data;
+  },
+
+  getJobStatus: async (jobId: string): Promise<ImportJob> => {
+    const { data } = await apiClient.get<ImportJob>(`/documents/jobs/${jobId}`);
     return data;
   },
 

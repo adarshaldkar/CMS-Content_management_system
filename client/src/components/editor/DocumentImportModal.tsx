@@ -9,21 +9,21 @@ import {
   Sparkles,
   Link as LinkIcon,
   Table as TableIcon,
-  Code,
   Sigma,
-  ListOrdered,
   Image as ImageIcon,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Eye,
-  CheckSquare,
-  Square,
   FileCheck,
-  X,
   Blocks,
   Copy,
   Download,
+  ShieldCheck,
+  HelpCircle,
+  ExternalLink,
+  SplitSquareVertical,
+  CheckSquare,
+  Square,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Dialog,
@@ -35,7 +35,14 @@ import {
 import { Switch } from '../ui/switch';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
-import { documentsApi, type DocumentImportResult, type DocumentPage, type GutenbergParseResult } from '../../api/documents.api';
+import {
+  documentsApi,
+  type DocumentImportResult,
+  type DocumentPage,
+  type GutenbergParseResult,
+  type ExtractedImageAsset,
+  type ImportJob,
+} from '../../api/documents.api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 
 interface DocumentImportModalProps {
@@ -57,12 +64,24 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [importResult, setImportResult] = useState<DocumentImportResult | null>(null);
+  const [activeJob, setActiveJob] = useState<ImportJob | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Pagination & Page Navigation State
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [selectedPageNumbers, setSelectedPageNumbers] = useState<number[]>([]);
-  const [viewMode, setViewMode] = useState<'single' | 'continuous'>('single');
+  const [studioSubView, setStudioSubView] = useState<'preview' | 'media' | 'links'>('preview');
+
+  // Selective Ingestion Controls
+  const [importText, setImportText] = useState(true);
+  const [importMedia, setImportMedia] = useState(true);
+  const [importLinks, setImportLinks] = useState(true);
+  const [importTables, setImportTables] = useState(true);
+  const [importFootnotes, setImportFootnotes] = useState(true);
+  const [useDetectedTitle, setUseDetectedTitle] = useState(true);
+
+  // Extracted Media Management with Editable Captions & Credits
+  const [extractedMediaList, setExtractedMediaList] = useState<(ExtractedImageAsset & { selected: boolean })[]>([]);
 
   // Gutenberg State
   const [gutenbergInput, setGutenbergInput] = useState('');
@@ -72,63 +91,23 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
   const [isExportingGutenberg, setIsExportingGutenberg] = useState(false);
   const [copiedGutenberg, setCopiedGutenberg] = useState(false);
 
-  // Ingestion Toggles
-  const [useDetectedTitle, setUseDetectedTitle] = useState(true);
-  const [importLists, setImportLists] = useState(true);
-  const [importTables, setImportTables] = useState(true);
-  const [importLinks, setImportLinks] = useState(true);
-  const [importMathCode, setImportMathCode] = useState(true);
-
   useEffect(() => {
     if (isOpen) {
       setSelectedFile(null);
       setImportResult(null);
+      setActiveJob(null);
       setErrorMsg(null);
       setIsParsing(false);
       setCurrentPageIndex(0);
       setSelectedPageNumbers([]);
-      setViewMode('single');
+      setStudioSubView('preview');
+      setExtractedMediaList([]);
       setGutenbergInput('');
       setGutenbergResult(null);
       setGutenbergExportOutput('');
       setCopiedGutenberg(false);
     }
   }, [isOpen]);
-
-  // Handle Gutenberg Parse
-  const handleParseGutenberg = async () => {
-    if (!gutenbergInput.trim()) return;
-    setIsGutenbergLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await documentsApi.parseGutenberg(gutenbergInput);
-      setGutenbergResult(res);
-    } catch {
-      setErrorMsg('Failed to parse WordPress Gutenberg blocks.');
-    } finally {
-      setIsGutenbergLoading(false);
-    }
-  };
-
-  // Handle Gutenberg Export
-  const handleExportGutenberg = async () => {
-    setIsExportingGutenberg(true);
-    try {
-      const res = await documentsApi.serializeGutenberg(currentGazetteHtml || '');
-      setGutenbergExportOutput(res.gutenbergHtml);
-    } catch {
-      setErrorMsg('Failed to serialize Gazette manuscript into Gutenberg format.');
-    } finally {
-      setIsExportingGutenberg(false);
-    }
-  };
-
-  const handleCopyGutenberg = () => {
-    if (!gutenbergExportOutput) return;
-    navigator.clipboard.writeText(gutenbergExportOutput);
-    setCopiedGutenberg(true);
-    setTimeout(() => setCopiedGutenberg(false), 2000);
-  };
 
   const handleFileSelect = async (file: File) => {
     const validExts = ['.docx', '.md', '.markdown', '.txt', '.pdf'];
@@ -150,15 +129,61 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
     try {
       const result = await documentsApi.importDocument(file);
       setImportResult(result);
+      if (result.job) {
+        setActiveJob(result.job);
+      }
       setCurrentPageIndex(0);
+
       const total = result.totalPages || (result.pages ? result.pages.length : 1);
       const allNums = Array.from({ length: total }, (_, i) => i + 1);
       setSelectedPageNumbers(allNums);
-    } catch {
-      setErrorMsg('Document extraction failed. Ensure file is not password-protected.');
+
+      // Initialize extracted media list
+      const mediaItems = (result.extractedImages || []).map((img) => ({
+        ...img,
+        selected: true,
+        caption: img.caption || '',
+        credit: img.credit || '',
+      }));
+      setExtractedMediaList(mediaItems);
+    } catch (err: any) {
+      setErrorMsg(err?.response?.data?.message || 'Document extraction failed. Ensure file is not corrupt or password-protected.');
     } finally {
       setIsParsing(false);
     }
+  };
+
+  const handleParseGutenberg = async () => {
+    if (!gutenbergInput.trim()) return;
+    setIsGutenbergLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await documentsApi.parseGutenberg(gutenbergInput);
+      setGutenbergResult(res);
+    } catch {
+      setErrorMsg('Failed to parse WordPress Gutenberg blocks.');
+    } finally {
+      setIsGutenbergLoading(false);
+    }
+  };
+
+  const handleExportGutenberg = async () => {
+    setIsExportingGutenberg(true);
+    try {
+      const res = await documentsApi.serializeGutenberg(currentGazetteHtml || '');
+      setGutenbergExportOutput(res.gutenbergHtml);
+    } catch {
+      setErrorMsg('Failed to serialize Gazette manuscript into Gutenberg format.');
+    } finally {
+      setIsExportingGutenberg(false);
+    }
+  };
+
+  const handleCopyGutenberg = () => {
+    if (!gutenbergExportOutput) return;
+    navigator.clipboard.writeText(gutenbergExportOutput);
+    setCopiedGutenberg(true);
+    setTimeout(() => setCopiedGutenberg(false), 2000);
   };
 
   const pages: DocumentPage[] = importResult?.pages || [
@@ -179,15 +204,6 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
     );
   };
 
-  const handleSelectAllPages = () => {
-    const allNums = Array.from({ length: totalPages }, (_, i) => i + 1);
-    setSelectedPageNumbers(allNums);
-  };
-
-  const handleDeselectAllPages = () => {
-    setSelectedPageNumbers([]);
-  };
-
   const handleConfirm = () => {
     if (activeTab === 'gutenberg' && gutenbergResult) {
       onConfirmImport({
@@ -200,7 +216,23 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
 
     if (!importResult) return;
     const selectedPages = pages.filter((p) => selectedPageNumbers.includes(p.pageNumber));
-    const combinedHtml = selectedPages.map((p) => p.htmlContent).join('\n\n<hr class="cms-page-break my-6" />\n\n');
+    let combinedHtml = selectedPages.map((p) => p.htmlContent).join('\n\n<hr class="cms-page-break my-6" />\n\n');
+
+    // Append selected media figures if enabled
+    if (importMedia && extractedMediaList.length > 0) {
+      const selectedMedia = extractedMediaList.filter((m) => m.selected);
+      if (selectedMedia.length > 0) {
+        const mediaHtml = selectedMedia
+          .map(
+            (m) =>
+              `<figure class="my-6 text-center"><img src="${m.url}" alt="${m.originalName}" class="max-w-full rounded mx-auto" />${
+                m.caption ? `<figcaption class="text-xs font-serif italic text-slate-500 mt-2">${m.caption}${m.credit ? ` (${m.credit})` : ''}</figcaption>` : ''
+              }</figure>`,
+          )
+          .join('\n');
+        combinedHtml = `${combinedHtml}\n\n${mediaHtml}`;
+      }
+    }
 
     onConfirmImport({
       htmlContent: combinedHtml,
@@ -211,36 +243,34 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-50 font-sans">
-        {/* Header */}
-        <DialogHeader className="px-6 py-3.5 bg-white border-b border-slate-200 shrink-0 flex flex-row items-center justify-between">
+      <DialogContent className="max-w-7xl w-[96vw] h-[92vh] flex flex-col p-0 overflow-hidden bg-slate-50 font-sans">
+        {/* Top Header */}
+        <DialogHeader className="px-6 py-3 bg-white border-b border-slate-200 shrink-0 flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-rose-50 text-accent-crimson rounded-md border border-rose-100">
+            <div className="p-2 bg-rose-50 text-rose-800 rounded-md border border-rose-100">
               <FileText size={18} />
             </div>
             <div>
-              <DialogTitle className="text-base font-serif font-bold text-ink-primary">
-                Universal Manuscript Ingestion &amp; Gutenberg Interoperability
+              <DialogTitle className="text-base font-serif font-bold text-slate-900">
+                Universal Document Ingestion Studio &amp; Telemetry
               </DialogTitle>
-              <DialogDescription className="text-xs text-ink-secondary">
-                Import formatted Word (.docx), PDF, Markdown, or WordPress Gutenberg blocks
+              <DialogDescription className="text-xs text-slate-500">
+                Inspect, normalize, and selectively convert PDFs (Word, PowerPoint, LaTeX, Scans) with zero silent loss
               </DialogDescription>
             </div>
           </div>
 
-          {/* Top Segmented Tab Switcher */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-md border border-slate-200 text-xs">
+          {/* Tab Switcher */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-md border border-slate-200 text-xs font-mono">
             <button
               type="button"
               onClick={() => setActiveTab('file')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded font-medium transition-all ${
-                activeTab === 'file'
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeTab === 'file' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Upload size={13} />
-              <span>Document File Ingestion</span>
+              <Upload size={12} />
+              <span>Universal Ingestion</span>
             </button>
             <button
               type="button"
@@ -250,22 +280,278 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
                   handleExportGutenberg();
                 }
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded font-medium transition-all ${
-                activeTab === 'gutenberg'
-                  ? 'bg-white text-rose-800 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
+                activeTab === 'gutenberg' ? 'bg-white text-rose-800 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Blocks size={13} />
-              <span>WordPress Gutenberg Adapter</span>
+              <Blocks size={12} />
+              <span>WordPress Gutenberg</span>
             </button>
           </div>
         </DialogHeader>
 
-        {/* ─── TAB 2: WORDPRESS GUTENBERG ADAPTER ────────────────────────────── */}
-        {activeTab === 'gutenberg' ? (
+        {/* ─── TAB 1: UNIVERSAL INGESTION STUDIO ─────────────────────────────── */}
+        {activeTab === 'file' ? (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {/* Upload Area */}
+            {!importResult && !isParsing && (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+                <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-800 flex items-center justify-center mb-4 border border-rose-100 shadow-2xs">
+                  <Upload size={28} />
+                </div>
+                <h3 className="font-serif text-lg font-bold text-slate-900 mb-1">
+                  Upload Journalistic Manuscript
+                </h3>
+                <p className="text-xs text-slate-500 max-w-lg mb-6 leading-relaxed">
+                  Support for Adobe Acrobat (.pdf from PowerPoint, Word, Google Docs, InDesign, Scans), Word (.docx), Markdown (.md), and plain text.
+                </p>
+
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".docx,.md,.markdown,.txt,.pdf"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleFileSelect(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <span className="px-5 py-2.5 bg-rose-800 hover:bg-rose-900 text-white text-xs font-mono font-bold rounded shadow-xs transition-colors">
+                    Browse Local Manuscript (25 MB max)
+                  </span>
+                </label>
+
+                {errorMsg && (
+                  <div className="mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isParsing && (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white">
+                <LoadingSpinner />
+                <h4 className="font-serif text-base font-bold text-slate-900 mt-4">
+                  Inspecting Document Structure &amp; Telemetry…
+                </h4>
+                <p className="text-xs text-slate-500 mt-1 font-mono">
+                  Reconstructing multi-column reading order &amp; deduplicating media assets…
+                </p>
+              </div>
+            )}
+
+            {importResult && !isParsing && (
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {/* ─── TELEMETRY STRIP ───────────────────────────────────────── */}
+                <div className="bg-slate-900 text-white px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono border-b border-slate-800">
+                  <div className="flex items-center gap-4">
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 size={13} />
+                      <span>{activeJob?.report?.statusOutcome || 'SUCCESS'}</span>
+                    </span>
+                    <span>•</span>
+                    <span>{importResult.wordCount?.toLocaleString() || 0} words</span>
+                    <span>•</span>
+                    <span>{totalPages} pages</span>
+                    <span>•</span>
+                    <span>{extractedMediaList.length} images</span>
+                    <span>•</span>
+                    <span>{importResult.links?.length || 0} links</span>
+                  </div>
+
+                  {/* Sub-view Switcher */}
+                  <div className="flex items-center bg-slate-800 p-0.5 rounded text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setStudioSubView('preview')}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        studioSubView === 'preview' ? 'bg-rose-800 text-white font-bold' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      Dual-Sheet Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStudioSubView('media')}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        studioSubView === 'media' ? 'bg-rose-800 text-white font-bold' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      Extracted Media ({extractedMediaList.length})
+                    </button>
+                  </div>
+                </div>
+
+                {/* ─── STUDIO MAIN BODY (3 Columns) ─────────────────────────── */}
+                <div className="flex-1 overflow-hidden flex divide-x divide-slate-200">
+                  {/* Left Controls & Page Selector */}
+                  <div className="w-80 bg-white p-4 flex flex-col justify-between overflow-y-auto shrink-0">
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Ingested File</span>
+                        <h4 className="font-bold text-sm text-slate-900 truncate">{importResult.filename}</h4>
+                        <p className="text-xs text-slate-500 font-mono mt-0.5">
+                          {(importResult.fileSizeBytes ? (importResult.fileSizeBytes / 1024 / 1024).toFixed(2) : 0)} MB • {totalPages} pages
+                        </p>
+                      </div>
+
+                      {/* Selective Ingestion Checkbox Matrix */}
+                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                        <span className="text-xs font-bold text-slate-700 block">Selective Extraction Toggles</span>
+                        <div className="space-y-1.5 text-xs text-slate-600">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={importText} onChange={(e) => setImportText(e.target.checked)} className="rounded text-rose-800" />
+                            <span>Manuscript Text &amp; Headings</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={importMedia} onChange={(e) => setImportMedia(e.target.checked)} className="rounded text-rose-800" />
+                            <span>Extracted Media &amp; Figures ({extractedMediaList.length})</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={importTables} onChange={(e) => setImportTables(e.target.checked)} className="rounded text-rose-800" />
+                            <span>Structured Tables &amp; Matrices</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={importLinks} onChange={(e) => setImportLinks(e.target.checked)} className="rounded text-rose-800" />
+                            <span>Recovered Hyperlinks ({importResult.links?.length || 0})</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Page Navigator */}
+                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-700">Pages ({selectedPageNumbers.length}/{totalPages})</span>
+                          <div className="flex items-center gap-2 text-[11px] font-mono text-rose-800">
+                            <button type="button" onClick={() => setSelectedPageNumbers(Array.from({ length: totalPages }, (_, i) => i + 1))} className="hover:underline">All</button>
+                            <span>•</span>
+                            <button type="button" onClick={() => setSelectedPageNumbers([])} className="hover:underline">None</button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-1.5 max-h-[140px] overflow-y-auto p-1 bg-slate-50 rounded border border-slate-200">
+                          {pages.map((p) => {
+                            const isSelected = selectedPageNumbers.includes(p.pageNumber);
+                            const isViewing = currentPageIndex === p.pageNumber - 1;
+                            return (
+                              <button
+                                key={p.pageNumber}
+                                type="button"
+                                onClick={() => {
+                                  setCurrentPageIndex(p.pageNumber - 1);
+                                  togglePageSelection(p.pageNumber);
+                                }}
+                                className={`p-1.5 rounded text-xs font-mono font-bold transition-all border ${
+                                  isViewing
+                                    ? 'border-rose-800 bg-rose-50 text-rose-900 ring-1 ring-rose-800'
+                                    : isSelected
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                    : 'border-slate-200 bg-white text-slate-400'
+                                }`}
+                              >
+                                P.{p.pageNumber}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Content Area: Dual-Sheet Preview OR Extracted Media */}
+                  <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
+                    {studioSubView === 'media' ? (
+                      /* Media Asset Gallery */
+                      <div className="space-y-4 max-w-4xl mx-auto">
+                        <h4 className="font-serif font-bold text-base text-slate-900 flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4 text-rose-800" />
+                          <span>Extracted Media Assets ({extractedMediaList.length})</span>
+                        </h4>
+
+                        {extractedMediaList.length === 0 ? (
+                          <div className="p-8 text-center bg-white rounded-md border border-slate-200 text-xs text-slate-500">
+                            No raster images or diagrams detected in manuscript.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {extractedMediaList.map((img, idx) => (
+                              <div key={idx} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm space-y-3">
+                                <div className="relative h-44 bg-slate-900 rounded overflow-hidden flex items-center justify-center">
+                                  <img src={img.url} alt={img.originalName} className="max-h-full max-w-full object-contain" />
+                                  <label className="absolute top-2 left-2 bg-slate-900/80 text-white px-2 py-1 rounded text-xs font-mono flex items-center gap-1.5 cursor-pointer backdrop-blur-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={img.selected}
+                                      onChange={(e) => {
+                                        const updated = [...extractedMediaList];
+                                        updated[idx].selected = e.target.checked;
+                                        setExtractedMediaList(updated);
+                                      }}
+                                    />
+                                    <span>Import Image</span>
+                                  </label>
+                                </div>
+                                <div>
+                                  <input
+                                    type="text"
+                                    placeholder="Add figure caption…"
+                                    value={img.caption || ''}
+                                    onChange={(e) => {
+                                      const updated = [...extractedMediaList];
+                                      updated[idx].caption = e.target.value;
+                                      setExtractedMediaList(updated);
+                                    }}
+                                    className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded font-serif mb-1.5"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Photo credit / source…"
+                                    value={img.credit || ''}
+                                    onChange={(e) => {
+                                      const updated = [...extractedMediaList];
+                                      updated[idx].credit = e.target.value;
+                                      setExtractedMediaList(updated);
+                                    }}
+                                    className="w-full text-[11px] p-1.5 bg-slate-50 border border-slate-200 rounded font-mono"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Dual-Sheet Preview: Page View vs Semantic HTML */
+                      <div className="max-w-4xl mx-auto bg-white border border-slate-200 rounded-sm shadow-md p-10 font-sans min-h-[560px] flex flex-col justify-between">
+                        <div>
+                          <div className="pb-4 mb-6 border-b border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                            <span className="uppercase tracking-wider">{importResult.filename}</span>
+                            <span>Page {currentPage.pageNumber} of {totalPages}</span>
+                          </div>
+
+                          <div
+                            className="prose prose-slate max-w-none text-slate-900 text-base leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: currentPage.htmlContent }}
+                          />
+                        </div>
+
+                        <div className="pt-6 mt-8 border-t border-slate-100 text-center text-[10px] font-mono text-slate-400">
+                          — Page {currentPage.pageNumber} ({currentPage.wordCount} words) —
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ─── TAB 2: WORDPRESS GUTENBERG ADAPTER ──────────────────────────── */
           <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-200">
-            {/* Left: Gutenberg Ingestion */}
+            {/* Left: Ingest from Gutenberg */}
             <div className="p-6 flex flex-col justify-between overflow-y-auto bg-white">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -273,43 +559,33 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
                     <Blocks className="h-4 w-4 text-rose-800" />
                     <span>Import from WordPress Gutenberg</span>
                   </h4>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    Parse &lt;!-- wp:block --&gt;
-                  </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Paste raw WordPress post content with block comment delimiters. Gazette will convert them into clean semantic nodes without data loss.
+                  Paste raw WordPress post HTML comments. Gazette will parse headers, quotes, drop-caps, and tables into semantic nodes without data loss.
                 </p>
 
                 <textarea
-                  rows={8}
+                  rows={9}
                   value={gutenbergInput}
                   onChange={(e) => setGutenbergInput(e.target.value)}
                   placeholder="<!-- wp:paragraph -->&#10;<p>Paste your WordPress Gutenberg block code here…</p>&#10;<!-- /wp:paragraph -->"
                   className="w-full font-mono text-xs p-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-800 text-slate-900"
                 />
 
-                <div className="flex items-center justify-between">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleParseGutenberg}
-                    disabled={isGutenbergLoading || !gutenbergInput.trim()}
-                    className="bg-rose-800 hover:bg-rose-900 text-white text-xs font-mono"
-                  >
-                    {isGutenbergLoading ? 'Parsing Blocks…' : 'Parse Gutenberg Content'}
-                  </Button>
-                  {gutenbergResult && (
-                    <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
-                      ✓ {gutenbergResult.blocksCount} blocks parsed ({gutenbergResult.unsupportedBlocksCount} preserved)
-                    </span>
-                  )}
-                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleParseGutenberg}
+                  disabled={isGutenbergLoading || !gutenbergInput.trim()}
+                  className="bg-rose-800 hover:bg-rose-900 text-white text-xs font-mono"
+                >
+                  {isGutenbergLoading ? 'Parsing Blocks…' : 'Parse Gutenberg Content'}
+                </Button>
 
                 {gutenbergResult && (
                   <div className="rounded-md border border-slate-200 bg-slate-50 p-4 max-h-[160px] overflow-y-auto">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block mb-2">
-                      Parsed Preview:
+                      Parsed Preview ({gutenbergResult.blocksCount} blocks):
                     </span>
                     <div
                       className="prose prose-sm max-w-none text-xs"
@@ -325,7 +601,7 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
                     type="button"
                     size="sm"
                     onClick={handleConfirm}
-                    className="bg-accent-crimson text-white text-xs font-mono"
+                    className="bg-rose-800 text-white text-xs font-mono"
                   >
                     Insert Parsed WordPress Content
                   </Button>
@@ -353,11 +629,11 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
                   </Button>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Convert your current Gazette manuscript into standard WordPress Gutenberg block comments, ready to paste directly into WordPress Core editor.
+                  Convert current Gazette story manuscript into WordPress Gutenberg block HTML comments.
                 </p>
 
                 <textarea
-                  rows={12}
+                  rows={13}
                   readOnly
                   value={gutenbergExportOutput || 'Click "Refresh Export" to serialize current manuscript.'}
                   className="w-full font-mono text-[11px] p-3 bg-slate-900 text-slate-100 border border-slate-700 rounded-md"
@@ -365,7 +641,7 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-                <span className="text-xs text-slate-400">100% WordPress Gutenberg Compliant</span>
+                <span className="text-xs text-slate-400">100% Gutenberg Block Compliant</span>
                 <Button
                   type="button"
                   size="sm"
@@ -379,150 +655,14 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
               </div>
             </div>
           </div>
-        ) : (
-          /* ─── TAB 1: FILE INGESTION (WORD, PDF, MD) ─────────────────────── */
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {!importResult && !isParsing && (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
-                <div className="w-16 h-16 rounded-full bg-rose-50 text-accent-crimson flex items-center justify-center mb-4 border border-rose-100 shadow-2xs">
-                  <Upload size={28} />
-                </div>
-                <h3 className="font-serif text-lg font-bold text-ink-primary mb-1">
-                  Upload Journalistic Manuscript
-                </h3>
-                <p className="text-xs text-ink-secondary max-w-md mb-6 leading-relaxed">
-                  Support for Microsoft Word (.docx), Adobe Acrobat (.pdf), Markdown (.md), and plain text dispatches with full pagination.
-                </p>
-
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".docx,.md,.markdown,.txt,.pdf"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleFileSelect(e.target.files[0]);
-                      }
-                    }}
-                  />
-                  <span className="px-5 py-2.5 bg-accent-crimson hover:bg-rose-900 text-white text-xs font-mono font-medium rounded shadow-xs transition-colors">
-                    Browse Local File (25 MB max)
-                  </span>
-                </label>
-
-                {errorMsg && (
-                  <div className="mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded flex items-center gap-2">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {isParsing && (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white">
-                <LoadingSpinner />
-                <h4 className="font-serif text-base font-bold text-ink-primary mt-4">
-                  Parsing Document Pages &amp; Typography…
-                </h4>
-                <p className="text-xs text-ink-secondary mt-1 font-mono">
-                  Reconstructing wrapped PDF lines and extracting tables…
-                </p>
-              </div>
-            )}
-
-            {importResult && !isParsing && (
-              <div className="flex-1 overflow-hidden flex divide-x divide-slate-200">
-                {/* Left: Sidebar Controls */}
-                <div className="w-80 bg-white p-5 flex flex-col justify-between overflow-y-auto">
-                  <div className="space-y-4">
-                    <div>
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Ingested File</span>
-                      <h4 className="font-bold text-sm text-slate-900 truncate">{importResult.filename}</h4>
-                      <p className="text-xs text-slate-500 font-mono mt-0.5">
-                        {importResult.wordCount} words • {totalPages} pages • {importResult.readingTimeMinutes} min read
-                      </p>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-700">Page Selection</span>
-                        <div className="flex items-center gap-2 text-[11px] font-mono text-rose-800">
-                          <button type="button" onClick={handleSelectAllPages} className="hover:underline">All</button>
-                          <span>•</span>
-                          <button type="button" onClick={handleDeselectAllPages} className="hover:underline">None</button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-1.5 max-h-[140px] overflow-y-auto p-1 bg-slate-50 rounded border border-slate-200">
-                        {pages.map((p) => {
-                          const isSelected = selectedPageNumbers.includes(p.pageNumber);
-                          const isViewing = currentPageIndex === p.pageNumber - 1;
-                          return (
-                            <button
-                              key={p.pageNumber}
-                              type="button"
-                              onClick={() => {
-                                setCurrentPageIndex(p.pageNumber - 1);
-                                togglePageSelection(p.pageNumber);
-                              }}
-                              className={`p-1.5 rounded text-xs font-mono font-bold transition-all border ${
-                                isViewing
-                                  ? 'border-rose-800 bg-rose-50 text-rose-900 ring-1 ring-rose-800'
-                                  : isSelected
-                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                                  : 'border-slate-200 bg-white text-slate-400'
-                              }`}
-                            >
-                              P.{p.pageNumber}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <Label htmlFor="use-title" className="text-slate-700 font-medium">Use Detected Headline</Label>
-                        <Switch id="use-title" checked={useDetectedTitle} onCheckedChange={setUseDetectedTitle} />
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <Label htmlFor="import-tables" className="text-slate-700 font-medium">Import Tables</Label>
-                        <Switch id="import-tables" checked={importTables} onCheckedChange={setImportTables} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Page Preview Sheet */}
-                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center bg-slate-100">
-                  <div className="w-full max-w-3xl bg-white border border-slate-200 rounded-sm shadow-md p-10 font-sans min-h-[520px] flex flex-col justify-between">
-                    <div>
-                      <div className="pb-4 mb-6 border-b border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-400">
-                        <span className="uppercase tracking-wider">{importResult.filename}</span>
-                        <span>Page {currentPage.pageNumber} of {totalPages}</span>
-                      </div>
-                      <div
-                        className="prose prose-slate max-w-none text-ink-primary text-base leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: currentPage.htmlContent }}
-                      />
-                    </div>
-                    <div className="pt-6 mt-8 border-t border-slate-100 text-center text-[10px] font-mono text-slate-400">
-                      — Page {currentPage.pageNumber} ({currentPage.wordCount} words) —
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         )}
 
         {/* Footer */}
         <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-between bg-white shrink-0">
-          <div className="text-xs font-mono text-ink-secondary">
+          <div className="text-xs font-mono text-slate-500">
             {activeTab === 'file' && importResult && (
               <span>
-                Selected <strong className="text-accent-crimson">{selectedPageNumbers.length}</strong> of {totalPages} pages
+                Selected <strong className="text-rose-800">{selectedPageNumbers.length}</strong> of {totalPages} pages for insertion
               </span>
             )}
           </div>
@@ -536,9 +676,10 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
                 size="sm"
                 onClick={handleConfirm}
                 disabled={selectedPageNumbers.length === 0}
-                className="bg-accent-crimson text-white text-xs font-mono"
+                className="bg-rose-800 hover:bg-rose-900 text-white text-xs font-mono flex items-center gap-1.5"
               >
-                Import Selected Pages
+                <FileCheck size={14} />
+                <span>Import {selectedPageNumbers.length} Selected Pages</span>
               </Button>
             )}
           </div>
