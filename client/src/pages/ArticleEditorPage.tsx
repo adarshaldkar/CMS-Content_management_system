@@ -41,6 +41,7 @@ import { RevisionDiffViewer } from '../components/editor/RevisionDiffViewer';
 import { PrePublishChecklistModal, type PrePublishAuditData } from '../components/editor/PrePublishChecklistModal';
 import { tourService } from '../services/tour.service';
 import { apiClient } from '../api/client';
+import { UnsavedChangesModal } from '../components/editor/UnsavedChangesModal';
 import type { Article, ArticleStatus, Category } from '../types';
 
 type WorkspaceMode = 'write' | 'review' | 'preview';
@@ -106,6 +107,14 @@ export const ArticleEditorPage: React.FC = () => {
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [diffViewerOpen, setDiffViewerOpen] = useState(false);
   const [prePublishModalOpen, setPrePublishModalOpen] = useState(false);
+  const [leaveConfirmModalOpen, setLeaveConfirmModalOpen] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+
+  // Recovered Local Draft State
+  const [recoveredDraft, setRecoveredDraft] = useState<{
+    data: any;
+    savedAt: string;
+  } | null>(null);
 
   // Autosave State Tracking
   const [autosaveStatus, setAutosaveStatus] = useState<
@@ -113,6 +122,151 @@ export const ArticleEditorPage: React.FC = () => {
   >('saved');
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(new Date());
   const [timeAgoText, setTimeAgoText] = useState('Saved just now');
+
+  const storageDraftKey = `gazette_draft_backup_${id || 'new'}`;
+
+  // ─── 1. Continuous LocalStorage Draft Auto-Backup (Debounced) ────────────
+  useEffect(() => {
+    if (autosaveStatus !== 'dirty') return;
+
+    const timer = setTimeout(() => {
+      try {
+        const payload = {
+          article: {
+            title: article.title,
+            slug: article.slug,
+            description: article.description,
+            content: article.content,
+            categoryId: article.categoryId,
+            tagIds: article.tagIds,
+            coverImage: article.coverImage,
+            seoTitle: article.seoTitle,
+            seoDescription: article.seoDescription,
+            status: article.status,
+            showAuthorName: article.showAuthorName,
+          },
+          tags,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(storageDraftKey, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('Draft localStorage auto-backup failed', e);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [article, tags, autosaveStatus, storageDraftKey]);
+
+  // ─── 2. Check for Recoverable Local Draft on Initial Mount ────────────────
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageDraftKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.savedAt && (parsed.article?.title || parsed.article?.content)) {
+          const draftTime = new Date(parsed.savedAt).getTime();
+          const serverTime = lastSavedTime ? lastSavedTime.getTime() : 0;
+          if (!id || draftTime > serverTime + 2000) {
+            setRecoveredDraft({
+              data: parsed,
+              savedAt: parsed.savedAt,
+            });
+          }
+        }
+      }
+    } catch {
+      // ignore json parse error
+    }
+  }, [id, storageDraftKey, lastSavedTime]);
+
+  const handleRestoreLocalDraft = () => {
+    if (!recoveredDraft?.data) return;
+    const { article: recoveredArticle, tags: recoveredTags } = recoveredDraft.data;
+    if (recoveredArticle) {
+      setArticle((prev) => ({
+        ...prev,
+        ...recoveredArticle,
+      }));
+    }
+    if (Array.isArray(recoveredTags)) {
+      setTags(recoveredTags);
+    }
+    setAutosaveStatus('dirty');
+    setRecoveredDraft(null);
+    setSuccessMessage('Restored unsaved manuscript backup from browser cache.');
+  };
+
+  const handleDiscardLocalDraft = () => {
+    try {
+      localStorage.removeItem(storageDraftKey);
+    } catch {}
+    setRecoveredDraft(null);
+  };
+
+  // ─── 3. Browser Back / Tab Close Native & PopState Guards ─────────────────
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (autosaveStatus === 'dirty') {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes in your story.';
+        return 'You have unsaved changes in your story.';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [autosaveStatus]);
+
+  useEffect(() => {
+    if (autosaveStatus === 'dirty') {
+      window.history.pushState({ gazetteGuard: true }, '', window.location.href);
+
+      const handlePopState = () => {
+        if (autosaveStatus === 'dirty') {
+          // Push history back to prevent immediate navigation
+          window.history.pushState({ gazetteGuard: true }, '', window.location.href);
+          setPendingNavigationPath('/stories');
+          setLeaveConfirmModalOpen(true);
+        }
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, [autosaveStatus]);
+
+  const handleGuardedNavigate = (targetPath: string = '/stories') => {
+    if (autosaveStatus === 'dirty') {
+      setPendingNavigationPath(targetPath);
+      setLeaveConfirmModalOpen(true);
+    } else {
+      navigate(targetPath);
+    }
+  };
+
+  const handleConfirmDiscardAndLeave = () => {
+    try {
+      localStorage.removeItem(storageDraftKey);
+    } catch {}
+    setAutosaveStatus('saved');
+    setLeaveConfirmModalOpen(false);
+    const dest = pendingNavigationPath || '/stories';
+    navigate(dest);
+  };
+
+  const handleConfirmSaveAndLeave = async () => {
+    const saved = await handleSaveDraft();
+    if (saved) {
+      try {
+        localStorage.removeItem(storageDraftKey);
+      } catch {}
+      setAutosaveStatus('saved');
+      setLeaveConfirmModalOpen(false);
+      const dest = pendingNavigationPath || '/stories';
+      navigate(dest);
+    }
+  };
 
   useEffect(() => {
     apiClient
@@ -272,6 +426,9 @@ export const ArticleEditorPage: React.FC = () => {
         setArticle(updated);
         setLastSavedTime(new Date());
         setAutosaveStatus('saved');
+        try {
+          localStorage.removeItem(storageDraftKey);
+        } catch {}
         setSuccessMessage(
           article.status === 'published'
             ? 'Story changes saved and updated successfully.'
@@ -283,6 +440,9 @@ export const ArticleEditorPage: React.FC = () => {
         setArticle(created);
         setLastSavedTime(new Date());
         setAutosaveStatus('saved');
+        try {
+          localStorage.removeItem(storageDraftKey);
+        } catch {}
         navigate(`/write/${created.id}`, { replace: true });
         setSuccessMessage('Story draft created.');
         return created;
@@ -340,6 +500,10 @@ export const ArticleEditorPage: React.FC = () => {
       });
       setArticle(updated);
       setLastSavedTime(new Date());
+      setAutosaveStatus('saved');
+      try {
+        localStorage.removeItem(storageDraftKey);
+      } catch {}
       setSuccessMessage(`Story successfully transitioned to ${targetStatus.replace('_', ' ')}.`);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || 'Workflow transition failed.');
@@ -373,13 +537,14 @@ export const ArticleEditorPage: React.FC = () => {
       {/* ─── Top Master Header with Mode Switcher ─────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xs border-b border-border-subtle px-4 sm:px-6 py-2.5 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
-          <Link
-            to="/stories"
-            className="p-1.5 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded-sm transition-colors"
+          <button
+            type="button"
+            onClick={() => handleGuardedNavigate('/stories')}
+            className="p-1.5 text-ink-secondary hover:text-ink-primary hover:bg-slate-100 rounded-sm transition-colors cursor-pointer"
             title="Return to Stories"
           >
             <ArrowLeft className="w-4 h-4" />
-          </Link>
+          </button>
 
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-crimson font-bold">
@@ -620,6 +785,45 @@ export const ArticleEditorPage: React.FC = () => {
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left/Center Canvas (8 cols or 12 cols) */}
           <div className={`${inspectorOpen ? 'lg:col-span-8' : 'lg:col-span-12 max-w-4xl mx-auto w-full'} space-y-6 transition-all duration-200`}>
+            {/* Recovered Unsaved Local Draft Banner */}
+            {recoveredDraft && (
+              <div className="p-4 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border border-amber-300 rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 text-amber-800 rounded-full shrink-0 border border-amber-300">
+                    <Sparkles size={16} className="text-amber-700" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-xs text-amber-950 flex items-center gap-2">
+                      <span>Unsaved Manuscript Backup Recovered</span>
+                      <span className="font-mono text-[10px] text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded font-medium">
+                        {new Date(recoveredDraft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 mt-0.5">
+                      We found uncommitted edits cached in your browser from an earlier session. Would you like to restore them to your canvas?
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={handleDiscardLocalDraft}
+                    className="px-3 py-1.5 text-xs font-mono text-amber-900 hover:text-amber-950 hover:bg-amber-100 rounded transition-colors cursor-pointer"
+                  >
+                    Discard Backup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRestoreLocalDraft}
+                    className="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles size={13} />
+                    <span>Restore Draft</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Notifications */}
             {errorMessage && (
               <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-sm flex items-center gap-2">
@@ -1034,6 +1238,15 @@ export const ArticleEditorPage: React.FC = () => {
       )}
 
       {/* ─── MODALS ──────────────────────────────────────────────────────── */}
+      <UnsavedChangesModal
+        isOpen={leaveConfirmModalOpen}
+        onKeepEditing={() => setLeaveConfirmModalOpen(false)}
+        onDiscardAndLeave={handleConfirmDiscardAndLeave}
+        onSaveAndLeave={handleConfirmSaveAndLeave}
+        isSaving={saving}
+        articleTitle={article.title || 'Untitled Manuscript'}
+      />
+
       <MediaPickerModal
         isOpen={mediaPickerOpen}
         onClose={() => setMediaPickerOpen(false)}
