@@ -12,7 +12,9 @@ import {
   FileCheck2,
   RemoveFormatting,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
+
 import type { CommandExecutionContext } from './commandRegistry';
 import { toggleSemanticHighlight } from './commandRegistry';
 import { editorialNodes } from './editorialNodes';
@@ -252,10 +254,24 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         type="button"
         title="Clear Formatting"
         onClick={() => executionContext.executeCommand('removeFormat')}
-        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
+        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
       >
         <RemoveFormatting size={13} />
+      </button>
+
+      {/* Delete / Remove Selected Node */}
+      <button
+        type="button"
+        title="Delete Selection / Block (Ctrl+Shift+Delete)"
+        onClick={() => {
+          document.execCommand('delete');
+          setVisible(false);
+        }}
+        className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-900/80 rounded-xs transition-colors cursor-pointer"
+      >
+        <Trash2 size={13} />
       </button>
     </div>
   );
 };
+

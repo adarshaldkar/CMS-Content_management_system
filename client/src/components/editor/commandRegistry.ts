@@ -97,15 +97,54 @@ export function toggleSemanticHighlight(ctx?: CommandExecutionContext) {
     newRange.selectNodeContents(mark);
     sel.addRange(newRange);
   } catch {
-    try {
-      const mark = document.createElement('mark');
-      mark.className = 'cms-semantic-highlight bg-rose-50 text-accent-crimson px-1.5 py-0.5 rounded-xs font-medium';
-      range.surroundContents(mark);
-    } catch {
-      // Fallback
-    }
+    // Fallback
   }
 }
+
+export function deleteCurrentBlock(ctx: CommandExecutionContext): void {
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !ctx.editorRef.current) return;
+
+  const editor = ctx.editorRef.current;
+  let targetNode: Node | null = sel.anchorNode;
+
+  while (targetNode && targetNode !== editor) {
+    if (targetNode instanceof HTMLElement) {
+      const tag = targetNode.tagName.toUpperCase();
+      const isBlock = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'FIGURE', 'TABLE', 'ASIDE', 'PRE', 'HR', 'DIV'].includes(tag);
+      if (isBlock) {
+        const nextSibling = targetNode.nextElementSibling || targetNode.previousElementSibling;
+        targetNode.remove();
+        if (nextSibling && nextSibling instanceof HTMLElement) {
+          const range = document.createRange();
+          range.selectNodeContents(nextSibling);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else if (editor.innerHTML.trim() === '') {
+          editor.innerHTML = '<p><br></p>';
+        }
+        return;
+      }
+    }
+    targetNode = targetNode.parentNode;
+  }
+}
+
+export function clearEntireManuscript(ctx: CommandExecutionContext): void {
+  if (!ctx.editorRef.current) return;
+  ctx.editorRef.current.innerHTML = '<p><br></p>';
+  const sel = window.getSelection();
+  if (sel) {
+    const range = document.createRange();
+    range.selectNodeContents(ctx.editorRef.current);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
 
 export const EDITORIAL_COMMANDS: EditorialCommand[] = [
   // ─── TEXT CATEGORY ────────────────────────────────────────────────────────
@@ -325,6 +364,27 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     keywords: ['clear', 'remove formatting', 'clean'],
     execute: (ctx) => ctx.executeCommand('removeFormat'),
   },
+  {
+    id: 'edit.deleteBlock',
+    title: 'Delete Current Block',
+    category: 'format',
+    shortcut: 'Ctrl+Shift+Delete',
+    icon: 'Trash2',
+    description: 'Delete enclosing block (paragraph, table, image, callout, quote)',
+    keywords: ['delete', 'remove', 'trash', 'block', 'erase'],
+    execute: (ctx) => deleteCurrentBlock(ctx),
+  },
+  {
+    id: 'edit.clearAll',
+    title: 'Clear Entire Manuscript',
+    category: 'format',
+    shortcut: 'Ctrl+Alt+Backspace',
+    icon: 'RotateCcw',
+    description: 'Reset manuscript canvas to blank slate',
+    keywords: ['clear all', 'delete all', 'reset', 'blank', 'empty'],
+    execute: (ctx) => clearEntireManuscript(ctx),
+  },
+
 
   // ─── INSERT CATEGORY ──────────────────────────────────────────────────────
   {
@@ -413,24 +473,16 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
   },
   {
     id: 'media.video',
-    title: 'Upload Native Video',
+    title: 'Insert Video (Embed & Hosted)',
     category: 'media',
-    icon: 'Film',
-    description: 'Self-hosted MP4, WebM, MOV video with poster',
-    keywords: ['video', 'native video', 'mp4', 'movie', 'film'],
+    icon: 'Video',
+    description: 'Embed YouTube, Vimeo, Loom, Spotify, or upload secure Gazette MP4/WebM video',
+    keywords: ['video', 'youtube', 'vimeo', 'loom', 'spotify', 'mp4', 'webm', 'embed', 'player', 'broadcast'],
     execute: (ctx) => ctx.openModal('videoUpload'),
   },
   {
-    id: 'media.embed',
-    title: 'Embed Video / Rich Link',
-    category: 'media',
-    icon: 'Video',
-    description: 'YouTube, Vimeo, Loom, Spotify, or X URL embed',
-    keywords: ['youtube', 'vimeo', 'spotify', 'embed', 'player', 'loom'],
-    execute: (ctx) => ctx.openModal('richEmbed'),
-  },
-  {
     id: 'media.document',
+
     title: 'Import Manuscript (.docx, .pdf, Gutenberg)',
     category: 'media',
     icon: 'FileText',

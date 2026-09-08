@@ -38,14 +38,22 @@ import {
   Redo2,
   Type,
   Pilcrow,
+  Trash2,
+  RotateCcw,
+  Eraser,
 } from 'lucide-react';
+
+
 import {
   type CommandExecutionContext,
   type CommandCategory,
   type EditorialCommand,
   EDITORIAL_COMMANDS,
   toggleSemanticHighlight,
+  deleteCurrentBlock,
+  clearEntireManuscript,
 } from './commandRegistry';
+
 
 interface EditorialRibbonProps {
   executionContext: CommandExecutionContext;
@@ -100,8 +108,11 @@ const ICON_MAP: Record<string, React.ElementType> = {
   PanelRight,
   Eye,
   Pilcrow,
-  Type,
+  Trash2,
+  RotateCcw,
+  Eraser,
 };
+
 
 export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
   executionContext,
@@ -463,12 +474,13 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
 
           <button
             type="button"
-            title="Embed Video (YouTube, Vimeo, Spotify)"
-            onClick={() => executionContext.openModal('richEmbed')}
+            title="Insert Video (Embed & Gazette Hosted)"
+            onClick={() => executionContext.openModal('videoUpload')}
             className="p-1.5 rounded text-ink-secondary hover:text-accent-crimson hover:bg-rose-50 transition-colors cursor-pointer"
           >
             <Video className="h-3.5 w-3.5" />
           </button>
+
 
           <button
             type="button"
@@ -479,7 +491,42 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
           >
             <FileText className="h-3.5 w-3.5" />
           </button>
+
+          <div className="h-4 w-px bg-slate-200 mx-1" />
+
+          {/* Delete & Clear Controls */}
+          <button
+            type="button"
+            title="Clear Formatting / Strip Styles (Ctrl+\)"
+            onClick={() => executionContext.executeCommand('removeFormat')}
+            className="p-1.5 rounded text-ink-secondary hover:text-ink-primary hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <RemoveFormatting className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
+            title="Delete Current Block (Ctrl+Shift+Delete)"
+            onClick={() => deleteCurrentBlock(executionContext)}
+            className="p-1.5 rounded text-ink-secondary hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+          </button>
+
+          <button
+            type="button"
+            title="Clear Entire Manuscript (Reset Canvas)"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to clear the entire manuscript canvas? This action resets the editor.')) {
+                clearEntireManuscript(executionContext);
+              }
+            }}
+            className="p-1.5 rounded text-ink-secondary hover:text-rose-800 hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="h-3.5 w-3.5 text-slate-500 hover:text-rose-800" />
+          </button>
         </div>
+
 
         {/* View Toggle */}
         <div className="flex items-center gap-1 shrink-0">

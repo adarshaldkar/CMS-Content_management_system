@@ -13,9 +13,10 @@ import {
 } from 'lucide-react';
 import { MediaPickerModal } from './MediaPickerModal';
 import { RichEmbedModal } from './RichEmbedModal';
-import { VideoUploadModal } from './VideoUploadModal';
+import { UnifiedVideoModal } from './UnifiedVideoModal';
 import { DocumentImportModal } from './DocumentImportModal';
 import { TableBuilderModal } from './TableBuilderModal';
+
 import { EditorialRibbon } from './EditorialRibbon';
 import { SlashCommandPalette } from './SlashCommandPalette';
 import { FloatingSelectionMiniToolbar } from './FloatingSelectionMiniToolbar';
@@ -26,7 +27,10 @@ import {
   type EditorialCommand,
   type CommandExecutionContext,
   toggleSemanticHighlight,
+  deleteCurrentBlock,
+  clearEntireManuscript,
 } from './commandRegistry';
+
 import { embedsApi, type EmbedMetadataResponse } from '../../api/embeds.api';
 import { formatEmbedHtml } from '../../utils/embedFormatter';
 import { isValidUrl, detectEmbedInfo } from '../../utils/embedParser';
@@ -306,6 +310,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         } else if (key === 'z') {
           e.preventDefault();
           executeCommand('redo');
+        } else if (key === 'delete' || key === 'backspace') {
+          e.preventDefault();
+          deleteCurrentBlock(executionContext);
+          handleInput();
+        }
+        return;
+      }
+
+      if (isAlt && (key === 'backspace' || key === 'delete')) {
+        e.preventDefault();
+        if (window.confirm('Clear the entire manuscript canvas?')) {
+          clearEntireManuscript(executionContext);
+          handleInput();
         }
         return;
       }
@@ -342,8 +359,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         executeCommand('justifyFull');
       } else if (key === '\\') {
         e.preventDefault();
-        onToggleInspector && onToggleInspector();
+        executeCommand('removeFormat');
       }
+
     }
   };
 
@@ -996,17 +1014,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onSelect={handleMediaSelected}
       />
 
-      <RichEmbedModal
-        isOpen={embedModalOpen}
-        initialUrl={embedModalUrl}
-        onClose={() => setEmbedModalOpen(false)}
-        onInsert={handleEmbedInsert}
-      />
-
-      <VideoUploadModal
+      <UnifiedVideoModal
         isOpen={videoModalOpen}
-        onClose={() => setVideoModalOpen(false)}
-        onInsert={handleNativeVideoInsert}
+        initialUrl={embedModalUrl}
+        onClose={() => {
+          setVideoModalOpen(false);
+          setEmbedModalUrl('');
+        }}
+        onInsertVideo={(videoHtml) => insertHtml(videoHtml)}
       />
 
       <DocumentImportModal
@@ -1023,3 +1038,4 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     </div>
   );
 };
+
