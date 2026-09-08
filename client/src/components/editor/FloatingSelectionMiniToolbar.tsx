@@ -15,6 +15,7 @@ import {
   RemoveFormatting,
 } from 'lucide-react';
 import type { CommandExecutionContext } from './commandRegistry';
+import { toggleSemanticHighlight } from './commandRegistry';
 
 interface FloatingSelectionMiniToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
@@ -36,6 +37,7 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
     bold: false,
     italic: false,
     underline: false,
+    highlight: false,
   });
   const toolbarRef = useRef<HTMLDivElement>(null);
 
@@ -72,10 +74,21 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
       setVisible(true);
 
       try {
+        let isInsideMark = false;
+        let node: Node | null = sel.anchorNode;
+        while (node && node !== editorRef.current) {
+          if (node instanceof HTMLElement && (node.tagName === 'MARK' || node.classList.contains('cms-semantic-highlight'))) {
+            isInsideMark = true;
+            break;
+          }
+          node = node.parentNode;
+        }
+
         setActiveFormats({
           bold: document.queryCommandState('bold'),
           italic: document.queryCommandState('italic'),
           underline: document.queryCommandState('underline'),
+          highlight: isInsideMark,
         });
       } catch {
         // Ignore
@@ -152,16 +165,16 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
 
       <button
         type="button"
-        title="Semantic Highlight"
+        title="Semantic Highlight (Toggle)"
         onClick={() => {
-          const sel = window.getSelection();
-          if (sel && sel.toString()) {
-            executionContext.insertHtml(
-              `<mark class="bg-rose-50 text-accent-crimson px-1.5 py-0.5 rounded-xs font-medium">${sel.toString()}</mark>`,
-            );
-          }
+          toggleSemanticHighlight(executionContext);
+          setActiveFormats((prev) => ({ ...prev, highlight: !prev.highlight }));
         }}
-        className="p-1.5 text-slate-300 hover:text-accent-crimson hover:bg-slate-800 rounded-xs transition-colors cursor-pointer"
+        className={`p-1.5 rounded-xs transition-colors cursor-pointer ${
+          activeFormats.highlight
+            ? 'bg-rose-900 text-rose-200 ring-1 ring-rose-400/50'
+            : 'text-slate-300 hover:text-accent-crimson hover:bg-slate-800'
+        }`}
       >
         <Highlighter size={14} />
       </button>

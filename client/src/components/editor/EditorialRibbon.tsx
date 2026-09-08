@@ -40,10 +40,11 @@ import {
   Pilcrow,
 } from 'lucide-react';
 import {
-  EDITORIAL_COMMANDS,
-  type EditorialCommand,
-  type CommandCategory,
   type CommandExecutionContext,
+  type CommandCategory,
+  type EditorialCommand,
+  EDITORIAL_COMMANDS,
+  toggleSemanticHighlight,
 } from './commandRegistry';
 
 interface EditorialRibbonProps {
@@ -63,6 +64,8 @@ const CATEGORIES: { id: CommandCategory; label: string }[] = [
 ];
 
 const ICON_MAP: Record<string, React.ElementType> = {
+  Undo2,
+  Redo2,
   Bold,
   Italic,
   Underline,
@@ -111,6 +114,7 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
     italic: false,
     underline: false,
     strike: false,
+    highlight: false,
     ul: false,
     ol: false,
     align: 'left',
@@ -123,11 +127,28 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
     const updateActiveStates = () => {
       try {
         if (typeof document !== 'undefined') {
+          const sel = window.getSelection();
+          let isInsideMark = false;
+          if (sel && sel.anchorNode) {
+            let node: Node | null = sel.anchorNode;
+            while (node && node !== document.body) {
+              if (
+                node instanceof HTMLElement &&
+                (node.tagName === 'MARK' || node.classList.contains('cms-semantic-highlight'))
+              ) {
+                isInsideMark = true;
+                break;
+              }
+              node = node.parentNode;
+            }
+          }
+
           setActiveFormats({
             bold: document.queryCommandState('bold'),
             italic: document.queryCommandState('italic'),
             underline: document.queryCommandState('underline'),
             strike: document.queryCommandState('strikeThrough'),
+            highlight: isInsideMark,
             ul: document.queryCommandState('insertUnorderedList'),
             ol: document.queryCommandState('insertOrderedList'),
             align: document.queryCommandState('justifyCenter')
@@ -326,17 +347,16 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
 
           <button
             type="button"
-            title="Semantic Highlight"
+            title="Semantic Highlight (Toggle)"
             onClick={() => {
-              const sel = window.getSelection();
-              if (sel && sel.toString()) {
-                const text = sel.toString();
-                executionContext.insertHtml(
-                  `<mark class="bg-rose-50 text-accent-crimson px-1.5 py-0.5 rounded-xs font-medium">${text}</mark>`,
-                );
-              }
+              toggleSemanticHighlight(executionContext);
+              setActiveFormats((prev) => ({ ...prev, highlight: !prev.highlight }));
             }}
-            className="p-1.5 rounded text-ink-secondary hover:text-accent-crimson hover:bg-rose-50 transition-colors cursor-pointer"
+            className={`p-1.5 rounded transition-colors cursor-pointer ${
+              activeFormats.highlight
+                ? 'bg-rose-100 text-accent-crimson font-medium ring-1 ring-accent-crimson/40'
+                : 'text-ink-secondary hover:text-accent-crimson hover:bg-rose-50'
+            }`}
           >
             <Highlighter className="h-3.5 w-3.5" />
           </button>

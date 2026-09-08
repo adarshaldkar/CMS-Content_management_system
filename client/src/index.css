@@ -466,11 +466,28 @@
   overflow-x: auto !important;
 }
 
-.prose mark {
+/* ─── Gazette Editorial Semantic Highlight (Editor & Reader) ──────────── */
+mark,
+.prose mark,
+.cms-semantic-highlight,
+.manuscript-editor mark {
   background-color: #ffe4e6 !important;
   color: #881337 !important;
-  padding: 0.125rem 0.375rem !important;
-  border-radius: 2px !important;
+  padding: 0.15rem 0.375rem !important;
+  border-radius: 3px !important;
   font-weight: 500 !important;
+  box-decoration-break: clone !important;
+  -webkit-box-decoration-break: clone !important;
+  border: 1px solid rgba(225, 29, 72, 0.15) !important;
 }
+
+[data-theme='dark'] mark,
+[data-theme='dark'] .prose mark,
+[data-theme='dark'] .cms-semantic-highlight,
+[data-theme='dark'] .manuscript-editor mark {
+  background-color: rgba(225, 29, 72, 0.25) !important;
+  color: #fecdd3 !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+}
+
 
