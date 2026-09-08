@@ -25,6 +25,7 @@ import {
   EDITORIAL_COMMANDS,
   type EditorialCommand,
   type CommandExecutionContext,
+  toggleSemanticHighlight,
 } from './commandRegistry';
 import { embedsApi, type EmbedMetadataResponse } from '../../api/embeds.api';
 import { formatEmbedHtml } from '../../utils/embedFormatter';
@@ -234,10 +235,68 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     cmd.execute(executionContext);
   };
 
-  // ─── Keydown & Dynamic Shortcuts ─────────────────────────────────────────
+  // ─── Keydown & Dynamic Microsoft Word-Style Shortcuts ─────────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      const key = e.key.toLowerCase();
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    const isAlt = e.altKey;
+    const isShift = e.shiftKey;
+    const key = e.key.toLowerCase();
+
+    // 1. Headings & Paragraph shortcuts: Ctrl+Alt+1..3 / Ctrl+1..3 / Ctrl+Alt+0
+    if (isCtrlOrCmd && (isAlt || key === '1' || key === '2' || key === '3' || key === '0')) {
+      if (key === '1') {
+        e.preventDefault();
+        executeCommand('formatBlock', '<h2>');
+        return;
+      }
+      if (key === '2') {
+        e.preventDefault();
+        executeCommand('formatBlock', '<h3>');
+        return;
+      }
+      if (key === '3') {
+        e.preventDefault();
+        executeCommand('formatBlock', '<h4>');
+        return;
+      }
+      if (key === '0') {
+        e.preventDefault();
+        executeCommand('formatBlock', '<p>');
+        return;
+      }
+    }
+
+    if (isCtrlOrCmd) {
+      if (isShift) {
+        if (key === 'h') {
+          e.preventDefault();
+          toggleSemanticHighlight(executionContext);
+          handleInput();
+        } else if (key === 'q') {
+          e.preventDefault();
+          executeCommand('formatBlock', '<blockquote>');
+        } else if (key === 'c') {
+          e.preventDefault();
+          executeCommand('formatBlock', '<pre>');
+        } else if (key === 'x') {
+          e.preventDefault();
+          executeCommand('strikeThrough');
+        } else if (key === '7' || key === 'o') {
+          e.preventDefault();
+          executeCommand('insertOrderedList');
+        } else if (key === '8' || key === 'u' || key === 'l') {
+          e.preventDefault();
+          executeCommand('insertUnorderedList');
+        } else if (key === 't') {
+          e.preventDefault();
+          setTableModalOpen(true);
+        } else if (key === 'z') {
+          e.preventDefault();
+          executeCommand('redo');
+        }
+        return;
+      }
+
       if (key === 'b') {
         e.preventDefault();
         executeCommand('bold');
@@ -252,14 +311,22 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         handleOpenLinkPopover();
       } else if (key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          executeCommand('redo');
-        } else {
-          executeCommand('undo');
-        }
+        executeCommand('undo');
       } else if (key === 'y') {
         e.preventDefault();
         executeCommand('redo');
+      } else if (key === 'e') {
+        e.preventDefault();
+        executeCommand('justifyCenter');
+      } else if (key === 'l') {
+        e.preventDefault();
+        executeCommand('justifyLeft');
+      } else if (key === 'r') {
+        e.preventDefault();
+        executeCommand('justifyRight');
+      } else if (key === 'j') {
+        e.preventDefault();
+        executeCommand('justifyFull');
       } else if (key === '\\') {
         e.preventDefault();
         onToggleInspector && onToggleInspector();
