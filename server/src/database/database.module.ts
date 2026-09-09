@@ -26,8 +26,9 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
           uri,
           serverSelectionTimeoutMS: 3000,
           connectTimeoutMS: 3000,
-          lazyConnection: false,
+          lazyConnection: true,
           bufferCommands: false,
+
           autoIndex: false,
           connectionFactory: (connection: any) => {
             connection.on('error', () => {

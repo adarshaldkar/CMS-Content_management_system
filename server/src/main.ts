@@ -13,7 +13,12 @@ import type { EnvConfig } from './config/env.schema';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
+  const bootStart = performance.now();
+
   const app = await NestFactory.create(AppModule);
+  const nestCreated = performance.now();
+  console.log(`[BOOT] NestFactory.create: ${(nestCreated - bootStart).toFixed(1)}ms`);
+
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
   // Enable graceful shutdown lifecycle hooks (SIGTERM, SIGINT) to drain pools and workers cleanly
@@ -123,6 +128,7 @@ async function bootstrap() {
 
   // 5. Swagger Documentation
   if (nodeEnv !== 'production') {
+    const swaggerStart = performance.now();
     const swaggerConfig = new DocumentBuilder()
       .setTitle('CMS Platform API')
       .setDescription('Hardened Editorial Content Platform API (OWASP Top 10:2025 Compliant)')
@@ -131,9 +137,14 @@ async function bootstrap() {
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api/docs', app, document);
+    console.log(`[BOOT] Swagger setup: ${(performance.now() - swaggerStart).toFixed(1)}ms`);
   }
 
+  const listenStart = performance.now();
   await app.listen(port);
+  const totalBootTime = (performance.now() - bootStart).toFixed(1);
+  console.log(`[BOOT] Server listening: ${(performance.now() - listenStart).toFixed(1)}ms`);
+  console.log(`[BOOT] Total Backend Startup Time: ${totalBootTime}ms (~${(Number(totalBootTime) / 1000).toFixed(2)}s)`);
   console.log(`API running at http://localhost:${port}/api`);
   if (nodeEnv !== 'production') {
     console.log(`Swagger at http://localhost:${port}/api/docs`);
@@ -141,3 +152,4 @@ async function bootstrap() {
 }
 
 void bootstrap();
+

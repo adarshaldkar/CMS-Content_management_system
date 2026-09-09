@@ -40,16 +40,24 @@ export class MultiDatabaseMeshService implements OnApplicationBootstrap {
     this.activeEngine = (this.config.get('ACTIVE_DATABASE', { infer: true }) as DatabaseEngine) || 'postgres';
   }
 
-  async onApplicationBootstrap() {
-    this.logger.log('Initializing 6-Database Persistence Mesh...');
-    await Promise.allSettled([
+  onApplicationBootstrap() {
+    this.logger.log(`6-Database Persistence Mesh initialized. Active Engine: [${this.activeEngine.toUpperCase()}]`);
+    // Run schema synchronization for failover databases in the background without blocking HTTP server boot
+    void this.initializeSecondarySchemasInBackground();
+  }
+
+  private async initializeSecondarySchemasInBackground(): Promise<void> {
+    const startTime = Date.now();
+    const results = await Promise.allSettled([
       this.mariadb.ensureSchema(),
       this.mysql.ensureSchema(),
       this.cockroach.ensureSchema(),
       this.clickhouse.ensureSchema(),
     ]);
-    this.logger.log(`6-Database Persistence Mesh initialized. Active Engine: [${this.activeEngine.toUpperCase()}]`);
+    const duration = Date.now() - startTime;
+    this.logger.log(`Secondary persistence mesh schemas settled in ${duration}ms (non-blocking).`);
   }
+
 
   getActiveEngine(): DatabaseEngine {
     return this.activeEngine;
