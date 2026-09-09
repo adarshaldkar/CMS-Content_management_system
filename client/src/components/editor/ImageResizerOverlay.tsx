@@ -544,11 +544,15 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           </span>
         </div>
 
-        {/* Floating Quick Action Toolbar */}
+        {/* Floating Quick Action Toolbar (Smartly positioned so it's NEVER covered by sticky ribbon) */}
         <div
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute -top-14 left-1/2 -translate-x-1/2 pointer-events-auto flex items-center gap-1 p-1 bg-slate-900 text-white border border-slate-700 rounded shadow-xl text-xs font-mono select-none shrink-0 whitespace-nowrap z-50"
+          style={{
+            top: rect.top < 65 ? '12px' : '-52px',
+          }}
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-auto flex items-center gap-1 p-1.5 bg-slate-900/98 text-white border border-slate-600 rounded-md shadow-2xl text-xs font-mono select-none shrink-0 whitespace-nowrap z-[60]"
         >
+
           {/* Reorder Up / Down */}
           <button
             type="button"
