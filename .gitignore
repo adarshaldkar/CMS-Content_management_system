@@ -19,17 +19,21 @@ logs/
 *.log
 npm-debug.log*
 
-# OS / IDE
+# OS / IDE / Antigravity Agents
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.agents/
+.gemini/
 
-# Documentation & internal specifications
-# (tracked in repository)
-
-# Test output (source tests are intentionally tracked)
+# Non-production auxiliary tools and test suites
+archify/
+test/
+tests/
+test-fixtures/
+scripts/
 .cache/
 .playwright/
 test-results/
@@ -41,3 +45,8 @@ server/uploads/
 # Docker volumes (local)
 postgres_data/
 mongo_data/
+mariadb_data/
+mysql_data/
+cockroach_data/
+clickhouse_data/
+redis_data/
