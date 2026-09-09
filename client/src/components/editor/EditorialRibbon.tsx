@@ -207,8 +207,9 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
       className="sticky top-0 z-30 w-full border-b border-border-subtle bg-white/95 backdrop-blur-md font-sans select-none"
     >
       {/* ─── Top Category Tabs ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 border-b border-slate-100 h-8">
+      <div className="flex items-center justify-between px-3 border-b border-slate-100 h-8 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1">
+
           {CATEGORIES.map((cat) => {
             const isOpen = openDropdown === cat.id;
             return (
@@ -271,8 +272,9 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
       </div>
 
       {/* ─── Fast Quick-Action Tool Strip ──────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-1.5 gap-2 overflow-x-auto">
+      <div className="flex items-center justify-between px-3 py-1.5 gap-2 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1">
+
           {/* History Undo / Redo */}
           <button
             type="button"
