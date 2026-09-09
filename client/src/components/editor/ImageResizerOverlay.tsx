@@ -3,7 +3,6 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  Maximize2,
   Trash2,
   MessageSquare,
   Move,
@@ -11,7 +10,6 @@ import {
   ArrowDown,
   Minus,
   Plus,
-  GripVertical,
 } from 'lucide-react';
 
 interface ImageResizerOverlayProps {
@@ -59,9 +57,20 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
   const startHeightRef = useRef(0);
   const aspectRatioRef = useRef(1);
 
+  // Helper: Find enclosing block element (figure or paragraph)
+  const getEnclosingImageBlock = useCallback((img: HTMLImageElement): HTMLElement => {
+    const figure = img.closest('figure');
+    if (figure && editorRef.current?.contains(figure)) return figure;
+    const p = img.closest('p, div, blockquote, section');
+    if (p && p !== editorRef.current && editorRef.current?.contains(p)) {
+      return p as HTMLElement;
+    }
+    return img;
+  }, [editorRef]);
+
   // Update bounding box coordinates relative to container (or editor)
   const updateRect = useCallback(() => {
-    if (!selectedImg) {
+    if (!selectedImg || !selectedImg.isConnected) {
       setRect(null);
       return;
     }
@@ -110,21 +119,23 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
     };
   }, [editorRef, updateRect]);
 
-  // Re-calculate position when image changes
+  // Re-calculate position when image changes or layout reflows
   useEffect(() => {
     if (selectedImg) {
       updateRect();
+      const raf = requestAnimationFrame(updateRect);
+      return () => cancelAnimationFrame(raf);
     } else {
       setRect(null);
     }
   }, [selectedImg, updateRect]);
 
-  // ─── Keyboard Arrow Key Resizing (Arrow keys or Shift/Ctrl + Arrows) ───────
+  // ─── Keyboard Arrow Key Resizing & Moving (Arrow keys or Shift/Alt + Arrows) ──
   useEffect(() => {
     if (!selectedImg) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedImg) return;
+      if (!selectedImg || !editorRef.current) return;
 
       const activeEl = document.activeElement;
       const isTypingText =
@@ -146,30 +157,41 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
         return;
       }
 
-      const step = e.shiftKey ? 30 : 15;
+      // Alt+Up / Alt+Down: Move image block up or down
+      if (e.altKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveImageBlock('up');
+        return;
+      }
+      if (e.altKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveImageBlock('down');
+        return;
+      }
+
+      // Quick keyboard step sizing: + or = increases, - decreases
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        adjustSizeStep(50);
+        return;
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        adjustSizeStep(-50);
+        return;
+      }
+
+      const step = e.shiftKey ? 50 : 25;
 
       if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
         if (!isTypingText || e.shiftKey || e.ctrlKey) {
           e.preventDefault();
-          const currentWidth = selectedImg.offsetWidth || 300;
-          const maxWidth = editorRef.current ? editorRef.current.clientWidth - 40 : 1200;
-          const newWidth = Math.min(maxWidth, currentWidth + step);
-          selectedImg.style.width = `${newWidth}px`;
-          selectedImg.style.height = 'auto';
-          selectedImg.style.maxWidth = '100%';
-          updateRect();
-          onContentChange();
+          adjustSizeStep(step);
         }
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
         if (!isTypingText || e.shiftKey || e.ctrlKey) {
           e.preventDefault();
-          const currentWidth = selectedImg.offsetWidth || 300;
-          const newWidth = Math.max(60, currentWidth - step);
-          selectedImg.style.width = `${newWidth}px`;
-          selectedImg.style.height = 'auto';
-          selectedImg.style.maxWidth = '100%';
-          updateRect();
-          onContentChange();
+          adjustSizeStep(-step);
         }
       }
     };
@@ -190,8 +212,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
 
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
-    startWidthRef.current = selectedImg.offsetWidth || rect?.width || 300;
-    startHeightRef.current = selectedImg.offsetHeight || rect?.height || 200;
+    startWidthRef.current = selectedImg.getBoundingClientRect().width || rect?.width || 300;
+    startHeightRef.current = selectedImg.getBoundingClientRect().height || rect?.height || 200;
     aspectRatioRef.current = startWidthRef.current / (startHeightRef.current || 1);
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -203,25 +225,21 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
 
       switch (handle) {
         case 'top-left': {
-          // Dragging towards top-left (deltaX < 0, deltaY < 0) grows the image
           const effectiveDelta = -(deltaX + deltaY * aspectRatioRef.current) / 2;
           newWidth = Math.max(80, startWidthRef.current + effectiveDelta);
           break;
         }
         case 'top-right': {
-          // Dragging towards top-right (deltaX > 0, deltaY < 0) grows the image
           const effectiveDelta = (deltaX - deltaY * aspectRatioRef.current) / 2;
           newWidth = Math.max(80, startWidthRef.current + effectiveDelta);
           break;
         }
         case 'bottom-left': {
-          // Dragging towards bottom-left (deltaX < 0, deltaY > 0) grows the image
           const effectiveDelta = (-deltaX + deltaY * aspectRatioRef.current) / 2;
           newWidth = Math.max(80, startWidthRef.current + effectiveDelta);
           break;
         }
         case 'bottom-right': {
-          // Dragging towards bottom-right (deltaX > 0, deltaY > 0) grows the image
           const effectiveDelta = (deltaX + deltaY * aspectRatioRef.current) / 2;
           newWidth = Math.max(80, startWidthRef.current + effectiveDelta);
           break;
@@ -246,11 +264,13 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
 
       // Constrain within editor bounds
       const maxWidth = editorRef.current ? editorRef.current.clientWidth - 40 : 1200;
-      newWidth = Math.min(maxWidth, Math.max(80, newWidth));
+      newWidth = Math.min(maxWidth, Math.max(80, Math.round(newWidth)));
 
-      selectedImg.style.width = `${Math.round(newWidth)}px`;
+      selectedImg.style.width = `${newWidth}px`;
       selectedImg.style.height = 'auto';
       selectedImg.style.maxWidth = '100%';
+      selectedImg.removeAttribute('width');
+      selectedImg.removeAttribute('height');
 
       updateRect();
     };
@@ -260,7 +280,10 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
       setActiveHandle(null);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      onContentChange();
+      requestAnimationFrame(() => {
+        updateRect();
+        onContentChange();
+      });
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -279,9 +302,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
     const referenceEl = containerRef?.current || editorRef.current;
 
     const handleMouseMoveMove = (moveEvent: MouseEvent) => {
-      if (!editorRef.current || !referenceEl) return;
+      if (!editorRef.current || !referenceEl || !selectedImg) return;
 
-      // Find element under cursor inside the editor
       const elementsUnder = document.elementsFromPoint(moveEvent.clientX, moveEvent.clientY);
       const targetBlock = elementsUnder.find(
         (el) =>
@@ -325,13 +347,15 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
       window.removeEventListener('mouseup', handleMouseUpMove);
 
       if (dropTargetNodeRef.current && selectedImg) {
-        const itemToMove = selectedImg.closest('figure') || selectedImg;
+        const itemToMove = getEnclosingImageBlock(selectedImg);
         const { parent, nextSibling } = dropTargetNodeRef.current;
 
         if (parent && itemToMove !== nextSibling && itemToMove.nextSibling !== nextSibling) {
           parent.insertBefore(itemToMove, nextSibling);
-          updateRect();
-          onContentChange();
+          setTimeout(() => {
+            updateRect();
+            onContentChange();
+          }, 30);
         }
         dropTargetNodeRef.current = null;
       }
@@ -344,48 +368,63 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
   // ─── Move Up / Move Down Block Reordering ─────────────────────────────────
   const moveImageBlock = (direction: 'up' | 'down') => {
     if (!selectedImg || !editorRef.current) return;
-    const itemToMove = selectedImg.closest('figure') || selectedImg;
-    const parent = itemToMove.parentNode;
+    const block = getEnclosingImageBlock(selectedImg);
+    const parent = block.parentElement;
     if (!parent) return;
 
     if (direction === 'up') {
-      const prev = itemToMove.previousElementSibling;
+      const prev = block.previousElementSibling;
       if (prev) {
-        parent.insertBefore(itemToMove, prev);
-        updateRect();
-        onContentChange();
+        parent.insertBefore(block, prev);
+        setTimeout(() => {
+          updateRect();
+          onContentChange();
+        }, 30);
       }
     } else {
-      const next = itemToMove.nextElementSibling;
+      const next = block.nextElementSibling;
       if (next) {
-        parent.insertBefore(itemToMove, next.nextElementSibling);
-        updateRect();
-        onContentChange();
+        parent.insertBefore(block, next.nextElementSibling);
+        setTimeout(() => {
+          updateRect();
+          onContentChange();
+        }, 30);
       }
     }
   };
 
-  // ─── Quick Size Adjustment Buttons ───────────────────────────────────────
+  // ─── Quick Size Adjustment Buttons (+ / -) ───────────────────────────────
   const adjustSizeStep = (delta: number) => {
-    if (!selectedImg) return;
-    const currentWidth = selectedImg.offsetWidth || 300;
-    const maxWidth = editorRef.current ? editorRef.current.clientWidth - 40 : 1200;
-    const newWidth = Math.min(maxWidth, Math.max(80, currentWidth + delta));
+    if (!selectedImg || !editorRef.current) return;
+    const currentWidth = selectedImg.getBoundingClientRect().width || selectedImg.offsetWidth || 300;
+    const maxWidth = editorRef.current.clientWidth - 40;
+    const newWidth = Math.min(maxWidth, Math.max(80, Math.round(currentWidth + delta)));
+    
     selectedImg.style.width = `${newWidth}px`;
     selectedImg.style.height = 'auto';
     selectedImg.style.maxWidth = '100%';
-    updateRect();
-    onContentChange();
+    selectedImg.removeAttribute('width');
+    selectedImg.removeAttribute('height');
+
+    requestAnimationFrame(() => {
+      updateRect();
+      onContentChange();
+    });
   };
 
-  // ─── Quick Preset Actions ────────────────────────────────────────────────
+  // ─── Quick Preset Percentage Actions ─────────────────────────────────────
   const setPercentageWidth = (pct: number) => {
     if (!selectedImg) return;
     selectedImg.style.width = `${pct}%`;
     selectedImg.style.height = 'auto';
     selectedImg.style.maxWidth = '100%';
-    updateRect();
-    onContentChange();
+    selectedImg.removeAttribute('width');
+    selectedImg.removeAttribute('height');
+
+    requestAnimationFrame(() => {
+      updateRect();
+      onContentChange();
+    });
   };
 
   const setAlignment = (align: 'left' | 'center' | 'right') => {
@@ -406,8 +445,10 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
       selectedImg.style.float = 'right';
       selectedImg.style.clear = 'right';
     }
-    updateRect();
-    onContentChange();
+    requestAnimationFrame(() => {
+      updateRect();
+      onContentChange();
+    });
   };
 
   const handleDeleteImage = () => {
@@ -416,7 +457,11 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
     if (parentFigure && parentFigure.contains(selectedImg)) {
       parentFigure.remove();
     } else {
+      const parentP = selectedImg.parentElement;
       selectedImg.remove();
+      if (parentP && parentP !== editorRef.current && parentP.innerHTML.trim() === '') {
+        parentP.remove();
+      }
     }
     setSelectedImg(null);
     setRect(null);
@@ -446,59 +491,49 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
       caption.innerHTML = 'Add image caption or source…';
       figure.appendChild(caption);
     }
-    updateRect();
-    onContentChange();
+    requestAnimationFrame(() => {
+      updateRect();
+      onContentChange();
+    });
   };
 
   if (!selectedImg || !rect) return null;
 
   return (
     <>
-      {/* Live Drop Insertion Indicator Bar */}
-      {dropIndicator && (
+      {/* Visual Drop Line Indicator when moving */}
+      {isDraggingToMove && dropIndicator && (
         <div
-          className="absolute z-50 pointer-events-none transition-all duration-75 flex items-center"
           style={{
-            top: `${dropIndicator.top - 2}px`,
+            top: `${dropIndicator.top}px`,
             left: `${dropIndicator.left}px`,
             width: `${dropIndicator.width}px`,
-            height: '4px',
           }}
-        >
-          <div className="w-2.5 h-2.5 rounded-full bg-accent-crimson -ml-1 shadow-sm" />
-          <div className="flex-1 h-1 bg-accent-crimson rounded-full shadow-md animate-pulse" />
-          <div className="w-2.5 h-2.5 rounded-full bg-accent-crimson -mr-1 shadow-sm" />
-        </div>
+          className="absolute h-1 bg-accent-crimson rounded-full shadow-lg pointer-events-none z-50 animate-pulse"
+        />
       )}
 
-      {/* Main Resizer & Move Overlay */}
+      {/* Main Resizer Overlay Box */}
       <div
-        className="cms-image-resizer-overlay absolute pointer-events-none z-40"
         style={{
           top: `${rect.top}px`,
           left: `${rect.left}px`,
           width: `${rect.width}px`,
           height: `${rect.height}px`,
         }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className={`cms-image-resizer-overlay absolute pointer-events-none border-2 border-accent-crimson z-40 transition-all ${
+          isResizing || isDraggingToMove ? 'opacity-90' : 'opacity-100'
+        }`}
       >
-        {/* Visual Bounding Outline */}
-        <div
-          className={`absolute inset-0 border-2 ${
-            isResizing || isDraggingToMove
-              ? 'border-accent-crimson shadow-lg ring-2 ring-accent-crimson/30'
-              : 'border-accent-crimson/80'
-          } rounded-xs`}
-        />
-
-        {/* Center Drag & Move Handle Badge (Drag Anywhere in Document) */}
+        {/* Central "Move Image" Drag Badge */}
         <div
           onMouseDown={handleStartDragMove}
-          title="Click and drag to move image anywhere in manuscript"
-          className="absolute inset-0 m-auto w-32 h-9 bg-slate-900/90 hover:bg-slate-900 text-white rounded-md shadow-xl flex items-center justify-center gap-1.5 pointer-events-auto cursor-grab active:cursor-grabbing border border-slate-700 transition-transform hover:scale-105 select-none z-30"
+          title="Click and drag to reposition image anywhere in story flow"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900/95 text-white border border-accent-crimson/80 rounded-md shadow-2xl cursor-grab active:cursor-grabbing pointer-events-auto flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all select-none z-50"
         >
-          <GripVertical size={14} className="text-slate-400" />
-          <span className="text-xs font-mono font-medium">Move Image</span>
-          <Move size={12} className="text-accent-crimson" />
+          <Move size={14} className="text-accent-crimson animate-pulse" />
+          <span className="text-xs font-mono font-medium tracking-wide">Move Image</span>
         </div>
 
         {/* Floating Dimension Tooltip Badge */}
@@ -509,21 +544,26 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           </span>
         </div>
 
-        {/* Floating Quick Action Toolbar (Situated High Enough to Never Block Top Handles) */}
-        <div className="absolute -top-14 left-1/2 -translate-x-1/2 pointer-events-auto flex items-center gap-1 p-1 bg-slate-900 text-white border border-slate-700 rounded shadow-xl text-xs font-mono animate-in fade-in zoom-in-95 duration-100 select-none shrink-0 whitespace-nowrap z-50">
+        {/* Floating Quick Action Toolbar */}
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute -top-14 left-1/2 -translate-x-1/2 pointer-events-auto flex items-center gap-1 p-1 bg-slate-900 text-white border border-slate-700 rounded shadow-xl text-xs font-mono select-none shrink-0 whitespace-nowrap z-50"
+        >
           {/* Reorder Up / Down */}
           <button
             type="button"
-            onClick={() => moveImageBlock('up')}
-            title="Move Image Up (Above Previous Paragraph)"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); moveImageBlock('up'); }}
+            title="Move Image Up (Above Previous Block / Alt+Up)"
             className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
             <ArrowUp size={13} />
           </button>
           <button
             type="button"
-            onClick={() => moveImageBlock('down')}
-            title="Move Image Down (Below Next Paragraph)"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); moveImageBlock('down'); }}
+            title="Move Image Down (Below Next Block / Alt+Down)"
             className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
             <ArrowDown size={13} />
@@ -534,7 +574,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           {/* Alignment */}
           <button
             type="button"
-            onClick={() => setAlignment('left')}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAlignment('left'); }}
             title="Float Left (Wrap Text)"
             className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
@@ -543,7 +584,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
 
           <button
             type="button"
-            onClick={() => setAlignment('center')}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAlignment('center'); }}
             title="Align Center (Full Block)"
             className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
@@ -552,7 +594,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
 
           <button
             type="button"
-            onClick={() => setAlignment('right')}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAlignment('right'); }}
             title="Float Right (Wrap Text)"
             className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
@@ -564,48 +607,54 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           {/* Step resize buttons (- / +) */}
           <button
             type="button"
-            onClick={() => adjustSizeStep(-30)}
-            title="Shrink image (Left / Down Arrow)"
-            className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); adjustSizeStep(-60); }}
+            title="Shrink image (-60px / - key)"
+            className="p-1.5 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer font-bold"
           >
-            <Minus size={12} />
+            <Minus size={13} />
           </button>
           <button
             type="button"
-            onClick={() => adjustSizeStep(30)}
-            title="Enlarge image (Right / Up Arrow)"
-            className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); adjustSizeStep(60); }}
+            title="Enlarge image (+60px / + key)"
+            className="p-1.5 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer font-bold"
           >
-            <Plus size={12} />
+            <Plus size={13} />
           </button>
 
           <div className="w-px h-3.5 bg-slate-700 mx-0.5" />
 
-          {/* Quick Sizes */}
+          {/* Quick Preset Widths */}
           <button
             type="button"
-            onClick={() => setPercentageWidth(25)}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPercentageWidth(25); }}
             className="px-1.5 py-0.5 text-[10px] hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
             25%
           </button>
           <button
             type="button"
-            onClick={() => setPercentageWidth(50)}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPercentageWidth(50); }}
             className="px-1.5 py-0.5 text-[10px] hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
             50%
           </button>
           <button
             type="button"
-            onClick={() => setPercentageWidth(75)}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPercentageWidth(75); }}
             className="px-1.5 py-0.5 text-[10px] hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
             75%
           </button>
           <button
             type="button"
-            onClick={() => setPercentageWidth(100)}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPercentageWidth(100); }}
             className="px-1.5 py-0.5 text-[10px] hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
             100%
@@ -616,7 +665,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           {/* Add Caption */}
           <button
             type="button"
-            onClick={handleAddCaption}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAddCaption(); }}
             title="Add / Edit Caption"
             className="p-1 hover:bg-slate-800 rounded-xs text-slate-300 hover:text-white cursor-pointer"
           >
@@ -626,7 +676,8 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           {/* Delete */}
           <button
             type="button"
-            onClick={handleDeleteImage}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteImage(); }}
             title="Delete Image (Del/Backspace)"
             className="p-1 hover:bg-rose-950 text-slate-300 hover:text-rose-400 rounded-xs cursor-pointer"
           >
@@ -634,7 +685,7 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           </button>
         </div>
 
-        {/* ─── 4 Corner Drag Handles (Mouse Resize with High z-index & Touch Targets) ─── */}
+        {/* ─── 4 Corner Drag Handles (Mouse Resize) ─── */}
         {/* Top Left */}
         <div
           onMouseDown={(e) => handleMouseDown(e, 'top-left')}
@@ -671,7 +722,7 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
           <div className="w-1.5 h-1.5 bg-accent-crimson rounded-full" />
         </div>
 
-        {/* ─── 4 Edge Drag Handles (Mouse Resize) ────────────────────────────── */}
+        {/* ─── 4 Edge Drag Handles (Mouse Resize) ─── */}
         {/* Left Edge */}
         <div
           onMouseDown={(e) => handleMouseDown(e, 'left')}
