@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Blocks, X, Plus, Sparkles, Filter } from 'lucide-react';
 import { EDITORIAL_PATTERNS, type EditorialPattern } from './editorialPatterns';
+import { sanitizeHtml } from '../../utils/sanitize';
 
 interface EditorialPatternsModalProps {
   isOpen: boolean;
@@ -32,9 +33,12 @@ export const EditorialPatternsModal: React.FC<EditorialPatternsModalProps> = ({
 
   const selectedPattern = EDITORIAL_PATTERNS.find((p) => p.id === selectedPatternId) || filteredPatterns[0] || EDITORIAL_PATTERNS[0];
 
+  const renderPattern = (pattern: EditorialPattern) =>
+    pattern.renderContent ? pattern.renderContent() : pattern.htmlContent;
+
   const handleInsert = () => {
     if (selectedPattern) {
-      onInsertPattern(selectedPattern.htmlContent);
+      onInsertPattern(renderPattern(selectedPattern));
       onClose();
     }
   };
@@ -141,7 +145,7 @@ export const EditorialPatternsModal: React.FC<EditorialPatternsModalProps> = ({
                 </span>
                 <div
                   className="prose prose-sm max-w-none dark:prose-invert font-serif"
-                  dangerouslySetInnerHTML={{ __html: selectedPattern.htmlContent }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderPattern(selectedPattern)) }}
                 />
               </div>
             </div>

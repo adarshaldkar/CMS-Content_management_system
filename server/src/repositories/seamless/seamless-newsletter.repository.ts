@@ -152,6 +152,19 @@ export class SeamlessNewsletterRepository
     }
   }
 
+  async transitionCampaignStatus(
+    id: string,
+    fromStatus: NewsletterCampaign['status'],
+    toStatus: NewsletterCampaign['status'],
+    updates: Partial<NewsletterCampaign> = {},
+  ): Promise<NewsletterCampaign | null> {
+    try {
+      return await this.activeRepo.transitionCampaignStatus(id, fromStatus, toStatus, updates);
+    } catch {
+      return await this.fallbackRepo.transitionCampaignStatus(id, fromStatus, toStatus, updates);
+    }
+  }
+
   async findCampaigns(
     limit?: number,
     page?: number,

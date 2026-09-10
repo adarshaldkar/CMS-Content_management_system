@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { sanitizeHtml } from '../../utils/sanitize';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -449,7 +450,7 @@ export const EditorialReviewPage: React.FC = () => {
                 <div
                   className="prose prose-slate max-w-none text-sm leading-relaxed p-4 bg-canvas-paper border border-border-subtle font-sans max-h-96 overflow-y-auto"
                   style={{ borderRadius: 2 }}
-                  dangerouslySetInnerHTML={{ __html: selectedArticle.content }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedArticle.content) }}
                 />
               </div>
             </div>

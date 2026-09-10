@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { EmbedsService } from './embeds.service';
 import { ScrapeEmbedDto, EmbedMetadataResponseDto } from './dto/embeds.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,6 +17,7 @@ export class EmbedsController {
 
   @Post('scrape')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async scrape(@Body() dto: ScrapeEmbedDto): Promise<EmbedMetadataResponseDto> {
     return await this.embedsService.scrapeUrl(dto.url);
@@ -23,6 +25,7 @@ export class EmbedsController {
 
   @Post('transcript')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async transcript(
     @Body() dto: ScrapeEmbedDto,

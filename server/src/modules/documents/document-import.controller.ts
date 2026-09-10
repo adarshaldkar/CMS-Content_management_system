@@ -54,6 +54,7 @@ export class DocumentImportController {
 
       const pages = (docIR?.pages || []).map((p) => ({
         pageNumber: p.pageNumber,
+        isScanned: p.isScanned,
         htmlContent: this.pdfIngestionService.convertIRToSemanticHtml({
           ...docIR!,
           pages: [p],
@@ -71,7 +72,16 @@ export class DocumentImportController {
         readingTimeMinutes: Math.max(1, Math.ceil((docIR?.totalWords || 0) / 225)),
         headingsCount: docIR?.pages.reduce((acc, p) => acc + p.blocks.filter((b) => b.type === 'heading').length, 0) || 0,
         paragraphsCount: docIR?.pages.reduce((acc, p) => acc + p.blocks.filter((b) => b.type === 'paragraph').length, 0) || 0,
-        extractedImages: [],
+        extractedImages: job.extractedImages || [],
+        links: (docIR?.links || []).map((l) => ({
+          id: l.id,
+          pageNumber: l.pageNumber,
+          visibleText: l.visibleText,
+          url: l.url,
+          isExternal: l.isExternal,
+          isMalformed: l.isMalformed ?? false,
+          needsReview: l.needsReview ?? false,
+        })),
         filename: file.originalname,
         job,
       };
@@ -85,7 +95,7 @@ export class DocumentImportController {
   @ApiOperation({ summary: 'Get current status and telemetry of an ingestion job' })
   @RequirePermissions(Permission.MEDIA_UPLOAD)
   async getJobStatus(@Param('id') jobId: string): Promise<ImportJob> {
-    const job = this.pdfIngestionService.getJob(jobId);
+    const job = await this.pdfIngestionService.getJob(jobId);
     if (!job) {
       throw new NotFoundException(`Ingestion job ${jobId} not found.`);
     }

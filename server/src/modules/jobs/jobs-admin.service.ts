@@ -83,7 +83,9 @@ export class JobsAdminService {
     return stacktrace.map((trace) =>
       trace
         .replace(/[a-zA-Z]:\\[^\n]*?\\(server\\src\\[^\n]+)/g, '$1')
-        .replace(/\/home\/[^\n]*?\/(server\/src\/[^\n]+)/g, '$1'),
+        .replace(/[a-zA-Z]:\/[^\n]*?\/(server\/src\/[^\n]+)/g, '$1')
+        .replace(/\/(home|var|opt|srv|Users|workspace|data|app)\/[^\n]*?\/(server\/src\/[^\n]+)/g, '$2')
+        .replace(/file:\/\/\/[a-zA-Z]:[^\n]*?\/(server\/src\/[^\n]+)/g, '$1'),
     );
   }
 
@@ -113,6 +115,28 @@ export class JobsAdminService {
           oldestWaitingJobAgeMs = Math.max(0, Date.now() - waitingJobs[0].timestamp);
         }
 
+        // Derive real processing latency from recently completed jobs:
+        // p95 of (processedOn - timestamp) over the latest completed batch.
+        let p95ProcessingLatencyMs = 0;
+        const recentCompleted = await queue.getCompleted(0, 200);
+        const latencies = recentCompleted
+          .filter((j) => j.timestamp && j.processedOn && j.processedOn >= j.timestamp)
+          .map((j) => j.processedOn! - j.timestamp)
+          .sort((a, b) => a - b);
+        if (latencies.length > 0) {
+          const p95Index = Math.min(
+            latencies.length - 1,
+            Math.ceil(latencies.length * 0.95) - 1,
+          );
+          p95ProcessingLatencyMs = Math.max(0, latencies[p95Index]);
+        }
+
+        // Real throughput: completed jobs finalized within the last 60 seconds.
+        const now = Date.now();
+        const throughputPerMinute = recentCompleted.filter(
+          (j) => j.finishedOn && now - j.finishedOn <= 60_000,
+        ).length;
+
         summaries.push({
           queueName,
           isPaused,
@@ -126,11 +150,11 @@ export class JobsAdminService {
           },
           metrics: {
             oldestWaitingJobAgeMs,
-            p95ProcessingLatencyMs: 120, // Baseline telemetry
-            throughputPerMinute: (counts.active || 0) * 12,
+            p95ProcessingLatencyMs,
+            throughputPerMinute,
             dlqSize: counts.failed || 0,
           },
-          workersCount: queueName === QUEUE_NAMES.NOTIFICATION_OUTBOX ? 4 : 2,
+          workersCount: this.workerConcurrencyFor(queueName),
         });
       } catch (err) {
         this.logger.warn(`Failed to inspect queue [${queueName}]: ${(err as Error).message}`);
@@ -138,6 +162,26 @@ export class JobsAdminService {
     }
 
     return summaries;
+  }
+
+  /**
+   * Real worker concurrency for each registered queue. Mirrors the `concurrency`
+   * declared on the corresponding BullMQ Worker decorators. Queues without a live
+   * worker report 0 rather than a hardcoded placeholder.
+   */
+  private workerConcurrencyFor(queueName: string): number {
+    switch (queueName) {
+      case QUEUE_NAMES.SCHEDULED_PUBLISHING:
+        return 5;
+      case QUEUE_NAMES.NOTIFICATION_OUTBOX:
+        return 0;
+      case QUEUE_NAMES.MESH_RECONCILIATION:
+        return 0;
+      case QUEUE_NAMES.ANALYTICS_ROLLUP:
+        return 0;
+      default:
+        return 0;
+    }
   }
 
   /**

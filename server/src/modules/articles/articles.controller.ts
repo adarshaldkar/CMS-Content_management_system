@@ -48,7 +48,7 @@ export class ArticlesController {
   @Public()
   @Throttle({ default: { limit: 600, ttl: 60000 } })
   @UseInterceptors(RedisCacheInterceptor)
-  @Cacheable(60)
+  @Cacheable(60, undefined, 300)
   @Get()
   @ApiOperation({ summary: 'List public published articles or filter by query' })
   async list(

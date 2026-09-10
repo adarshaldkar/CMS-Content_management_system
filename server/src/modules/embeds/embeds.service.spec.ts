@@ -32,6 +32,25 @@ describe('Embeds Module & SSRF Defense', () => {
       expect(isPrivateIp('142.250.190.46')).toBe(false);
       expect(isPrivateIp('93.184.216.34')).toBe(false);
     });
+
+    it('should treat IPv4-mapped IPv6 loopback/private addresses as private', () => {
+      expect(isPrivateIp('::ffff:127.0.0.1')).toBe(true);
+      expect(isPrivateIp('::ffff:10.0.0.1')).toBe(true);
+      expect(isPrivateIp('::ffff:7f00:1')).toBe(true); // 127.0.0.1 hex-octet tail
+      expect(isPrivateIp('::ffff:0a00:0001')).toBe(true); // 10.0.0.1 zero-padded
+      expect(isPrivateIp('::ffff:c0a8:0101')).toBe(true); // 192.168.1.1
+      expect(isPrivateIp('::ffff:169.254.169.254')).toBe(true); // metadata
+    });
+
+    it('should reject or fail closed on malformed IPv4-mapped IPv6 tails', () => {
+      expect(isPrivateIp('::ffff:notanip')).toBe(true);
+      expect(isPrivateIp('::ffff:a00:1:2')).toBe(true);
+    });
+
+    it('should allow public addresses in IPv4-mapped form', () => {
+      expect(isPrivateIp('::ffff:8.8.8.8')).toBe(false);
+      expect(isPrivateIp('::ffff:808:808')).toBe(false); // 8.8.8.8 hex-octet tail
+    });
   });
 
   describe('URL Syntactic Gatekeeper (validateUrlSyntactics)', () => {

@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import {
   CreateNotificationDto,
   NotificationCursorResult,
@@ -12,6 +14,7 @@ import {
   NOTIFICATION_REPOSITORY,
 } from '../../repositories/interfaces/notification.repository.interface';
 import { RedisService } from '../../redis/redis.service';
+import { QUEUE_NAMES, JOB_NAMES } from '../../bull/bull-queue.constants';
 
 @Injectable()
 export class NotificationsService {
@@ -21,7 +24,32 @@ export class NotificationsService {
     @Inject(NOTIFICATION_REPOSITORY)
     private readonly notificationRepo: INotificationRepository,
     private readonly redisService: RedisService,
+    @InjectQueue(QUEUE_NAMES.NOTIFICATION_OUTBOX)
+    private readonly notificationQueue: Queue,
   ) {}
+
+  /**
+   * Asynchronously enqueues a notification onto the `notification-outbox` queue
+   * so delivery benefits from BullMQ retries/backoff and does not block the
+   * publishing request. Returns a stable job id for deduplication.
+   */
+  async enqueue(dto: CreateNotificationDto): Promise<{ queued: boolean; jobId: string }> {
+    const jobId = [
+      'notif',
+      dto.userId,
+      dto.type,
+      dto.resourceId,
+      dto.actorId || 'system',
+    ].join(':');
+    const job = await this.notificationQueue.add(JOB_NAMES.DISPATCH_NOTIFICATION, { dto }, {
+      jobId,
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 2000 },
+      removeOnComplete: 100,
+      removeOnFail: false,
+    });
+    return { queued: true, jobId: String(job.id) };
+  }
 
   /**
    * Dispatches a notification to a recipient after evaluating preferences and Redis deduplication.
@@ -151,10 +179,18 @@ export class NotificationsService {
    */
   async markAllAsRead(userId: string): Promise<{ success: boolean; markedCount: number }> {
     const markedCount = await this.notificationRepo.markAllAsRead(userId);
+    // Reconcile the fast counter from the authoritative DB count instead of a
+    // blind reset, so a concurrent new notification is not lost in the window
+    // between the DB write and the Redis reset.
     if (this.redisService.isHealthy()) {
       const client = this.redisService.getClient();
       if (client) {
-        client.set(`notif:unread:${userId}`, '0', 'EX', 604800).catch(() => {});
+        try {
+          const dbCount = await this.notificationRepo.getUnreadCount(userId);
+          await client.set(`notif:unread:${userId}`, String(dbCount), 'EX', 604800);
+        } catch (err: any) {
+          this.logger.warn(`markAllAsRead Redis reconciliation failed: ${err.message}`);
+        }
       }
     }
     return { success: true, markedCount };
@@ -205,6 +241,12 @@ export class NotificationsService {
     };
 
     const key = eventMap[type];
-    return key && prefs.events ? Boolean(prefs.events[key]) : true;
+    // Fail-closed: an unknown notification type must not bypass preferences.
+    if (!key) {
+      this.logger.warn(`Unknown notification type [${type}] — suppressing in-app delivery (fail-closed).`);
+      return false;
+    }
+    // Missing events object defaults to deliver-everything for existing users.
+    return prefs.events ? Boolean(prefs.events[key]) : true;
   }
 }

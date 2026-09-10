@@ -35,6 +35,12 @@ export interface INewsletterRepository {
     id: string,
     updates: Partial<NewsletterCampaign>,
   ): Promise<NewsletterCampaign | null>;
+  transitionCampaignStatus(
+    id: string,
+    fromStatus: NewsletterCampaign['status'],
+    toStatus: NewsletterCampaign['status'],
+    updates?: Partial<NewsletterCampaign>,
+  ): Promise<NewsletterCampaign | null>;
   findCampaigns(
     limit?: number,
     page?: number,

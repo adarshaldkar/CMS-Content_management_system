@@ -98,6 +98,17 @@ describe('NewsletterService', () => {
         };
         return mockCampaigns[idx];
       }),
+      transitionCampaignStatus: jest.fn(async (id: string, fromStatus: string, toStatus: string, updates: any = {}) => {
+        const idx = mockCampaigns.findIndex((c) => c.id === id && c.status === fromStatus);
+        if (idx === -1) return null;
+        mockCampaigns[idx] = {
+          ...mockCampaigns[idx],
+          ...updates,
+          status: toStatus,
+          updatedAt: new Date(),
+        };
+        return mockCampaigns[idx];
+      }),
       findCampaigns: jest.fn(async () => ({
         items: mockCampaigns,
         total: mockCampaigns.length,
@@ -312,7 +323,50 @@ describe('NewsletterService', () => {
     });
   });
 
+  describe('getPreferencesByToken', () => {
+    it('should return a masked email to avoid leaking PII over an unauthenticated capability endpoint', async () => {
+      const rawToken = 'cap-token-12345678901234567890123456789012';
+      const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+      mockSubscribers.push({
+        id: 'sub-pref',
+        email: 'reader@example.com',
+        status: SubscriberStatus.ACTIVE,
+        topics: ['news'],
+        frequency: DigestFrequency.DAILY,
+        verificationTokenHash: null,
+        verificationTokenExpiresAt: null,
+        unsubscribeTokenHash: hash,
+        bounceCount: 0,
+        verifiedAt: new Date(),
+        unsubscribedAt: null,
+        lastBouncedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.getPreferencesByToken(rawToken);
+      expect(result.email).toBe('re***@example.com');
+      expect(result.email).not.toBe('reader@example.com');
+    });
+  });
+
   describe('sendCampaign', () => {
+    it('should fail closed when a concurrent caller already transitioned the campaign to SENDING', async () => {
+      const campaign = await service.createCampaign(
+        {
+          subject: 'Race Test',
+          contentHtml: '<p>Race</p>',
+          targetTopics: ['tech'],
+        },
+        'author-1',
+      );
+
+      mockNewsletterRepo.transitionCampaignStatus.mockResolvedValueOnce(null);
+
+      await expect(service.sendCampaign(campaign.id)).rejects.toThrow(BadRequestException);
+      expect(mockBroadcastQueue.add).not.toHaveBeenCalled();
+    });
     it('should query active recipients and enqueue partitioned BullMQ batches with idempotency keys', async () => {
       mockSubscribers.push(
         {

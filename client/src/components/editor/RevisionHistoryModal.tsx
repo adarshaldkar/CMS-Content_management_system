@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { History, X, RotateCcw, Clock, ShieldCheck, Loader2 } from 'lucide-react';
 import { getArticleRevisions, restoreArticleRevision } from '../../api/articles.api';
 import type { ArticleRevision } from '../../types';
+import { sanitizeHtml } from '../../utils/sanitize';
 
 interface RevisionHistoryModalProps {
   isOpen: boolean;
@@ -159,7 +160,7 @@ export const RevisionHistoryModal: React.FC<RevisionHistoryModalProps> = ({
                   </h1>
                   <div
                     className="prose prose-slate max-w-none text-sm text-ink-primary font-sans leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: selectedRevision.content }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedRevision.content) }}
                   />
                 </div>
               </>

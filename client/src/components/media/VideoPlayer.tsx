@@ -153,13 +153,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!containerRef.current) return;
 
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
+      containerRef.current
+        .requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {});
     } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
+      document.exitFullscreen()
+        .then(() => setIsFullscreen(false))
+        .catch(() => {});
     }
   };
+
+  // Keep the fullscreen button icon truthful when the user exits with Esc.
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
 
   // Auto-hide controls on inactivity
   const handleMouseMove = () => {
@@ -174,9 +186,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Keyboard Shortcuts
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Bug #1 fix: do not intercept keys when the user is typing in an input
+    // Do not intercept keys when the user is typing in an input, or when the
+    // event originated inside a contentEditable subtree (e.g. rich-text editor).
+    if (e.nativeEvent.composed) {
+      const composedTarget = e.nativeEvent.composedPath()[0] as HTMLElement | undefined;
+      if (composedTarget?.closest?.('[contenteditable="true"]')) return;
+    }
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if ((e.target as HTMLElement).closest?.('[contenteditable="true"]')) return;
 
     if (e.key === ' ' || e.key === 'k') {
       e.preventDefault();

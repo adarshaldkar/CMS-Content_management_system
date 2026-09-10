@@ -53,6 +53,11 @@ import {
   deleteCurrentBlock,
   clearEntireManuscript,
 } from './commandRegistry';
+import {
+  queryInlineFormat,
+  queryListState,
+  queryAlignState,
+} from './semanticFormatting';
 
 
 interface EditorialRibbonProps {
@@ -154,31 +159,26 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
             }
           }
 
+          const editor = executionContext.editorRef.current;
           setActiveFormats({
-            bold: document.queryCommandState('bold'),
-            italic: document.queryCommandState('italic'),
-            underline: document.queryCommandState('underline'),
-            strike: document.queryCommandState('strikeThrough'),
+            bold: editor ? queryInlineFormat(editor, 'bold') : false,
+            italic: editor ? queryInlineFormat(editor, 'italic') : false,
+            underline: editor ? queryInlineFormat(editor, 'underline') : false,
+            strike: editor ? queryInlineFormat(editor, 'strikeThrough') : false,
             highlight: isInsideMark,
-            ul: document.queryCommandState('insertUnorderedList'),
-            ol: document.queryCommandState('insertOrderedList'),
-            align: document.queryCommandState('justifyCenter')
-              ? 'center'
-              : document.queryCommandState('justifyRight')
-              ? 'right'
-              : document.queryCommandState('justifyFull')
-              ? 'justify'
-              : 'left',
+            ul: editor ? queryListState(editor, 'ul') : false,
+            ol: editor ? queryListState(editor, 'ol') : false,
+            align: editor ? queryAlignState(editor) : 'left',
           });
         }
       } catch (e) {
-        // Silently handle if queryCommandState is unavailable
+        // Silently handle if formatting queries fail (editor not yet mounted).
       }
     };
 
     document.addEventListener('selectionchange', updateActiveStates);
     return () => document.removeEventListener('selectionchange', updateActiveStates);
-  }, []);
+  }, [executionContext]);
 
   // Close dropdown on outside click
   useEffect(() => {

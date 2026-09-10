@@ -41,10 +41,10 @@ export class FollowsService {
     const dateKey = new Date().toISOString().slice(0, 10);
     const groupKey = `group:${targetUserId}:NEW_FOLLOWER:author:${dateKey}`;
     this.notificationsService
-      .notify({
+      .enqueue({
         userId: targetUserId,
         actorId: actor.id,
-        actorName: actor.name || actor.email || 'A Reader',
+        actorName: actor.name || 'A Reader',
         actorAvatar: actor.avatarUrl || null,
         type: NotificationType.NEW_FOLLOWER,
         title: 'New Dispatch Follower',

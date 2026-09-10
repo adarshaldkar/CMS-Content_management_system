@@ -10,7 +10,11 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import { NewsletterService } from './newsletter.service';
 import {
   SubscribeDto,
@@ -27,7 +31,10 @@ import { RequirePermissions } from '../../common/decorators/security.decorators'
 
 @Controller()
 export class NewsletterController {
-  constructor(private readonly newsletterService: NewsletterService) {}
+  constructor(
+    private readonly newsletterService: NewsletterService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // ── Public Subscriber Endpoints ─────────────────────────────────────
 
@@ -57,7 +64,11 @@ export class NewsletterController {
 
   @Post('newsletter/webhook/events')
   @HttpCode(HttpStatus.OK)
-  async handleWebhook(@Body() body: NewsletterWebhookDto) {
+  async handleWebhook(
+    @Body() body: NewsletterWebhookDto,
+    @Headers('x-webhook-signature') signature?: string,
+  ) {
+    await this.verifyWebhookSignature(body, signature);
     return await this.newsletterService.handleWebhookEvent(body);
   }
 
@@ -116,5 +127,39 @@ export class NewsletterController {
   @RequirePermissions(Permission.NEWSLETTER_BROADCAST)
   async sendCampaign(@Param('id') id: string) {
     return await this.newsletterService.sendCampaign(id);
+  }
+
+  /**
+   * Verifies the email-provider webhook via an HMAC-SHA256 shared secret.
+   * When no secret is configured (dev), the endpoint stays open; in any other
+   * environment a missing/mismatched signature is rejected.
+   */
+  private async verifyWebhookSignature(
+    body: NewsletterWebhookDto,
+    signature?: string,
+  ): Promise<void> {
+    const secret = this.configService.get<string>('NEWSLETTER_WEBHOOK_SECRET', '');
+    if (!secret) {
+      return;
+    }
+
+    if (!signature) {
+      throw new UnauthorizedException('Missing webhook signature.');
+    }
+
+    const rawPayload = JSON.stringify(body);
+    const expected = crypto
+      .createHmac('sha256', secret)
+      .update(rawPayload)
+      .digest('hex');
+
+    const provided = signature.trim().replace(/^sha256=/, '');
+    const valid =
+      expected.length === provided.length &&
+      crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(provided, 'hex'));
+
+    if (!valid) {
+      throw new UnauthorizedException('Invalid webhook signature.');
+    }
   }
 }

@@ -20,13 +20,18 @@ export const envSchema = z.object({
     .default('postgres'),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
-  REDIS_PASSWORD: z.string().default('cms_dev_password'),
+  REDIS_PASSWORD: z.string().default(''),
   REDIS_DB: z.coerce.number().int().min(0).max(15).default(0),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
   COOKIE_SECURE: z
     .enum(['true', 'false'])
     .default('false')
+    .transform((v) => v === 'true'),
+  NEWSLETTER_WEBHOOK_SECRET: z.string().default(''),
+  NEWSLETTER_EMAIL_SIMULATED: z
+    .enum(['true', 'false'])
+    .default('true')
     .transform((v) => v === 'true'),
 });
 

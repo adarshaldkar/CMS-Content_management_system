@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { RedisService } from '../../redis/redis.service';
 import { safeFetch, validateUrlSyntactics } from './utils/ssrf-validator.util';
+import { sanitizeArticleContent } from '../../common/utils/sanitizer.util';
 import type {
   EmbedMetadataResponseDto,
   EmbedProvider,
@@ -328,7 +329,10 @@ export class EmbedsService {
 
       if (data.author_name) authorName = this.sanitizeText(data.author_name);
       if (data.author_url) authorUrl = data.author_url;
-      if (data.html) html = data.html;
+      // E1: oEmbed HTML is untrusted third-party markup — sanitize before it can
+      // reach a client dangerouslySetInnerHTML sink (strips scripts, on* handlers,
+      // javascript: URLs; allows platform.twitter.com iframes).
+      if (data.html) html = sanitizeArticleContent(data.html);
       title = `${authorName} on X`;
     } catch {
       // Fallback

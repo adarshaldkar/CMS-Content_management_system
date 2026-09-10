@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { NotificationsService } from './notifications.service';
 import { NOTIFICATION_REPOSITORY } from '../../repositories/interfaces/notification.repository.interface';
 import { RedisService } from '../../redis/redis.service';
 import { DeliveryStatus, NotificationType } from '../../domain/models';
+import { QUEUE_NAMES } from '../../bull/bull-queue.constants';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -93,6 +95,10 @@ describe('NotificationsService', () => {
         {
           provide: RedisService,
           useValue: mockRedisService,
+        },
+        {
+          provide: getQueueToken(QUEUE_NAMES.NOTIFICATION_OUTBOX),
+          useValue: { add: jest.fn().mockResolvedValue({ id: '1' }) },
         },
       ],
     }).compile();
@@ -217,11 +223,35 @@ describe('NotificationsService', () => {
       expect(mockRedisClient.decr).toHaveBeenCalledWith('notif:unread:author-1');
     });
 
-    it('should mark all notifications as read and reset Redis counter to 0', async () => {
+    it('should mark all notifications as read and reconcile Redis counter from DB', async () => {
       const result = await service.markAllAsRead('author-1');
       expect(result.success).toBe(true);
+      expect(result.markedCount).toBe(1);
       expect(mockRepo.markAllAsRead).toHaveBeenCalledWith('author-1');
-      expect(mockRedisClient.set).toHaveBeenCalledWith('notif:unread:author-1', '0', 'EX', 604800);
+      // Redis is refreshed from the authoritative DB count, not a blind reset.
+      expect(mockRepo.getUnreadCount).toHaveBeenCalledWith('author-1');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'notif:unread:author-1',
+        '1',
+        'EX',
+        604800,
+      );
+    });
+  });
+
+  describe('enqueue', () => {
+    it('should enqueue a notification for async outbox delivery with a stable job id', async () => {
+      const { queued } = await service.enqueue({
+        userId: 'author-1',
+        actorId: 'reader-2',
+        type: NotificationType.ARTICLE_LIKED,
+        title: 'Story Engagement',
+        message: 'Marcus liked your story',
+        resourceType: 'article',
+        resourceId: 'art-1',
+      });
+
+      expect(queued).toBe(true);
     });
   });
 });

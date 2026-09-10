@@ -50,9 +50,10 @@ export class MongoCategoryRepository implements ICategoryRepository {
 
     if (filters.status) query.status = filters.status;
     if (filters.search) {
+      const safeSearch = filters.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: filters.search, $options: 'i' } },
-        { slug: { $regex: filters.search, $options: 'i' } },
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { slug: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 

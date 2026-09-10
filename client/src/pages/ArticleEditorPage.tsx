@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { sanitizeHtml } from '../utils/sanitize';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Save,
@@ -950,7 +951,8 @@ export const ArticleEditorPage: React.FC = () => {
 
                   <div
                     className="prose prose-sm font-sans text-xs leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-slate-400">No story content yet.</p>' }}
+dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) ||
+                    '<p class="italic text-slate-400">No story content yet.</p>' }}
                   />
                 </article>
               </div>
@@ -978,7 +980,8 @@ export const ArticleEditorPage: React.FC = () => {
 
                 <div
                   className="prose prose-slate max-w-none text-sm leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-slate-400">No content.</p>' }}
+dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) ||
+                    '<p class="italic text-slate-400">No content.</p>' }}
                 />
 
                 <div className="pt-6 border-t border-slate-200 text-center text-xs text-slate-400">
@@ -1013,7 +1016,8 @@ export const ArticleEditorPage: React.FC = () => {
 
                 <div
                   className="prose prose-neutral max-w-none font-serif text-sm leading-relaxed columns-2 gap-8 text-justify"
-                  dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-slate-400">No content.</p>' }}
+dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) ||
+                    '<p class="italic text-slate-400">No content.</p>' }}
                 />
               </div>
             ) : (
@@ -1063,7 +1067,8 @@ export const ArticleEditorPage: React.FC = () => {
 
                   <div
                     className="prose prose-lg max-w-none font-sans text-ink-primary leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: article.content || '<p class="italic text-ink-secondary">No story manuscript entered yet.</p>' }}
+dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) ||
+                  '<p class="italic text-ink-secondary">No story manuscript entered yet.</p>' }}
                   />
 
                   {tags.length > 0 && (

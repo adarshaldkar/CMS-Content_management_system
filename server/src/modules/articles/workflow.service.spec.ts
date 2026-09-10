@@ -113,6 +113,7 @@ describe('WorkflowService (Publishing State Machine, Revisions & Concurrency)', 
           provide: NotificationsService,
           useValue: {
             notify: jest.fn().mockResolvedValue(null),
+            enqueue: jest.fn().mockResolvedValue({ queued: true, jobId: 'notif-wf-1' }),
           },
         },
         {

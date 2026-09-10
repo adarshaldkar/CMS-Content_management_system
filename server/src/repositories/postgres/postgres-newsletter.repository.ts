@@ -425,6 +425,46 @@ export class PostgresNewsletterRepository
     return res.rows.length > 0 ? this.mapCampaignRow(res.rows[0]) : null;
   }
 
+  async transitionCampaignStatus(
+    id: string,
+    fromStatus: NewsletterCampaign['status'],
+    toStatus: NewsletterCampaign['status'],
+    updates: Partial<NewsletterCampaign> = {},
+  ): Promise<NewsletterCampaign | null> {
+    const fields: string[] = ['status = $2'];
+    const values: any[] = [id, toStatus];
+    let idx = 3;
+
+    const upserts: Array<[string, any]> = [
+      ['subject', updates.subject],
+      ['preview_text', updates.previewText],
+      ['content_html', updates.contentHtml],
+      ['target_topics', updates.targetTopics ? JSON.stringify(updates.targetTopics) : undefined],
+      ['total_recipients', updates.totalRecipients],
+      ['delivered_count', updates.deliveredCount],
+      ['failed_count', updates.failedCount],
+      ['scheduled_at', updates.scheduledAt],
+      ['sent_at', updates.sentAt],
+    ];
+    for (const [col, val] of upserts) {
+      if (val !== undefined) {
+        fields.push(`${col} = $${idx++}`);
+        values.push(val);
+      }
+    }
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+
+    values.push(fromStatus);
+    const res = await this.postgres.pool.query(
+      `UPDATE newsletter_campaigns
+         SET ${fields.join(', ')}
+       WHERE id = $1 AND status = $${idx}
+       RETURNING *`,
+      values,
+    );
+    return res.rows.length > 0 ? this.mapCampaignRow(res.rows[0]) : null;
+  }
+
   async findCampaigns(
     limit = 20,
     page = 1,

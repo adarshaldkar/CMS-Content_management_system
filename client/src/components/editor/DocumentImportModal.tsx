@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sanitizeHtml } from '../../utils/sanitize';
 import {
   FileText,
   Upload,
@@ -128,6 +129,18 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
 
     try {
       const result = await documentsApi.importDocument(file);
+
+      // A failed pdf-parse job (corrupt/encrypted PDF or worker error) is
+      // returned as HTTP 200 with status 'failed' — surface it instead of
+      // rendering a blank ingest studio.
+      if (result.job && result.job.status === 'failed') {
+        setErrorMsg(
+          result.job.errorMessage ||
+            'Document extraction failed. Ensure the file is not corrupt, encrypted, or a scanned image without a text layer.',
+        );
+        return;
+      }
+
       setImportResult(result);
       if (result.job) {
         setActiveJob(result.job);
@@ -534,7 +547,7 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
 
                           <div
                             className="prose prose-slate max-w-none text-slate-900 text-base leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: currentPage.htmlContent }}
+                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentPage.htmlContent) }}
                           />
                         </div>
 
@@ -589,7 +602,7 @@ export const DocumentImportModal: React.FC<DocumentImportModalProps> = ({
                     </span>
                     <div
                       className="prose prose-sm max-w-none text-xs"
-                      dangerouslySetInnerHTML={{ __html: gutenbergResult.html }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(gutenbergResult.html) }}
                     />
                   </div>
                 )}

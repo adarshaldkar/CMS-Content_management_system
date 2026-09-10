@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sanitizeHtml } from '../utils/sanitize';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -556,7 +557,7 @@ export const ArticleReaderPage: React.FC = () => {
             {/* 4. Sanitized Content Body with Reader Preferences Applied */}
             <div
               className={`prose prose-slate max-w-none space-y-6 pt-4 text-ink-primary ${proseTypographyClass} ${proseSizeClass}`}
-              dangerouslySetInnerHTML={{ __html: article.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }}
             />
 
             {/* 4b. Special Edition Interactive Data Journalism Canvas (UI Phase 3) */}

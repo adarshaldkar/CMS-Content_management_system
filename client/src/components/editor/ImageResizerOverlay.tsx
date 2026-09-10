@@ -57,6 +57,23 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
   const startHeightRef = useRef(0);
   const aspectRatioRef = useRef(1);
 
+  // CE7: any drag listeners still attached when the overlay unmounts are
+  // removed so they cannot leak (and call setState on an unmounted tree).
+  const cleanupFnsRef = useRef<Array<() => void>>([]);
+
+  useEffect(() => {
+    return () => {
+      cleanupFnsRef.current.forEach((fn) => {
+        try {
+          fn();
+        } catch {
+          // noop
+        }
+      });
+      cleanupFnsRef.current = [];
+    };
+  }, []);
+
   // Helper: Find enclosing block element (figure or paragraph)
   const getEnclosingImageBlock = useCallback((img: HTMLImageElement): HTMLElement => {
     const figure = img.closest('figure');
@@ -286,8 +303,13 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
       });
     };
 
+    const cleanup = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    cleanupFnsRef.current.push(cleanup);
   };
 
   // ─── Drag to Move / Reposition Image in Document Flow ─────────────────────
@@ -361,8 +383,13 @@ export const ImageResizerOverlay: React.FC<ImageResizerOverlayProps> = ({
       }
     };
 
+    const cleanup = () => {
+      window.removeEventListener('mousemove', handleMouseMoveMove);
+      window.removeEventListener('mouseup', handleMouseUpMove);
+    };
     window.addEventListener('mousemove', handleMouseMoveMove);
     window.addEventListener('mouseup', handleMouseUpMove);
+    cleanupFnsRef.current.push(cleanup);
   };
 
   // ─── Move Up / Move Down Block Reordering ─────────────────────────────────

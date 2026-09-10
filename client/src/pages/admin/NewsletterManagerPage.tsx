@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { sanitizeHtml } from '../../utils/sanitize';
 import {
   Mail,
   Send,
@@ -434,7 +435,7 @@ export const NewsletterManagerPage: React.FC = () => {
             <div className="border border-slate-200 rounded p-4 bg-slate-50 min-h-[400px] overflow-auto">
               <div className="bg-white border border-slate-200 shadow-sm p-4 rounded text-ink-primary">
                 <div
-                  dangerouslySetInnerHTML={{ __html: contentHtml }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(contentHtml) }}
                   className="prose prose-sm max-w-none"
                 />
               </div>

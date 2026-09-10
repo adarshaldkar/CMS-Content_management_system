@@ -26,6 +26,11 @@ export interface EditorialPattern {
   icon: string;
   description: string;
   htmlContent: string;
+  /**
+   * Optional dynamic renderer so content that embeds the current date/time is
+   * produced at insert time instead of at module load (CE10, e.g. corrections).
+   */
+  renderContent?: () => string;
 }
 
 export const STORY_TEMPLATES: StoryTemplate[] = [
@@ -252,14 +257,31 @@ export const EDITORIAL_PATTERNS: EditorialPattern[] = [
     icon: '🛡️',
     description: 'Formal, transparent correction badge with timestamp and rectification text.',
     htmlContent: `
-<div class="cms-editorial-correction" data-date="${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}" data-node="correction">
+<div class="cms-editorial-correction" data-date="__GAZETTE_DATE__" data-node="correction">
   <div class="cms-correction-badge">
     <span class="badge-text">CORRECTION</span>
-    <time datetime="${new Date().toISOString()}">${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time>
+    <time datetime="__GAZETTE_ISO__">__GAZETTE_DATE__</time>
   </div>
   <p>An earlier version of this report misstated the initial fiscal year deficit figure. The accurate figure of $4.2 billion has been updated in the third paragraph.</p>
 </div>
 `.trim(),
+    renderContent: () => {
+      const now = new Date();
+      const label = now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      return `
+<div class="cms-editorial-correction" data-date="${label}" data-node="correction">
+  <div class="cms-correction-badge">
+    <span class="badge-text">CORRECTION</span>
+    <time datetime="${now.toISOString()}">${label}</time>
+  </div>
+  <p>An earlier version of this report misstated the initial fiscal year deficit figure. The accurate figure of $4.2 billion has been updated in the third paragraph.</p>
+</div>
+`.trim();
+    },
   },
 
   {

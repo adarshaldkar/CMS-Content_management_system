@@ -5,15 +5,45 @@ import * as net from 'net';
 import { BadRequestException } from '@nestjs/common';
 
 /**
+ * Decodes an IPv4-mapped IPv6 address (RFC 4291 §2.5.5.2) into a dotted-quad
+ * string. Handles both the dotted-quad tail (`::ffff:127.0.0.1`) and the
+ * hex-octet tail (`::ffff:0a00:0001` / `::ffff:a00:1`). Returns null when the
+ * tail is not a well-formed 32-bit IPv4 encoding.
+ */
+function mappedIpv4ToDotted(ip: string): string | null {
+  const idx = ip.toLowerCase().indexOf('ffff:');
+  if (idx === -1) return null;
+  const tail = ip.slice(idx + 5).trim();
+
+  if (tail.includes('.')) {
+    // Dotted-quad tail, e.g. ::ffff:10.0.0.1
+    return net.isIPv4(tail) ? tail : null;
+  }
+
+  // Hex-octet tail, e.g. 0a00:0001 (10.0.0.1)
+  const groups = tail.split(':').filter(Boolean);
+  if (groups.length === 0 || groups.length > 2) return null;
+  if (groups.some((g) => g.length > 4 || !/^[0-9a-f]{1,4}$/i.test(g))) return null;
+
+  const packed = parseInt(groups[0] || '0', 16) * 0x10000 + parseInt(groups[1] || '0', 16);
+  if (packed > 0xffffffff || packed < 0) return null;
+
+  return `${(packed >>> 24) & 0xff}.${(packed >>> 16) & 0xff}.${(packed >>> 8) & 0xff}.${packed & 0xff}`;
+}
+
+/**
  * Checks if an IPv4 or IPv6 string falls within a private, loopback, link-local,
  * or cloud metadata IP range.
  */
 export function isPrivateIp(ip: string): boolean {
   if (!net.isIP(ip)) return true;
 
-  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1)
+  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1 or ::ffff:7f00:1). Malformed mapped
+  // tails fail closed (treated as private) rather than slipping through as public.
   if (ip.startsWith('::ffff:')) {
-    ip = ip.substring(7);
+    const dotted = mappedIpv4ToDotted(ip);
+    if (!dotted) return true;
+    ip = dotted;
   }
 
   // Handle IPv4

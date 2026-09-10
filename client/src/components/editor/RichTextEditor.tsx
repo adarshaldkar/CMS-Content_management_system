@@ -35,6 +35,11 @@ import { embedsApi, type EmbedMetadataResponse } from '../../api/embeds.api';
 import { formatEmbedHtml } from '../../utils/embedFormatter';
 import { isValidUrl, detectEmbedInfo } from '../../utils/embedParser';
 import { isWordOrDocsHtml, cleanWordHtml } from '../../utils/wordPasteParser';
+import {
+  executeFormatCommand,
+  insertHtmlAtCaret,
+  queryBlockType,
+} from './semanticFormatting';
 
 interface RichTextEditorProps {
   value: string;
@@ -141,28 +146,104 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, [onChange]);
 
-  // Execute standard formatting command
-  const executeCommand = useCallback(
-    (command: string, valueArg: string | undefined = undefined) => {
-      if (editorRef.current) {
-        editorRef.current.focus();
+  // ─── Semantic formatting engine (CE1: no document.execCommand/queryCommandState) ──
+  const undoStackRef = useRef<string[]>([]);
+  const redoStackRef = useRef<string[]>([]);
+
+  const refreshCursorState = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    setActiveBlockType((prev) => {
+      const next = queryBlockType(editor);
+      return next === prev ? prev : next;
+    });
+  }, []);
+
+  const applyHistorySnapshot = useCallback(
+    (target: 'undo' | 'redo') => {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const undoStack = undoStackRef.current;
+      const redoStack = redoStackRef.current;
+      if (target === 'undo') {
+        const prev = undoStack.pop();
+        if (prev === undefined) return;
+        redoStack.push(editor.innerHTML);
+        editor.innerHTML = prev;
+      } else {
+        const next = redoStack.pop();
+        if (next === undefined) return;
+        undoStack.push(editor.innerHTML);
+        editor.innerHTML = next;
       }
-      document.execCommand(command, false, valueArg);
+      lastHtmlRef.current = editor.innerHTML;
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(true);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      refreshCursorState();
       handleInput();
     },
-    [handleInput],
+    [refreshCursorState, handleInput],
+  );
+
+  const executeCommand = useCallback(
+    (command: string, valueArg: string | undefined = undefined) => {
+      const editor = editorRef.current;
+      if (editor) editor.focus();
+      if (command === 'undo' || command === 'redo') {
+        applyHistorySnapshot(command);
+        return;
+      }
+      if (editor) {
+        const before = editor.innerHTML;
+        executeFormatCommand(editor, command, valueArg);
+        const after = editor.innerHTML;
+        if (after !== before) {
+          undoStackRef.current.push(before);
+          if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+          redoStackRef.current = [];
+        }
+      }
+      refreshCursorState();
+      handleInput();
+    },
+    [applyHistorySnapshot, refreshCursorState, handleInput],
   );
 
   const insertHtml = useCallback(
     (html: string) => {
-      if (editorRef.current) {
-        editorRef.current.focus();
+      const editor = editorRef.current;
+      if (editor) editor.focus();
+      if (editor) {
+        const before = editor.innerHTML;
+        insertHtmlAtCaret(editor, html);
+        const after = editor.innerHTML;
+        if (after !== before) {
+          undoStackRef.current.push(before);
+          if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+          redoStackRef.current = [];
+        }
       }
-      document.execCommand('insertHTML', false, html);
+      refreshCursorState();
       handleInput();
     },
-    [handleInput],
+    [refreshCursorState, handleInput],
   );
+
+  // Cursor/selection sync (CE6: ribbon block-type follows the caret).
+  useEffect(() => {
+    const onSelectionChange = () => {
+      if (document.activeElement !== editorRef.current) return;
+      refreshCursorState();
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, [refreshCursorState]);
 
   const openModal = useCallback((modalName: string, initialPayload?: any) => {
     if (modalName === 'link') {
@@ -533,8 +614,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       trimmed.startsWith('tel:') ||
       trimmed.startsWith('/');
 
+    // Reject attribute-breaking characters and control chars so the URL cannot
+    // escape its `href` attribute when interpolated into HTML.
+    const containsUnsafeChars = /["'`<>\s]/.test(trimmed.replace(/^mailto:|^tel:/, ''));
+
     if (!isSafe) {
       setLinkError('Invalid URL protocol. Allowed: https://, http://, mailto:, tel:');
+      return;
+    }
+    if (containsUnsafeChars) {
+      setLinkError('URL contains characters that are not permitted.');
       return;
     }
 
@@ -550,7 +639,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
     if (sel && sel.toString().length === 0 && savedRangeRef.current) {
       const targetAttr = linkTargetBlank ? ' target="_blank" rel="noopener noreferrer"' : '';
-      const anchorHtml = `<a href="${trimmed}"${targetAttr} class="text-accent-crimson font-serif underline hover:text-rose-900 transition-colors">${trimmed}</a>`;
+      const safeUrl = trimmed
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const anchorHtml = `<a href="${safeUrl}"${targetAttr} class="text-accent-crimson font-serif underline hover:text-rose-900 transition-colors">${safeUrl}</a>`;
       executeCommand('insertHTML', anchorHtml);
     } else {
       executeCommand('createLink', trimmed);
@@ -999,6 +1093,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onKeyUp={() => {
           handleInput();
           checkSlashCommand();
+          refreshCursorState();
         }}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}

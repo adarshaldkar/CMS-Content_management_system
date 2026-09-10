@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { QUEUE_NAMES, JOB_NAMES } from '../../bull/bull-queue.constants';
 import {
@@ -7,6 +8,7 @@ import {
   type INewsletterRepository,
 } from '../../repositories/interfaces/newsletter.repository.interface';
 import { CampaignStatus, SubscriberStatus } from '../../domain/models';
+import type { EnvConfig } from '../../config/env.schema';
 
 export interface VerificationJobPayload {
   email: string;
@@ -36,8 +38,13 @@ export class NewsletterBroadcastWorker extends WorkerHost {
   constructor(
     @Inject(NEWSLETTER_REPOSITORY)
     private readonly newsletterRepo: INewsletterRepository,
+    private readonly configService: ConfigService<EnvConfig, true>,
   ) {
     super();
+  }
+
+  private get simulated(): boolean {
+    return this.configService.get('NEWSLETTER_EMAIL_SIMULATED', { infer: true });
   }
 
   async process(job: Job): Promise<{ success: boolean; processedCount: number }> {
@@ -60,7 +67,15 @@ export class NewsletterBroadcastWorker extends WorkerHost {
     const { email } = job.data;
     const masked = email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
 
-    this.logger.log(`[BullMQ] Dispatched double opt-in verification email to [${masked}] (Job: ${job.id})`);
+    if (!this.simulated) {
+      throw new Error(
+        'NEWSLETTER_EMAIL_SIMULATED=false but no SMTP transport is configured. Add a real mail transport or re-enable the simulation flag.',
+      );
+    }
+
+    this.logger.log(
+      `[BullMQ] [SIMULATED] Dispatched double opt-in verification email to [${masked}] (Job: ${job.id}) — set NEWSLETTER_EMAIL_SIMULATED=false to require real delivery.`,
+    );
     return { success: true, processedCount: 1 };
   }
 
@@ -85,8 +100,17 @@ export class NewsletterBroadcastWorker extends WorkerHost {
           continue;
         }
 
-        // Delivery simulated / completed
+        if (!this.simulated) {
+          failed++;
+          this.logger.error(
+            `[BullMQ] Recipient [${sub.id}]: NEWSLETTER_EMAIL_SIMULATED=false but no SMTP transport is configured.`,
+          );
+          continue;
+        }
+
+        // Delivery simulated (explicitly gated behind the env flag)
         delivered++;
+        this.logger.log(`[BullMQ] [SIMULATED] Delivered broadcast to [${sub.id}]`);
       } catch (err) {
         this.logger.error(`[BullMQ] Failed to deliver broadcast to [${sub.id}]: ${(err as Error).message}`);
         failed++;

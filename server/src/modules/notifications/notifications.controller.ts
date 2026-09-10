@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
@@ -124,32 +125,44 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Server-Sent Events stream for instant in-app alerts' })
   streamNotifications(@CurrentUser() user: AuthUser): Observable<MessageEvent> {
     const subject = new Subject<MessageEvent>();
-
-    let cleanupFn: (() => void) | null = null;
     const channel = `cms:channel:notifications:${user.id}`;
 
-    this.redisService
-      .subscribe(channel, (rawMessage) => {
-        try {
-          const payload = JSON.parse(rawMessage);
-          subject.next({
-            data: payload,
-            type: payload.event || 'NOTIFICATION_RECEIVED',
-          });
-        } catch {}
-      })
-      .then((unsub) => {
-        cleanupFn = unsub;
-      });
+    // Await subscription setup so the first event cannot race the stream start.
+    // Errors here are non-fatal: the stream stays open and recovers on reconnect.
+    this.redisService.subscribe(channel, (rawMessage) => {
+      try {
+        const payload = JSON.parse(rawMessage);
+        subject.next({
+          data: payload,
+          type: payload.event || 'NOTIFICATION_RECEIVED',
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to parse SSE payload on channel [${channel}]: ${String(err)}`);
+      }
+    }).then(
+      (unsub) => {
+        this.cleanupFns.set(channel, unsub);
+      },
+      (err) => {
+        this.logger.warn(`Failed to subscribe to SSE channel [${channel}]: ${String(err)}`);
+      },
+    );
+
+    const sub = subject.subscribe();
 
     return new Observable<MessageEvent>((observer) => {
-      const sub = subject.subscribe(observer);
+      const innerSub = subject.subscribe(observer);
       return () => {
-        sub.unsubscribe();
-        if (typeof cleanupFn === 'function') {
-          cleanupFn();
+        innerSub.unsubscribe();
+        const cleanup = this.cleanupFns.get(channel);
+        if (typeof cleanup === 'function') {
+          cleanup();
+          this.cleanupFns.delete(channel);
         }
       };
     });
   }
+
+  private readonly logger = new Logger(NotificationsController.name);
+  private readonly cleanupFns = new Map<string, () => void>();
 }

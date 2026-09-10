@@ -59,10 +59,10 @@ export class LikesService {
     const dateKey = new Date().toISOString().slice(0, 10);
     const groupKey = `group:${article.authorId}:ARTICLE_LIKED:${articleId}:${dateKey}`;
 
-    await this.notificationsService.notify({
+    await this.notificationsService.enqueue({
       userId: article.authorId,
       actorId: actor.id,
-      actorName: actor.name || actor.email || 'A Reader',
+      actorName: actor.name || 'A Reader',
       actorAvatar: actor.avatarUrl || null,
       type: NotificationType.ARTICLE_LIKED,
       title: 'Story Engagement',

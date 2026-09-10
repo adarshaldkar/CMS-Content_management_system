@@ -141,9 +141,16 @@ export class PostgresNotificationRepository implements INotificationRepository, 
           actor_count = cms_notifications.actor_count + 1,
           actor_name = EXCLUDED.actor_name,
           actor_avatar = EXCLUDED.actor_avatar,
-          actors_summary = jsonb_insert(
-            COALESCE(cms_notifications.actors_summary, '[]'::jsonb), '{0}',
-            jsonb_build_object('id', EXCLUDED.actor_id, 'name', EXCLUDED.actor_name), true
+          actors_summary = (
+            SELECT jsonb_agg(t.elem ORDER BY t.ord)
+            FROM jsonb_array_elements(
+              jsonb_insert(
+                COALESCE(cms_notifications.actors_summary, '[]'::jsonb), '{0}',
+                jsonb_build_object('id', EXCLUDED.actor_id, 'name', EXCLUDED.actor_name),
+                true
+              )
+            ) WITH ORDINALITY AS t(elem, ord)
+            WHERE t.ord <= 5
           ),
           message = EXCLUDED.message,
           updated_at = NOW()

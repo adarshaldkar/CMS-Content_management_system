@@ -25,6 +25,7 @@ import {
   type NewsletterStats,
 } from '../../domain/models';
 import { QUEUE_NAMES, JOB_NAMES } from '../../bull/bull-queue.constants';
+import { sanitizeArticleContent } from '../../common/utils/sanitizer.util';
 
 @Injectable()
 export class NewsletterService {
@@ -208,7 +209,7 @@ export class NewsletterService {
     }
 
     return {
-      email: subscriber.email,
+      email: this.maskEmail(subscriber.email),
       status: subscriber.status,
       topics: subscriber.topics,
       frequency: subscriber.frequency,
@@ -311,7 +312,7 @@ export class NewsletterService {
     return await this.newsletterRepo.createCampaign({
       subject: dto.subject.trim(),
       previewText: dto.previewText?.trim() || '',
-      contentHtml: dto.contentHtml,
+      contentHtml: sanitizeArticleContent(dto.contentHtml),
       targetTopics: dto.targetTopics || [],
       status: dto.scheduledAt ? CampaignStatus.SCHEDULED : CampaignStatus.DRAFT,
       totalRecipients: 0,
@@ -353,14 +354,25 @@ export class NewsletterService {
       throw new BadRequestException('No active subscribers match the target topic criteria.');
     }
 
-    // Update campaign to SENDING state
-    await this.newsletterRepo.updateCampaign(campaignId, {
-      status: CampaignStatus.SENDING,
-      totalRecipients: activeRecipients.length,
-      deliveredCount: 0,
-      failedCount: 0,
-      sentAt: new Date(),
-    });
+    // NL5: atomic compare-and-set DRAFT/SCHEDULED -> SENDING. Only the first
+    // concurrent caller wins; losers get the null below instead of double-enqueue.
+    const transitioned = await this.newsletterRepo.transitionCampaignStatus(
+      campaignId,
+      campaign.status,
+      CampaignStatus.SENDING,
+      {
+        totalRecipients: activeRecipients.length,
+        deliveredCount: 0,
+        failedCount: 0,
+        sentAt: new Date(),
+      },
+    );
+
+    if (!transitioned) {
+      throw new BadRequestException(
+        `Campaign [${campaignId}] state changed concurrently; broadcast not started.`,
+      );
+    }
 
     // Partition into batches of 50
     const CHUNK_SIZE = 50;

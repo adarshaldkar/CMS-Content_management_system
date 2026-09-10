@@ -1,4 +1,5 @@
 import { GazetteDocumentIR } from './gazette-document-ir';
+import type { ExtractedImageAsset } from '../document-import.service';
 
 export type ImportJobStatus =
   | 'queued'
@@ -39,6 +40,7 @@ export interface ImportJob {
   completedAt?: string;
   report?: ImportJobReport;
   documentIR?: GazetteDocumentIR;
+  extractedImages?: ExtractedImageAsset[];
   generatedHtml?: string;
   errorMessage?: string;
 }

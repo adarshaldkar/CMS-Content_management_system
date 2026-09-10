@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LayoutTemplate, X, Check, Clock, Sparkles, BookOpen } from 'lucide-react';
 import { STORY_TEMPLATES, type StoryTemplate } from './editorialPatterns';
+import { sanitizeHtml } from '../../utils/sanitize';
 
 interface StoryTemplatesModalProps {
   isOpen: boolean;
@@ -123,7 +124,7 @@ export const StoryTemplatesModal: React.FC<StoryTemplatesModalProps> = ({
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 max-h-[260px] overflow-y-auto">
                 <div
                   className="prose prose-sm max-w-none dark:prose-invert font-serif text-xs leading-relaxed opacity-85"
-                  dangerouslySetInnerHTML={{ __html: selectedTemplate.htmlContent }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedTemplate.htmlContent) }}
                 />
               </div>
 

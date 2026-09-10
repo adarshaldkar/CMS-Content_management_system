@@ -18,6 +18,12 @@ export interface ExtractedImageAsset {
   url: string;
   mimeType: string;
   sizeBytes: number;
+  sha256Hash?: string;
+  width?: number;
+  height?: number;
+  caption?: string;
+  credit?: string;
+  isVectorOrChart?: boolean;
 }
 
 export interface DocumentPage {
@@ -39,6 +45,15 @@ export interface DocumentImportResult {
   headingsCount: number;
   paragraphsCount: number;
   extractedImages: ExtractedImageAsset[];
+  links?: Array<{
+    id: string;
+    pageNumber: number;
+    visibleText: string;
+    url: string;
+    isExternal: boolean;
+    isMalformed: boolean;
+    needsReview: boolean;
+  }>;
   warnings?: string[];
 }
 
@@ -181,15 +196,28 @@ export class DocumentImportService {
   private detectFormat(file: Express.Multer.File): 'docx' | 'md' | 'txt' | 'pdf' {
     const ext = file.originalname.slice(file.originalname.lastIndexOf('.')).toLowerCase();
     const buf = file.buffer;
+    const isPkZip = buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
 
-    // Magic-byte check for .docx (PK zip header: 0x50 0x4B 0x03 0x04)
-    if (ext === '.docx' || (buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04)) {
+    // Magic-byte check for .docx (PK zip header: 0x50 0x4B 0x03 0x04).
+    // Other Office files (pptx/xlsx) are also ZIP archives, so a bare PK
+    // header is ambiguous — confirm the archive actually contains Word XML
+    // before classifying it as a docx.
+    if (ext === '.docx' || (isPkZip && buf.toString('latin1').includes('word/document.xml'))) {
       return 'docx';
     }
 
     // Magic-byte check for .pdf (%PDF header: 0x25 0x50 0x44 0x46)
     if (ext === '.pdf' || (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46)) {
       return 'pdf';
+    }
+
+    // Spreadsheet / presentation archives share the same ZIP magic byte as
+    // docx files. Give a clear message instead of passing them to mammoth.
+    const unsupportedOffice = ['.pptx', '.pptm', '.potx', '.xlsx', '.xlsm', '.odt', '.ods', '.odp', '.ppt', '.pps', '.xls', '.rtf'];
+    if (unsupportedOffice.includes(ext)) {
+      throw new BadRequestException(
+        `'${ext}' files are not supported. Save the file as .docx or .pdf and retry.`,
+      );
     }
 
     if (ext === '.md' || ext === '.markdown') {

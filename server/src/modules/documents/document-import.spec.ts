@@ -139,5 +139,25 @@ Engineers have demonstrated fault-tolerant qubits operating at sub-kelvin temper
         BadRequestException,
       );
     });
+
+    it('should not misdetect a .pptx (also a ZIP archive) as a .docx', async () => {
+      const fakeFile: Express.Multer.File = {
+        fieldname: 'file',
+        originalname: 'slides.pptx',
+        encoding: '7bit',
+        mimetype: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        // PK\x03\x04 + a [Content_Types] marker for the presentationml flavor, no word/document.xml
+        buffer: Buffer.from('PK\x03\x04[Content_Types].xmlapplication/vnd.openxmlformats-officedocument.presentationml.presentation'),
+        size: 100,
+        stream: null as any,
+        destination: '',
+        filename: 'slides.pptx',
+        path: '',
+      };
+
+      await expect(service.importDocument(fakeFile, mockUser)).rejects.toThrow(
+        new BadRequestException(`'.pptx' files are not supported. Save the file as .docx or .pdf and retry.`),
+      );
+    });
   });
 });

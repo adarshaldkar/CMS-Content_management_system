@@ -7,6 +7,9 @@ build/
 coverage/
 *.tsbuildinfo
 *.zip
+*.pdf
+*.docx
+
 
 # Environment (never commit secrets)
 .env

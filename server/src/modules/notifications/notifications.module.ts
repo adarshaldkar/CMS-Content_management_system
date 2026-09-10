@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BullModule } from '@nestjs/bullmq';
 import { PostgresService } from '../../database/postgres.service';
 import {
   NotificationPreferencesSchema,
@@ -12,8 +13,10 @@ import {
 import { PostgresNotificationRepository } from '../../repositories/postgres/postgres-notification.repository';
 import { MongoNotificationRepository } from '../../repositories/mongo/mongo-notification.repository';
 import { notificationRepositoryProvider } from '../../repositories/repository.providers';
+import { QUEUE_NAMES } from '../../bull/bull-queue.constants';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { NotificationOutboxWorker } from './notification-outbox.worker';
 
 @Global()
 @Module({
@@ -23,6 +26,7 @@ import { NotificationsService } from './notifications.service';
       { name: NotificationPreferencesSchemaClass.name, schema: NotificationPreferencesSchema },
       { name: PushSubscriptionSchemaClass.name, schema: PushSubscriptionSchema },
     ]),
+    BullModule.registerQueue({ name: QUEUE_NAMES.NOTIFICATION_OUTBOX }),
   ],
   controllers: [NotificationsController],
   providers: [
@@ -31,6 +35,7 @@ import { NotificationsService } from './notifications.service';
     MongoNotificationRepository,
     notificationRepositoryProvider,
     NotificationsService,
+    NotificationOutboxWorker,
   ],
   exports: [NotificationsService, notificationRepositoryProvider],
 })

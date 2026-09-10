@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { sanitizeArticleContent } from '../../common/utils/sanitizer.util';
 
 export interface GutenbergBlock {
   blockName: string;
@@ -17,6 +18,32 @@ export interface GutenbergParseResult {
 @Injectable()
 export class GutenbergAdapterService {
   private readonly logger = new Logger(GutenbergAdapterService.name);
+
+  // D4: HTML-escape attribute text before it is interpolated into markup.
+  private escapeHtmlAttr(value: unknown): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // D4: HTML-escape element text (no quote escaping needed, but harmless).
+  private escapeHtmlText(value: unknown): string {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  // D4: only allow a known-safe subset of alignment CSS values to reach style=
+  private textAlignStyle(value: unknown): string {
+    const v = String(value ?? '').toLowerCase();
+    return ['left', 'center', 'right', 'justify'].includes(v)
+      ? ` style="text-align: ${v}"`
+      : '';
+  }
 
   /**
    * Bi-directional Parser: Converts WordPress Gutenberg HTML comments into clean Gazette Semantic HTML
@@ -56,7 +83,7 @@ export class GutenbergAdapterService {
         case 'paragraph':
         case 'core/paragraph': {
           const dropCap = attrs.dropCap ? ' class="cms-drop-cap"' : '';
-          const align = attrs.textAlign ? ` style="text-align: ${attrs.textAlign}"` : '';
+          const align = this.textAlignStyle(attrs.textAlign);
           const cleanP = rawInnerHtml || '<p></p>';
           if (dropCap || align) {
             outputHtmlPieces.push(cleanP.replace(/^<p>/i, `<p${dropCap}${align}>`));
@@ -69,7 +96,7 @@ export class GutenbergAdapterService {
         case 'heading':
         case 'core/heading': {
           const level = attrs.level || 2;
-          const align = attrs.textAlign ? ` style="text-align: ${attrs.textAlign}"` : '';
+          const align = this.textAlignStyle(attrs.textAlign);
           const cleanText = rawInnerHtml.replace(/<\/?h[1-6][^>]*>/gi, '').trim();
           if (!detectedTitle && level <= 2) {
             detectedTitle = cleanText.replace(/<[^>]*>/g, '');
@@ -81,10 +108,10 @@ export class GutenbergAdapterService {
         case 'image':
         case 'core/image': {
           const imgMatch = rawInnerHtml.match(/<img[^>]+src="([^">]+)"[^>]*>/i);
-          const src = attrs.url || (imgMatch ? imgMatch[1] : '');
-          const alt = attrs.alt || 'Editorial Image';
+          const src = this.escapeHtmlAttr(attrs.url || (imgMatch ? imgMatch[1] : ''));
+          const alt = this.escapeHtmlAttr(attrs.alt || 'Editorial Image');
           const captionMatch = rawInnerHtml.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
-          const caption = attrs.caption || (captionMatch ? captionMatch[1] : '');
+          const caption = this.escapeHtmlText(attrs.caption || (captionMatch ? captionMatch[1] : ''));
           const alignClass = attrs.align === 'wide' ? ' class="cms-align-wide"' : attrs.align === 'full' ? ' class="cms-align-full"' : '';
 
           outputHtmlPieces.push(
@@ -149,7 +176,7 @@ export class GutenbergAdapterService {
     if (blocksCount === 0) {
       return {
         title: '',
-        html: gutenbergContent,
+        html: sanitizeArticleContent(gutenbergContent),
         blocksCount: 0,
         unsupportedBlocksCount: 0,
       };
@@ -157,7 +184,7 @@ export class GutenbergAdapterService {
 
     return {
       title: detectedTitle,
-      html: outputHtmlPieces.join('\n\n'),
+      html: sanitizeArticleContent(outputHtmlPieces.join('\n\n')),
       blocksCount,
       unsupportedBlocksCount,
     };
@@ -248,6 +275,6 @@ export class GutenbergAdapterService {
       gutenbergBlocks.push(`<!-- wp:paragraph${dropCap ? ' {"dropCap":true}' : ''} -->\n<p${dropCap ? ' class="has-drop-cap"' : ''}>${cleanContent}</p>\n<!-- /wp:paragraph -->`);
     }
 
-    return gutenbergBlocks.join('\n\n');
+    return sanitizeArticleContent(gutenbergBlocks.join('\n\n'));
   }
 }

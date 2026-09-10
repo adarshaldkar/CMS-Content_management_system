@@ -18,6 +18,7 @@ export const ALL_QUEUES: QueueName[] = [
 
 export const JOB_NAMES = {
   PUBLISH_SCHEDULED_ARTICLE: 'publish-scheduled-article',
+  RECONCILE_SCHEDULED_PUBLISHERS: 'reconcile-scheduled-publishers',
   DISPATCH_NOTIFICATION: 'dispatch-notification',
   DISPATCH_NEWSLETTER_VERIFICATION: 'dispatch-newsletter-verification',
   DISPATCH_NEWSLETTER_BATCH: 'dispatch-newsletter-batch',

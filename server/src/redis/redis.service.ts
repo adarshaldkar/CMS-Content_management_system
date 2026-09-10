@@ -5,6 +5,7 @@ import Redis, { RedisOptions } from 'ioredis';
 export interface CacheEnvelope<T> {
   entityVersion?: number;
   activeEngine?: string;
+  generation?: number;
   cachedAt: string;
   payload: T;
 }
@@ -29,7 +30,7 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
   async onModuleInit(): Promise<void> {
     const host = this.configService.get<string>('REDIS_HOST', 'localhost');
     const port = this.configService.get<number>('REDIS_PORT', 6379);
-    const password = this.configService.get<string>('REDIS_PASSWORD', 'cms_dev_password');
+    const password = this.configService.get<string>('REDIS_PASSWORD', '');
     const db = this.configService.get<number>('REDIS_DB', 0);
 
     const redisOptions: RedisOptions = {
@@ -136,7 +137,7 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     key: string,
     payload: T,
     ttlSeconds: number,
-    metadata?: { entityVersion?: number; activeEngine?: string },
+    metadata?: { entityVersion?: number; activeEngine?: string; generation?: number },
   ): Promise<void> {
     if (!this.isHealthy() || !this.client) return;
 
@@ -144,6 +145,7 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
       const envelope: CacheEnvelope<T> = {
         entityVersion: metadata?.entityVersion,
         activeEngine: metadata?.activeEngine,
+        generation: metadata?.generation,
         cachedAt: new Date().toISOString(),
         payload,
       };
@@ -154,14 +156,90 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     }
   }
 
+  /** Derives the generation counter key for a cache key, ignoring any query string. */
+  private generationKeyFor(cacheKey: string): string {
+    const base = cacheKey.split('?')[0].replace(/^cms:v1:cache:/, '');
+    return `cms:v1:gen:${base}`;
+  }
+
+  /**
+   * Returns the current generation counter for a cache key. Read side of
+   * version-aware invalidation: an envelope whose `generation` differs is stale.
+   */
+  async getGeneration(cacheKey: string): Promise<number> {
+    if (!this.isHealthy() || !this.client) return 0;
+    try {
+      const raw = await this.client.get(this.generationKeyFor(cacheKey));
+      const n = parseInt(raw || '0', 10);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    } catch (err: any) {
+      this.logger.warn(`Redis getGeneration error for key ${cacheKey}: ${err.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Bumps the generation counters for the given cache keys. Called when entries
+   * are invalidated so that any concurrently re-cached stale copy is discarded.
+   */
+  private async bumpGenerations(...cacheKeys: string[]): Promise<void> {
+    if (!this.isHealthy() || !this.client || cacheKeys.length === 0) return;
+    try {
+      const uniqueKeys = [...new Set(cacheKeys.map((k) => this.generationKeyFor(k)))];
+      for (const genKey of uniqueKeys) {
+        await this.client.incr(genKey);
+      }
+    } catch (err: any) {
+      this.logger.warn(`Redis bumpGenerations error: ${err.message}`);
+    }
+  }
+
   async delCached(...keys: string[]): Promise<void> {
     if (!this.isHealthy() || !this.client || keys.length === 0) return;
 
     try {
       await this.client.del(...keys);
+      await this.bumpGenerations(...keys);
     } catch (err: any) {
       this.logger.warn(`Redis delCached error: ${err.message}`);
     }
+  }
+
+  /**
+   * Deletes every key matching a glob pattern using a non-blocking SCAN.
+   * `DEL` does not support wildcards, so a cursor-based scan is required to
+   * reliably invalidate namespaced cache entries (e.g. all paginated lists).
+   * Generation counters for the matched keys are bumped afterwards.
+   */
+  async delByPattern(pattern: string): Promise<number> {
+    if (!this.isHealthy() || !this.client) return 0;
+
+    let deleted = 0;
+    const matched: string[] = [];
+    let cursor = '0';
+    try {
+      do {
+        const [nextCursor, keys] = await this.client.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          200,
+        );
+        cursor = nextCursor;
+        if (keys.length > 0) {
+          matched.push(...keys);
+          deleted += await this.client.del(...keys);
+        }
+      } while (cursor !== '0');
+
+      if (matched.length > 0) {
+        await this.bumpGenerations(...matched);
+      }
+    } catch (err: any) {
+      this.logger.warn(`Redis delByPattern error (${pattern}): ${err.message}`);
+    }
+    return deleted;
   }
 
   /* ──────────────────────────────────────────────────────────────────────────
@@ -280,7 +358,11 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     inFlightTtlSeconds = 30,
   ): Promise<{ status: 'ACQUIRED' | 'PENDING' | 'COMPLETED'; result?: any }> {
     if (!this.isHealthy() || !this.client) {
-      return { status: 'ACQUIRED' }; // Degrade gracefully
+      // Fail-closed: with Redis unavailable we cannot prove this request is a
+      // duplicate AND we cannot deduplicate concurrent writes. Reject with
+      // PENDING so the caller aborts instead of risking duplicate mutations.
+      this.logger.warn('Idempotency unavailable (Redis down). Failing closed to prevent duplicate writes.');
+      return { status: 'PENDING' };
     }
 
     const compositeKey = `idempotency:${userId}:${operation}:${clientKey}`;
@@ -302,8 +384,8 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
 
       return { status: 'ACQUIRED' };
     } catch (err: any) {
-      this.logger.warn(`Idempotency check failed: ${err.message}`);
-      return { status: 'ACQUIRED' };
+      this.logger.warn(`Idempotency check failed, failing closed: ${err.message}`);
+      return { status: 'PENDING' };
     }
   }
 

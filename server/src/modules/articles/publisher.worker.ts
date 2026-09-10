@@ -51,11 +51,34 @@ export class PublisherWorker extends WorkerHost implements OnModuleInit {
   }
 
   /**
-   * On startup, reconcile any SCHEDULED articles in the database that may lack a delayed BullMQ job
+   * On startup, reconcile any SCHEDULED articles in the database that may lack
+   * a delayed BullMQ job, then arm a self-scheduling repeatable reconcile job so
+   * a failed enqueue is repaired within the repeat interval (no restart needed).
    */
   async onModuleInit(): Promise<void> {
     this.logger.log('BullMQ Scheduled Publisher Worker initialized.');
     await this.reconcileMissedSchedules();
+
+    try {
+      await this.publishingQueue?.upsertJobScheduler(
+        `reconcile:${QUEUE_NAMES.SCHEDULED_PUBLISHING}`,
+        { every: 60_000 },
+        {
+          name: JOB_NAMES.RECONCILE_SCHEDULED_PUBLISHERS,
+          data: {},
+          opts: {
+            removeOnComplete: 1000,
+            removeOnFail: false,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+          },
+        },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to arm periodic schedule reconciliation: ${(err as Error).message}`,
+      );
+    }
   }
 
   /**
@@ -65,6 +88,14 @@ export class PublisherWorker extends WorkerHost implements OnModuleInit {
     job: Job<ScheduledPublishJobPayload>,
   ): Promise<{ success: boolean; published: boolean; reason?: string }> {
     const { articleId, version, publishingSlotId } = job.data;
+
+    // Periodic reconciliation keeper: closes the schedule-integrity hole (DB set
+    // to SCHEDULED with a lost enqueue) by republishing/re-enqueueing within the
+    // repeat window, without relying on process restart.
+    if (job.name === JOB_NAMES.RECONCILE_SCHEDULED_PUBLISHERS) {
+      await this.reconcileMissedSchedules();
+      return { success: true, published: false, reason: 'RECONCILED' };
+    }
 
     // Handle simulated test drill tasks
     if ((job.data as any)?.simulation) {
@@ -107,55 +138,84 @@ export class PublisherWorker extends WorkerHost implements OnModuleInit {
       return { success: true, published: false, reason: 'STALE_VERSION' };
     }
 
-    const now = new Date();
-    const updated = await this.articleRepo.update(article.id, {
-      status: ContentStatus.PUBLISHED,
-      publishedAt: now,
-      scheduledAt: null,
-      version: article.version + 1,
-    });
-
-    if (!updated || updated.status !== ContentStatus.PUBLISHED) {
-      throw new Error(`Failed to update article [${articleId}] to PUBLISHED status`);
-    }
-
-    // Write audit trail
-    await this.auditService.log({
-      action: AuditEventType.ARTICLE_STATUS_CHANGED,
-      resource: `Article:${article.id}`,
-      result: 'SUCCESS',
-      metadata: {
-        trigger: 'BULLMQ_SCHEDULED_PUBLISHER',
-        jobId: job.id,
-        from: ContentStatus.SCHEDULED,
-        to: ContentStatus.PUBLISHED,
-        publishingSlotId: publishingSlotId || null,
-      },
-    });
-
-    // Invalidate L2 caching
-    await this.redisService.delCached(`cache:article:${article.slug}`, `cache:articles:*`);
-
-    // Dispatch author notification
-    if (this.notificationsService && article.authorId) {
-      try {
-        await this.notificationsService.notify({
-          userId: article.authorId,
-          actorName: 'The Gazette Desk',
-          type: NotificationType.ARTICLE_PUBLISHED,
-          title: 'Story Published',
-          message: `Your scheduled story "${article.title}" is now live on the Front Page.`,
-          resourceType: 'article',
-          resourceId: article.id,
-          resourceSlug: article.slug,
-        });
-      } catch (notifErr) {
-        this.logger.warn(`Failed to dispatch publication notification for [${articleId}]: ${(notifErr as Error).message}`);
+    // R7: distributed mutex guards the read-check-update window so concurrent
+    // workers cannot both promote the same SCHEDULED article. If Redis is down
+    // we proceed without the fence (DB status check remains the second gate).
+    let lock: Awaited<ReturnType<RedisService['acquireFencingLock']>> | null = null;
+    if (this.redisService.isHealthy()) {
+      lock = await this.redisService.acquireFencingLock(`article:${articleId}`, 20000);
+      if (!lock) {
+        this.logger.warn(`Fencing lock for article [${articleId}] is held by another worker. Skipping job [${job.id}].`);
+        return { success: true, published: false, reason: 'LOCK_BUSY' };
       }
     }
 
-    this.logger.log(`Successfully published scheduled article "${article.title}" [${article.id}].`);
-    return { success: true, published: true };
+    try {
+      const now = new Date();
+      const updated = await this.articleRepo.update(article.id, {
+        status: ContentStatus.PUBLISHED,
+        publishedAt: now,
+        scheduledAt: null,
+        version: article.version + 1,
+      });
+
+      if (!updated || updated.status !== ContentStatus.PUBLISHED) {
+        throw new Error(`Failed to update article [${articleId}] to PUBLISHED status`);
+      }
+
+      // Write audit trail
+      await this.auditService.log({
+        action: AuditEventType.ARTICLE_STATUS_CHANGED,
+        resource: `Article:${article.id}`,
+        result: 'SUCCESS',
+        metadata: {
+          trigger: 'BULLMQ_SCHEDULED_PUBLISHER',
+          jobId: job.id,
+          from: ContentStatus.SCHEDULED,
+          to: ContentStatus.PUBLISHED,
+          publishingSlotId: publishingSlotId || null,
+          fencingToken: lock?.fencingToken ?? null,
+        },
+      });
+
+      // Invalidate L2 caching: use the correct `cms:v1:cache:*` namespace and
+      // sweep every paginated list variant, since the page cache key includes
+      // the full query string.
+      await this.redisService.delCached(
+        `cms:v1:cache:articles:slug:${article.slug}`,
+        `cms:v1:cache:articles:id:${article.id}`,
+        'cms:v1:cache:articles',
+      );
+      await this.redisService.delByPattern('cms:v1:cache:articles?*');
+      await this.redisService.delByPattern('cms:v1:cache:articles:*');
+
+      // Dispatch author notification
+      if (this.notificationsService && article.authorId) {
+        try {
+          await this.notificationsService.enqueue({
+            userId: article.authorId,
+            actorName: 'The Gazette Desk',
+            type: NotificationType.ARTICLE_PUBLISHED,
+            title: 'Story Published',
+            message: `Your scheduled story "${article.title}" is now live on the Front Page.`,
+            resourceType: 'article',
+            resourceId: article.id,
+            resourceSlug: article.slug,
+          });
+        } catch (notifErr) {
+          this.logger.warn(`Failed to dispatch publication notification for [${articleId}]: ${(notifErr as Error).message}`);
+        }
+      }
+
+      this.logger.log(`Successfully published scheduled article "${article.title}" [${article.id}].`);
+      return { success: true, published: true };
+    } finally {
+      if (lock) {
+        await this.redisService
+          .releaseFencingLock(`article:${articleId}`, lock.lockId)
+          .catch(() => {});
+      }
+    }
   }
 
   /**
@@ -174,26 +234,64 @@ export class PublisherWorker extends WorkerHost implements OnModuleInit {
 
         const scheduledTime = new Date(article.scheduledAt);
         if (scheduledTime <= now) {
-          // Overdue schedule: publish immediately
-          const updated = await this.articleRepo.update(article.id, {
-            status: ContentStatus.PUBLISHED,
-            publishedAt: now,
-            scheduledAt: null,
-            version: article.version + 1,
-          });
+          // Overdue schedule: publish immediately under the fencing lock to avoid
+          // racing a late BullMQ delayed job.
+          let lock: Awaited<ReturnType<RedisService['acquireFencingLock']>> | null = null;
+          if (this.redisService.isHealthy()) {
+            lock = await this.redisService.acquireFencingLock(`article:${article.id}`, 20000);
+            if (!lock) continue; // Another worker owns this publish
+          }
 
-          if (updated && updated.status === ContentStatus.PUBLISHED) {
-            await this.auditService.log({
-              action: AuditEventType.ARTICLE_STATUS_CHANGED,
-              resource: `Article:${article.id}`,
-              result: 'SUCCESS',
-              metadata: {
-                trigger: 'BULLMQ_BOOTSTRAP_RECONCILIATION',
-                from: ContentStatus.SCHEDULED,
-                to: ContentStatus.PUBLISHED,
-              },
+          try {
+            const updated = await this.articleRepo.update(article.id, {
+              status: ContentStatus.PUBLISHED,
+              publishedAt: now,
+              scheduledAt: null,
+              version: article.version + 1,
             });
-            this.logger.log(`Reconciliation promoted overdue article "${article.title}" to PUBLISHED.`);
+
+            if (updated && updated.status === ContentStatus.PUBLISHED) {
+              await this.auditService.log({
+                action: AuditEventType.ARTICLE_STATUS_CHANGED,
+                resource: `Article:${article.id}`,
+                result: 'SUCCESS',
+                metadata: {
+                  trigger: 'BULLMQ_BOOTSTRAP_RECONCILIATION',
+                  from: ContentStatus.SCHEDULED,
+                  to: ContentStatus.PUBLISHED,
+                  fencingToken: lock?.fencingToken ?? null,
+                },
+              });
+
+              await this.redisService.delCached(
+                `cms:v1:cache:articles:slug:${article.slug}`,
+                `cms:v1:cache:articles:id:${article.id}`,
+                'cms:v1:cache:articles',
+              );
+              await this.redisService.delByPattern('cms:v1:cache:articles?*');
+              await this.redisService.delByPattern('cms:v1:cache:articles:*');
+
+              if (this.notificationsService && article.authorId) {
+                await this.notificationsService.enqueue({
+                  userId: article.authorId,
+                  actorName: 'The Gazette Desk',
+                  type: NotificationType.ARTICLE_PUBLISHED,
+                  title: 'Story Published',
+                  message: `Your scheduled story "${article.title}" is now live on the Front Page.`,
+                  resourceType: 'article',
+                  resourceId: article.id,
+                  resourceSlug: article.slug,
+                }).catch(() => {});
+              }
+
+              this.logger.log(`Reconciliation promoted overdue article "${article.title}" to PUBLISHED.`);
+            }
+          } finally {
+            if (lock) {
+              await this.redisService
+                .releaseFencingLock(`article:${article.id}`, lock.lockId)
+                .catch(() => {});
+            }
           }
         } else if (this.publishingQueue) {
           // Future schedule: ensure delayed BullMQ job exists

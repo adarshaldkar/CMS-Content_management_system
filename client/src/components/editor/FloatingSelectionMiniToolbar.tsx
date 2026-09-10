@@ -18,6 +18,7 @@ import {
 import type { CommandExecutionContext } from './commandRegistry';
 import { toggleSemanticHighlight } from './commandRegistry';
 import { editorialNodes } from './editorialNodes';
+import { queryInlineFormat } from './semanticFormatting';
 
 interface FloatingSelectionMiniToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
@@ -88,10 +89,11 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
           node = node.parentNode;
         }
 
+        const editor = editorRef.current;
         setActiveFormats({
-          bold: document.queryCommandState('bold'),
-          italic: document.queryCommandState('italic'),
-          underline: document.queryCommandState('underline'),
+          bold: editor ? queryInlineFormat(editor, 'bold') : false,
+          italic: editor ? queryInlineFormat(editor, 'italic') : false,
+          underline: editor ? queryInlineFormat(editor, 'underline') : false,
           highlight: isInsideMark,
         });
       } catch {
@@ -264,7 +266,7 @@ export const FloatingSelectionMiniToolbar: React.FC<FloatingSelectionMiniToolbar
         type="button"
         title="Delete Selection / Block (Ctrl+Shift+Delete)"
         onClick={() => {
-          document.execCommand('delete');
+          executionContext.executeCommand('delete');
           setVisible(false);
         }}
         className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-900/80 rounded-xs transition-colors cursor-pointer"

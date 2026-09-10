@@ -127,7 +127,9 @@ export class MongoNewsletterRepository implements INewsletterRepository {
       query.status = filters.status;
     }
     if (filters.search) {
-      query.email = { $regex: filters.search.trim(), $options: 'i' };
+      // Escape regex metacharacters to prevent ReDoS and regex injection
+      const escaped = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.email = { $regex: escaped, $options: 'i' };
     }
     if (filters.topic) {
       query.topics = filters.topic;
@@ -204,6 +206,22 @@ export class MongoNewsletterRepository implements INewsletterRepository {
     updates: Partial<NewsletterCampaign>,
   ): Promise<NewsletterCampaign | null> {
     const updated = await this.campaignModel.findByIdAndUpdate(id, { $set: updates }, { new: true }).exec();
+    return updated ? this.mapCampaign(updated) : null;
+  }
+
+  async transitionCampaignStatus(
+    id: string,
+    fromStatus: NewsletterCampaign['status'],
+    toStatus: NewsletterCampaign['status'],
+    updates: Partial<NewsletterCampaign> = {},
+  ): Promise<NewsletterCampaign | null> {
+    const updated = await this.campaignModel
+      .findOneAndUpdate(
+        { _id: id, status: fromStatus },
+        { $set: { ...updates, status: toStatus } },
+        { new: true },
+      )
+      .exec();
     return updated ? this.mapCampaign(updated) : null;
   }
 

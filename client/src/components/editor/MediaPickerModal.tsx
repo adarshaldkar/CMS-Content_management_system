@@ -22,6 +22,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [customUrl, setCustomUrl] = useState('');
   const [urlPreviewError, setUrlPreviewError] = useState(false);
+  const [customUrlError, setCustomUrlError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -46,10 +47,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
   }, [isOpen]);
 
-  // Escape key listener for accessible dismissal
+  // Escape key listener for accessible dismissal. stopImmediatePropagation()
+  // prevents the keystroke from also tripping sibling editors/modals
+  // (CE9: double-Escape cascade).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
         onClose();
       }
     };
@@ -110,8 +115,28 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
   const handleApplyCustomUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customUrl.trim()) return;
-    onSelect(customUrl.trim());
+    const trimmed = customUrl.trim();
+    if (!trimmed) {
+      setCustomUrlError('Please enter an image URL.');
+      return;
+    }
+    if (/[\s"`<>]/.test(trimmed)) {
+      setCustomUrlError('URL contains invalid characters.');
+      return;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      setCustomUrlError('Please enter a valid absolute URL, e.g. https://example.com/image.jpg');
+      return;
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      setCustomUrlError('Only http(s) image URLs are allowed.');
+      return;
+    }
+    setCustomUrlError(null);
+    onSelect(trimmed);
     onClose();
   };
 
@@ -216,6 +241,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     onChange={(e) => {
                       setCustomUrl(e.target.value);
                       setUrlPreviewError(false);
+                      setCustomUrlError(null);
                     }}
                     placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
                     className="w-full px-3 py-2 text-xs border border-border-subtle focus:border-ink-primary bg-canvas-paper text-ink-primary focus:outline-none font-mono"
@@ -223,6 +249,15 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     autoFocus
                   />
                 </div>
+
+                {customUrlError && (
+                  <div
+                    className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono"
+                    style={{ borderRadius: 2 }}
+                  >
+                    {customUrlError}
+                  </div>
+                )}
 
                 {customUrl && (
                   <div className="space-y-2">

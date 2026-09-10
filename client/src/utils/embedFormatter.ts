@@ -43,6 +43,7 @@ export function formatEmbedHtml(
           src="${embedUrl}"
           title="${title}"
           loading="lazy"
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
           class="w-full h-full border-0 absolute inset-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowfullscreen

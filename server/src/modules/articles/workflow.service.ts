@@ -316,23 +316,32 @@ export class WorkflowService {
       if (finalTargetStatus === ContentStatus.SCHEDULED && updatePayload.scheduledAt) {
         const delayMs = Math.max(0, new Date(updatePayload.scheduledAt).getTime() - Date.now());
         const jobId = `job:publish:${updated.id}:${updated.version}`;
-        await this.publishingQueue.add(
-          JOB_NAMES.PUBLISH_SCHEDULED_ARTICLE,
-          {
-            articleId: updated.id,
-            version: updated.version,
-            scheduledAt: new Date(updatePayload.scheduledAt).toISOString(),
-            publishingSlotId: updatePayload.publishingSlotId || null,
-            enqueuedByUserId: user.id,
-            enqueuedAt: new Date().toISOString(),
-          },
-          {
-            jobId,
-            delay: delayMs,
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 5000 },
-          },
-        );
+        try {
+          await this.publishingQueue.add(
+            JOB_NAMES.PUBLISH_SCHEDULED_ARTICLE,
+            {
+              articleId: updated.id,
+              version: updated.version,
+              scheduledAt: new Date(updatePayload.scheduledAt).toISOString(),
+              publishingSlotId: updatePayload.publishingSlotId || null,
+              enqueuedByUserId: user.id,
+              enqueuedAt: new Date().toISOString(),
+            },
+            {
+              jobId,
+              delay: delayMs,
+              attempts: 3,
+              backoff: { type: 'exponential', delay: 5000 },
+            },
+          );
+        } catch (queueErr) {
+          // DB is already SCHEDULED; the periodic reconcile job in
+          // PublisherWorker re-enqueues it within ~60s, so do not roll the
+          // article back — just surface the failure.
+          this.logger.warn(
+            `Failed to enqueue scheduled publish job for [${updated.id}]: ${(queueErr as Error).message}. The periodic reconciler will repair it.`,
+          );
+        }
       } else if (currentStatus === ContentStatus.SCHEDULED && finalTargetStatus !== ContentStatus.SCHEDULED) {
         // Unscheduling or reverting: remove any pending delayed jobs
         try {
@@ -374,10 +383,10 @@ export class WorkflowService {
 
       if (notifType) {
         this.notificationsService
-          .notify({
+          .enqueue({
             userId: updated.authorId,
             actorId: user.id,
-            actorName: user.name || user.email || 'Editorial Desk',
+            actorName: user.name || 'Editorial Desk',
             type: notifType,
             title,
             message,

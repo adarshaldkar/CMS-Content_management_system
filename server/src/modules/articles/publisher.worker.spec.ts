@@ -50,10 +50,14 @@ describe('PublisherWorker (BullMQ Scheduled Publishing & Idempotency)', () => {
 
   const mockRedisService: Partial<RedisService> = {
     delCached: jest.fn().mockResolvedValue(undefined),
+    delByPattern: jest.fn().mockResolvedValue(0),
+    isHealthy: jest.fn().mockReturnValue(true),
+    acquireFencingLock: jest.fn().mockResolvedValue({ lockId: 'lock-1', fencingToken: 1 }),
+    releaseFencingLock: jest.fn().mockResolvedValue(true),
   };
 
   const mockNotificationsService: Partial<NotificationsService> = {
-    notify: jest.fn().mockResolvedValue({} as any),
+    enqueue: jest.fn().mockResolvedValue({ queued: true, jobId: 'notif-1' }),
   };
 
   const mockQueue = {
@@ -157,6 +161,33 @@ describe('PublisherWorker (BullMQ Scheduled Publishing & Idempotency)', () => {
       expect(result.published).toBe(false);
       expect(result.reason).toBe('STALE_VERSION');
       expect(mockArticleRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('should reconcile overdue SCHEDULED articles when the periodic reconciler job fires', async () => {
+      (mockArticleRepo.findMany as jest.Mock).mockResolvedValue({
+        items: [scheduledArticle],
+        total: 1,
+      });
+      (mockArticleRepo.update as jest.Mock).mockResolvedValue({
+        ...scheduledArticle,
+        status: ContentStatus.PUBLISHED,
+      });
+
+      const result = await worker.process({
+        id: 'job-reconcile-1',
+        name: 'reconcile-scheduled-publishers',
+        data: {} as any,
+      } as any);
+
+      expect(result.reason).toBe('RECONCILED');
+      expect(mockArticleRepo.findMany).toHaveBeenCalledWith({
+        status: ContentStatus.SCHEDULED,
+        limit: 100,
+      });
+      expect(mockArticleRepo.update).toHaveBeenCalledWith(
+        'art-scheduled-1',
+        expect.objectContaining({ status: ContentStatus.PUBLISHED }),
+      );
     });
   });
 });

@@ -116,10 +116,10 @@ export class CommentsService {
       // Threaded reply: notify parent comment author
       const parentComment = await this.commentRepo.findById(parentId);
       if (parentComment && parentComment.authorId !== actor.id) {
-        await this.notificationsService.notify({
+        await this.notificationsService.enqueue({
           userId: parentComment.authorId,
           actorId: actor.id,
-          actorName: actor.name || actor.email || 'A Reader',
+          actorName: actor.name || 'A Reader',
           actorAvatar: actor.avatarUrl || null,
           type: NotificationType.COMMENT_REPLY,
           title: 'New Reply to Your Comment',
@@ -132,10 +132,10 @@ export class CommentsService {
     } else {
       // Top-level comment: notify article author
       if (article.authorId && article.authorId !== actor.id) {
-        await this.notificationsService.notify({
+        await this.notificationsService.enqueue({
           userId: article.authorId,
           actorId: actor.id,
-          actorName: actor.name || actor.email || 'A Reader',
+          actorName: actor.name || 'A Reader',
           actorAvatar: actor.avatarUrl || null,
           type: NotificationType.COMMENT_RECEIVED,
           title: 'New Discussion on Your Story',
