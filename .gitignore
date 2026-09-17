@@ -10,12 +10,19 @@ coverage/
 *.pdf
 *.docx
 
-
 # Environment (never commit secrets)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.template
 server/.env
+server/.env.*
+!server/.env.example
+!server/.env.template
+client/.env
+client/.env.*
+!client/.env.example
+!client/.env.template
 
 # Logs
 logs/
@@ -31,28 +38,31 @@ Thumbs.db
 .agents/
 .gemini/
 
-# Non-production auxiliary tools and test suites
-archify/
+# Test Suites, Test Files, Test Fixtures, and Test Results (Never Push to Git)
 test/
 tests/
 client/tests/
 server/test/
+test-fixtures/
+test-results/
+coverage/
+.playwright/
+playwright-report/
+blob-report/
+.cache/
+scripts/
+archify/
 *.spec.ts
 *.test.ts
 *.test.tsx
 *.spec.js
 *.test.js
-test-fixtures/
-scripts/
-.cache/
-.playwright/
-test-results/
 
-# Uploads (runtime)
+# Uploads (runtime user media)
 uploads/
 server/uploads/
 
-# Docker volumes (local)
+# Docker database volumes (local persistence)
 postgres_data/
 mongo_data/
 mariadb_data/

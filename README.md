@@ -230,8 +230,8 @@ Verify or configure `server/.env`:
 ```env
 PORT=3001
 CLIENT_URL=http://localhost:5173
-DATABASE_URL=postgresql://postgres:asd123@localhost:5432/cms_platform
-MONGODB_URI=mongodb://root:asd123@localhost:27017/cms_platform?authSource=admin
+DATABASE_URL=postgresql://cms:your_postgres_password@localhost:5432/cms_platform
+MONGO_URI=mongodb://cms:your_mongo_password@localhost:27017/cms_platform?authSource=admin
 JWT_ACCESS_SECRET=your_super_secret_access_key_at_least_32_chars
 JWT_REFRESH_SECRET=your_super_secret_refresh_key_at_least_32_chars
 ACTIVE_DATABASE=postgres
