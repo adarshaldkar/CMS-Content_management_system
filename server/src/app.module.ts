@@ -24,6 +24,7 @@ import { EmbedsModule } from './modules/embeds/embeds.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { LegalModule } from './modules/legal/legal.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
+import { MessagesModule } from './modules/messages/messages.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { PrivacyModule } from './modules/privacy/privacy.module';
     DocumentsModule,
     LegalModule,
     PrivacyModule,
+    MessagesModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',
