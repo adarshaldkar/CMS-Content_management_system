@@ -142,7 +142,9 @@ export const RichEmbedModal: React.FC<RichEmbedModalProps> = ({
   };
 
   const handleCopyTranscript = () => {
-    const text = previewData?.transcript || '';
+    const text = (previewData?.transcript || '')
+      .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, '')
+      .trim();
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);

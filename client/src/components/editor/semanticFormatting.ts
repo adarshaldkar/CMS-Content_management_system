@@ -310,20 +310,42 @@ export function removeFormat(editor: HTMLElement): void {
 }
 
 export function insertHtmlAtCaret(editor: HTMLElement, html: string): void {
+  editor.focus();
+  let range: Range | null = null;
   const sel = window.getSelection();
-  const range =
-    sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : document.createRange();
+
+  if (sel && sel.rangeCount > 0) {
+    const candidateRange = sel.getRangeAt(0);
+    if (editor.contains(candidateRange.commonAncestorContainer)) {
+      range = candidateRange;
+    }
+  }
+
+  if (!range) {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
   if (range.collapsed === false) range.deleteContents();
 
   const clean = sanitizeHtml(html || '');
   const template = document.createElement('template');
   template.innerHTML = clean;
 
-  const first = template.content.firstChild;
+  const fragment = template.content;
+  const first = fragment.firstChild;
+  const last = fragment.lastChild;
   if (!first) return;
-  range.insertNode(template.content);
-  const inserted = first.parentNode;
-  if (inserted) placeCaretAfter(inserted.lastChild ?? first);
+
+  range.insertNode(fragment);
+  if (last) {
+    placeCaretAfter(last);
+  }
 }
 
 export function createLink(editor: HTMLElement, url: string): void {

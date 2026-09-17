@@ -15,6 +15,12 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Copy,
+  Info,
 } from 'lucide-react';
 import {
   Dialog,
@@ -30,8 +36,8 @@ import {
   type VideoProviderType,
 } from '../../utils/videoProviderRegistry';
 import { uploadMediaAsset } from '../../api/media.api';
+import { embedsApi, type TranscriptLine } from '../../api/embeds.api';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-
 
 interface UnifiedVideoModalProps {
   isOpen: boolean;
@@ -53,6 +59,17 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
   const [startMinutes, setStartMinutes] = useState(0);
   const [startSeconds, setStartSeconds] = useState(0);
   const [isPrivacyEnhanced, setIsPrivacyEnhanced] = useState(true);
+
+  // Video Transcript / Scrape State
+  const [isScraping, setIsScraping] = useState(false);
+  const [scrapeAttempted, setScrapeAttempted] = useState(false);
+  const [hasTranscript, setHasTranscript] = useState(false);
+  const [transcriptText, setTranscriptText] = useState('');
+  const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
+  const [includeTranscriptInEmbed, setIncludeTranscriptInEmbed] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [transcriptSearch, setTranscriptSearch] = useState('');
+  const [copiedTranscript, setCopiedTranscript] = useState(false);
 
   // Self-Hosted Upload State
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -79,6 +96,15 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
       setStartMinutes(0);
       setStartSeconds(0);
       setIsPrivacyEnhanced(true);
+      setIsScraping(false);
+      setScrapeAttempted(false);
+      setHasTranscript(false);
+      setTranscriptText('');
+      setTranscriptLines([]);
+      setIncludeTranscriptInEmbed(false);
+      setTranscriptOpen(false);
+      setTranscriptSearch('');
+      setCopiedTranscript(false);
       setUploadedFile(null);
       setUploadProgress(0);
       setIsUploading(false);
@@ -98,7 +124,75 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
 
   // Derived external canonical data
   const totalStartSeconds = startMinutes * 60 + startSeconds;
-  const canonical = externalUrl ? videoProviderRegistry.canonicalize(externalUrl, totalStartSeconds, isPrivacyEnhanced) : null;
+  const canonical = externalUrl
+    ? videoProviderRegistry.canonicalize(externalUrl, totalStartSeconds, isPrivacyEnhanced)
+    : null;
+
+  // Live scrape metadata & transcripts from backend
+  useEffect(() => {
+    if (!isOpen || sourceType !== 'external' || !externalUrl.trim()) {
+      return;
+    }
+
+    const trimmed = externalUrl.trim();
+    const can = videoProviderRegistry.canonicalize(trimmed);
+    if (!can.isValid) return;
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      setIsScraping(true);
+      try {
+        const data = await embedsApi.scrape(trimmed);
+        if (!isMounted) return;
+        setScrapeAttempted(true);
+
+        if (data.title && !videoTitle) {
+          setVideoTitle(data.title);
+        }
+        if (data.authorName && !credit) {
+          setCredit(data.authorName);
+        }
+
+        if (data.hasTranscript && data.transcriptLines && data.transcriptLines.length > 0) {
+          setHasTranscript(true);
+          const clean = (data.transcript || '')
+            .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, '')
+            .trim();
+          setTranscriptText(clean);
+          const cleanLines = data.transcriptLines.map((l) => ({
+            ...l,
+            text: (l.text || '').replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, '').trim(),
+          }));
+          setTranscriptLines(cleanLines);
+        } else {
+          setHasTranscript(false);
+          setTranscriptText('');
+          setTranscriptLines([]);
+        }
+      } catch {
+        if (!isMounted) return;
+        setScrapeAttempted(true);
+        setHasTranscript(false);
+        setTranscriptText('');
+        setTranscriptLines([]);
+      } finally {
+        if (isMounted) setIsScraping(false);
+      }
+    }, 450);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [externalUrl, isOpen, sourceType]);
+
+  const handleCopyTranscript = () => {
+    if (!transcriptText) return;
+    const clean = transcriptText.replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, '').trim();
+    navigator.clipboard.writeText(clean);
+    setCopiedTranscript(true);
+    setTimeout(() => setCopiedTranscript(false), 2000);
+  };
 
   const handleFileUpload = async (file: File) => {
     const validVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg'];
@@ -118,7 +212,6 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
     setUploadProgress(15);
 
     try {
-      // Simulate chunked upload progress then upload via Media API
       const interval = setInterval(() => {
         setUploadProgress((prev) => (prev < 85 ? prev + 15 : prev));
       }, 300);
@@ -161,7 +254,32 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
         align,
       };
 
-      const html = videoProviderRegistry.generateVideoBlockHtml(meta);
+      let html = videoProviderRegistry.generateVideoBlockHtml(meta);
+
+      if (includeTranscriptInEmbed && transcriptText.trim()) {
+        const clean = transcriptText
+          .replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, '')
+          .trim();
+        const escaped = clean
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        const transcriptHtml = `
+<details class="cms-embed-transcript my-4 p-4 bg-slate-50 border border-slate-200 rounded-md text-left select-text">
+  <summary class="cursor-pointer font-serif font-bold text-xs text-slate-800 hover:text-rose-800 transition-colors flex items-center justify-between">
+    <span>📜 Editorial Video Transcript &amp; Reference</span>
+    <span class="text-[11px] font-mono text-slate-500 font-normal">(${transcriptLines.length} lines)</span>
+  </summary>
+  <div class="cms-transcript-content mt-3 pt-3 border-t border-slate-200 text-xs font-sans text-ink-primary whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+${escaped}
+  </div>
+</details>
+<p><br></p>`.trim();
+
+        html = `${html}\n${transcriptHtml}`;
+      }
+
       onInsertVideo(html);
       onClose();
     } else {
@@ -200,6 +318,10 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
     }
   };
 
+  const filteredLines = transcriptLines.filter((l) =>
+    transcriptSearch ? l.text.toLowerCase().includes(transcriptSearch.toLowerCase()) : true
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl w-[94vw] max-h-[92vh] flex flex-col p-0 overflow-hidden bg-white font-sans">
@@ -227,8 +349,10 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                 setSourceType('external');
                 setErrorMsg(null);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
-                sourceType === 'external' ? 'bg-white text-rose-800 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all cursor-pointer ${
+                sourceType === 'external'
+                  ? 'bg-white text-rose-800 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Globe size={13} />
@@ -240,8 +364,10 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                 setSourceType('hosted');
                 setErrorMsg(null);
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all ${
-                sourceType === 'hosted' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-all cursor-pointer ${
+                sourceType === 'hosted'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Upload size={13} />
@@ -261,97 +387,245 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
 
           {/* ─── TAB 1: EXTERNAL VIDEO EMBED ───────────────────────────────── */}
           {sourceType === 'external' ? (
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-              <div className="md:col-span-7 space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    External Video URL (YouTube, Vimeo, Loom, Spotify)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
-                    value={externalUrl}
-                    onChange={(e) => {
-                      setExternalUrl(e.target.value);
-                      setErrorMsg(null);
-                    }}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-800 font-mono text-slate-900"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1 font-mono">
-                    Supports normal URLs, youtu.be, YouTube Shorts, Vimeo with private hashes, and Loom recordings.
-                  </p>
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div className="md:col-span-7 space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      External Video URL (YouTube, Vimeo, Loom, Spotify)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="url"
+                        placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                        value={externalUrl}
+                        onChange={(e) => {
+                          setExternalUrl(e.target.value);
+                          setErrorMsg(null);
+                        }}
+                        className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-800 font-mono text-slate-900 pr-10"
+                      />
+                      {isScraping && (
+                        <div className="absolute right-3 top-2.5">
+                          <LoadingSpinner size="sm" />
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1 font-mono">
+                      Supports normal URLs, youtu.be, YouTube Shorts, Vimeo, and Loom recordings.
+                    </p>
+                  </div>
+
+                  {/* Timestamp Controls */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <Clock size={13} className="text-rose-800" />
+                      <span>Playback Start Timestamp</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-mono">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          max={300}
+                          value={startMinutes}
+                          onChange={(e) =>
+                            setStartMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))
+                          }
+                          className="w-14 p-1.5 bg-white border border-slate-200 rounded text-center"
+                        />
+                        <span className="text-slate-500">min</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          max={59}
+                          value={startSeconds}
+                          onChange={(e) =>
+                            setStartSeconds(
+                              Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
+                            )
+                          }
+                          className="w-14 p-1.5 bg-white border border-slate-200 rounded text-center"
+                        />
+                        <span className="text-slate-500">sec</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        (Total: {totalStartSeconds}s)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Privacy Enhanced Toggle */}
+                  <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={16} className="text-emerald-600" />
+                      <div>
+                        <span className="text-xs font-bold text-slate-700 block">
+                          Privacy-Enhanced Mode
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          Embed via youtube-nocookie.com (No tracking cookies until played)
+                        </span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isPrivacyEnhanced}
+                      onChange={(e) => setIsPrivacyEnhanced(e.target.checked)}
+                      className="rounded text-rose-800 cursor-pointer"
+                    />
+                  </div>
                 </div>
 
-                {/* Timestamp Controls */}
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                    <Clock size={13} className="text-rose-800" />
-                    <span>Playback Start Timestamp</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-mono">
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        max={300}
-                        value={startMinutes}
-                        onChange={(e) => setStartMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                        className="w-14 p-1.5 bg-white border border-slate-200 rounded text-center"
+                {/* Right: Live Embed Preview */}
+                <div className="md:col-span-5 flex flex-col justify-center">
+                  <div className="bg-slate-950 rounded-lg overflow-hidden border border-slate-800 shadow-md aspect-video relative flex items-center justify-center text-slate-500 text-xs">
+                    {canonical && canonical.isValid ? (
+                      <iframe
+                        src={canonical.embedUrl}
+                        title="Preview"
+                        className="w-full h-full border-0 absolute inset-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       />
-                      <span className="text-slate-500">min</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        value={startSeconds}
-                        onChange={(e) => setStartSeconds(Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0)))}
-                        className="w-14 p-1.5 bg-white border border-slate-200 rounded text-center"
-                      />
-                      <span className="text-slate-500">sec</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">
-                      (Total: {totalStartSeconds}s)
-                    </span>
+                    ) : (
+                      <div className="text-center p-4 space-y-2">
+                        <Film size={28} className="mx-auto text-slate-600" />
+                        <p className="font-mono text-[11px]">Enter a video URL to generate preview</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                {/* Privacy Enhanced Toggle */}
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-md">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck size={16} className="text-emerald-600" />
-                    <div>
-                      <span className="text-xs font-bold text-slate-700 block">Privacy-Enhanced Mode</span>
-                      <span className="text-[11px] text-slate-500">Embed via youtube-nocookie.com (No tracking cookies until played)</span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isPrivacyEnhanced}
-                    onChange={(e) => setIsPrivacyEnhanced(e.target.checked)}
-                    className="rounded text-rose-800"
-                  />
                 </div>
               </div>
 
-              {/* Right: Live Embed Preview */}
-              <div className="md:col-span-5 flex flex-col justify-center">
-                <div className="bg-slate-950 rounded-lg overflow-hidden border border-slate-800 shadow-md aspect-video relative flex items-center justify-center text-slate-500 text-xs">
-                  {canonical && canonical.isValid ? (
-                    <iframe
-                      src={canonical.embedUrl}
-                      title="Preview"
-                      className="w-full h-full border-0 absolute inset-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    />
-                  ) : (
-                    <div className="text-center p-4 space-y-2">
-                      <Film size={28} className="mx-auto text-slate-600" />
-                      <p className="font-mono text-[11px]">Enter a video URL to generate preview</p>
+              {/* ─── VIDEO TRANSCRIPT & CAPTIONS SECTION ─────────────────────── */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText size={16} className="text-rose-800" />
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">
+                        Editorial Video Transcript &amp; Captions
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Extract speech-to-text transcript from YouTube / video streams
+                      </span>
                     </div>
-                  )}
+                  </div>
+
+                  {isScraping ? (
+                    <div className="flex items-center gap-1.5 text-xs text-rose-800 font-mono">
+                      <LoadingSpinner size="sm" />
+                      <span>Scanning transcript…</span>
+                    </div>
+                  ) : hasTranscript ? (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-full text-[11px] font-mono font-medium">
+                      ✅ Transcript Available ({transcriptLines.length} lines)
+                    </span>
+                  ) : scrapeAttempted && externalUrl.trim() ? (
+                    <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full text-[11px] font-mono">
+                      No Closed Captions Found
+                    </span>
+                  ) : null}
                 </div>
+
+                {hasTranscript ? (
+                  <div className="space-y-3 pt-2">
+                    {/* Attach to Manuscript Checkbox */}
+                    <label className="flex items-center gap-2 p-2.5 bg-white border border-slate-200 rounded-md cursor-pointer hover:border-slate-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={includeTranscriptInEmbed}
+                        onChange={(e) => setIncludeTranscriptInEmbed(e.target.checked)}
+                        className="rounded text-rose-800 cursor-pointer"
+                      />
+                      <span className="text-xs font-medium text-slate-800">
+                        Include collapsible transcript accordion below video in the manuscript
+                      </span>
+                    </label>
+
+                    {/* Collapsible Transcript Viewer */}
+                    <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setTranscriptOpen((v) => !v)}
+                        className="w-full px-3 py-2 bg-slate-100/70 hover:bg-slate-100 flex items-center justify-between text-xs font-mono text-slate-700 transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span>Preview Video Transcript</span>
+                          <span className="text-[10px] text-slate-400">
+                            ({transcriptLines.length} timed lines)
+                          </span>
+                        </span>
+                        {transcriptOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+
+                      {transcriptOpen && (
+                        <div className="p-3 space-y-2 border-t border-slate-200">
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <Search
+                                size={13}
+                                className="absolute left-2.5 top-2.5 text-slate-400"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Search within transcript dialogue…"
+                                value={transcriptSearch}
+                                onChange={(e) => setTranscriptSearch(e.target.value)}
+                                className="w-full text-xs pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded font-sans"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCopyTranscript}
+                              className="text-xs font-mono shrink-0 flex items-center gap-1"
+                            >
+                              {copiedTranscript ? (
+                                <>
+                                  <Check size={12} className="text-emerald-600" />
+                                  <span className="text-emerald-700">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={12} />
+                                  <span>Copy Transcript</span>
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          <div className="max-h-48 overflow-y-auto space-y-1 p-2 bg-slate-50 rounded border border-slate-100 text-xs font-mono">
+                            {filteredLines.length > 0 ? (
+                              filteredLines.map((line, idx) => (
+                                <div
+                                  key={idx}
+                                  className="text-slate-800 font-sans text-xs py-0.5 hover:bg-white rounded px-1"
+                                >
+                                  {line.text}
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-center text-slate-400 py-2 text-xs">
+                                No transcript matches "{transcriptSearch}".
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : scrapeAttempted && externalUrl.trim() && !isScraping ? (
+                  <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded text-[11px] text-amber-800 flex items-center gap-2">
+                    <Info size={14} className="shrink-0 text-amber-700" />
+                    <span>
+                      Transcript / closed captions are disabled on this video by the creator or platform. The video will embed and play normally.
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -361,7 +635,9 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                 {!hostedVideoUrl ? (
                   <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:bg-slate-50 transition-colors">
                     <Upload size={28} className="mx-auto text-rose-800 mb-2" />
-                    <h5 className="font-serif font-bold text-sm text-slate-800">Upload Video Asset</h5>
+                    <h5 className="font-serif font-bold text-sm text-slate-800">
+                      Upload Video Asset
+                    </h5>
                     <p className="text-xs text-slate-500 mb-4">MP4, WebM, or MOV up to 200 MB</p>
 
                     <label className="cursor-pointer">
@@ -375,7 +651,7 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                           }
                         }}
                       />
-                      <span className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono rounded shadow-xs">
+                      <span className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-mono rounded shadow-xs cursor-pointer">
                         Select Video File
                       </span>
                     </label>
@@ -409,7 +685,7 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                         setHostedVideoUrl('');
                         setUploadedFile(null);
                       }}
-                      className="text-xs font-mono text-slate-600"
+                      className="text-xs font-mono text-slate-600 cursor-pointer"
                     >
                       Replace
                     </Button>
@@ -500,7 +776,9 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-slate-500 block mb-1">Videographer / Agency Credit</label>
+                <label className="text-xs font-mono text-slate-500 block mb-1">
+                  Videographer / Agency Credit
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Associated Press / Reuters Video"
@@ -519,21 +797,33 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setWidthPercent(50)}
-                    className={`px-2.5 py-1 rounded ${widthPercent === 50 ? 'bg-slate-900 text-white font-bold' : 'text-slate-600'}`}
+                    className={`px-2.5 py-1 rounded cursor-pointer ${
+                      widthPercent === 50
+                        ? 'bg-slate-900 text-white font-bold'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                   >
                     50%
                   </button>
                   <button
                     type="button"
                     onClick={() => setWidthPercent(75)}
-                    className={`px-2.5 py-1 rounded ${widthPercent === 75 ? 'bg-slate-900 text-white font-bold' : 'text-slate-600'}`}
+                    className={`px-2.5 py-1 rounded cursor-pointer ${
+                      widthPercent === 75
+                        ? 'bg-slate-900 text-white font-bold'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                   >
                     75%
                   </button>
                   <button
                     type="button"
                     onClick={() => setWidthPercent(100)}
-                    className={`px-2.5 py-1 rounded ${widthPercent === 100 ? 'bg-slate-900 text-white font-bold' : 'text-slate-600'}`}
+                    className={`px-2.5 py-1 rounded cursor-pointer ${
+                      widthPercent === 100
+                        ? 'bg-slate-900 text-white font-bold'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                   >
                     100% Full Width
                   </button>
@@ -546,7 +836,9 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setAlign('left')}
-                    className={`p-1.5 rounded ${align === 'left' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                    className={`p-1.5 rounded cursor-pointer ${
+                      align === 'left' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                     title="Align Left"
                   >
                     <AlignLeft size={13} />
@@ -554,7 +846,11 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setAlign('center')}
-                    className={`p-1.5 rounded ${align === 'center' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                    className={`p-1.5 rounded cursor-pointer ${
+                      align === 'center'
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                     title="Align Center"
                   >
                     <AlignCenter size={13} />
@@ -562,7 +858,11 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setAlign('right')}
-                    className={`p-1.5 rounded ${align === 'right' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                    className={`p-1.5 rounded cursor-pointer ${
+                      align === 'right'
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                     title="Align Right"
                   >
                     <AlignRight size={13} />
@@ -580,14 +880,20 @@ export const UnifiedVideoModal: React.FC<UnifiedVideoModalProps> = ({
           </span>
 
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} className="text-xs font-mono">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="text-xs font-mono cursor-pointer"
+            >
               Cancel
             </Button>
             <Button
               type="button"
               size="sm"
               onClick={handleInsert}
-              className="bg-rose-800 hover:bg-rose-900 text-white text-xs font-mono flex items-center gap-1.5 shadow-xs"
+              className="bg-rose-800 hover:bg-rose-900 text-white text-xs font-mono flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Play size={13} />
               <span>Insert Video into Manuscript</span>

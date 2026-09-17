@@ -9,7 +9,11 @@
     "lint": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --project=chromium tests/e2e/editorial/golden-journey.spec.ts",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report test-results/playwright-report"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",

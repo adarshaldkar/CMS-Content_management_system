@@ -567,7 +567,7 @@ export class EmbedsService {
           .filter((l: any) => l.text.length > 0);
 
         if (lines.length > 0) {
-          const formattedTranscript = lines.map((l) => `${l.time} ${l.text}`).join('\n');
+          const formattedTranscript = lines.map((l) => l.text).join('\n');
           return {
             transcript: formattedTranscript,
             transcriptLines: lines,
@@ -603,15 +603,16 @@ export class EmbedsService {
             const timeMatch = line.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*(.*)$/);
             if (timeMatch) {
               return {
-                time: `[${timeMatch[1]}]`,
                 text: timeMatch[2] || line,
               };
             }
             return { text: line };
           });
 
+          const cleanDesc = lines.map((l) => l.text).join('\n');
+
           return {
-            transcript: unescapedDesc,
+            transcript: cleanDesc,
             transcriptLines: lines,
             hasTranscript: true,
           };

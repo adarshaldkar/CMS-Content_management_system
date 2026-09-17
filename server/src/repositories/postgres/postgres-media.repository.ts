@@ -42,8 +42,13 @@ export class PostgresMediaRepository implements IMediaRepository {
           size bigint NOT NULL,
           url text NOT NULL,
           uploaded_by text NOT NULL,
+          variants jsonb DEFAULT '[]'::jsonb,
+          optimization jsonb,
           created_at timestamptz NOT NULL DEFAULT now()
         );
+
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS variants jsonb DEFAULT '[]'::jsonb;
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS optimization jsonb;
 
         CREATE INDEX IF NOT EXISTS idx_media_uploaded_by ON cms_media(uploaded_by);
         CREATE INDEX IF NOT EXISTS idx_media_created_at ON cms_media(created_at DESC);
@@ -54,7 +59,7 @@ export class PostgresMediaRepository implements IMediaRepository {
     await this.ready;
   }
 
-  private toDomain(row: MediaRow): Media {
+  private toDomain(row: any): Media {
     return {
       id: row.id,
       filename: row.filename,
@@ -63,6 +68,8 @@ export class PostgresMediaRepository implements IMediaRepository {
       size: Number(row.size),
       url: row.url,
       uploadedBy: row.uploaded_by,
+      variants: row.variants || undefined,
+      optimization: row.optimization || undefined,
       createdAt: row.created_at,
     };
   }
@@ -72,8 +79,8 @@ export class PostgresMediaRepository implements IMediaRepository {
     const result = await this.postgres.pool.query<MediaRow>(
       `
       INSERT INTO cms_media (
-        filename, original_name, mime_type, size, url, uploaded_by
-      ) VALUES ($1, $2, $3, $4, $5, $6)
+        filename, original_name, mime_type, size, url, uploaded_by, variants, optimization
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
       `,
       [
@@ -83,6 +90,8 @@ export class PostgresMediaRepository implements IMediaRepository {
         data.size,
         data.url,
         data.uploadedBy,
+        JSON.stringify(data.variants || []),
+        data.optimization ? JSON.stringify(data.optimization) : null,
       ],
     );
     return this.toDomain(result.rows[0]);

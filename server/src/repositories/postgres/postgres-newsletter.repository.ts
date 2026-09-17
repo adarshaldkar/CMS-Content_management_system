@@ -60,7 +60,7 @@ export class PostgresNewsletterRepository
           failed_count INT NOT NULL DEFAULT 0,
           scheduled_at TIMESTAMPTZ,
           sent_at TIMESTAMPTZ,
-          author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          author_id UUID REFERENCES cms_users(id) ON DELETE SET NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );

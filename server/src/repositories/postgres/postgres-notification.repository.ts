@@ -49,8 +49,8 @@ export class PostgresNotificationRepository implements INotificationRepository, 
       await this.postgres.pool.query(`
         CREATE TABLE IF NOT EXISTS cms_notifications (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          user_id UUID NOT NULL REFERENCES cms_users(id) ON DELETE CASCADE,
+          actor_id UUID REFERENCES cms_users(id) ON DELETE SET NULL,
           actor_name VARCHAR(255) NOT NULL,
           actor_avatar TEXT,
           actor_count INT NOT NULL DEFAULT 1,
@@ -81,7 +81,7 @@ export class PostgresNotificationRepository implements INotificationRepository, 
         WHERE is_read = FALSE AND group_key IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS cms_notification_preferences (
-          user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          user_id UUID PRIMARY KEY REFERENCES cms_users(id) ON DELETE CASCADE,
           channels JSONB NOT NULL DEFAULT '{"inApp": true, "email": true, "browserPush": false}'::jsonb,
           events JSONB NOT NULL DEFAULT '{
             "onArticlePublished": true,
@@ -102,7 +102,7 @@ export class PostgresNotificationRepository implements INotificationRepository, 
 
         CREATE TABLE IF NOT EXISTS cms_push_subscriptions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES cms_users(id) ON DELETE CASCADE,
           endpoint TEXT NOT NULL,
           p256dh TEXT NOT NULL,
           auth TEXT NOT NULL,

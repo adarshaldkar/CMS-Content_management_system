@@ -516,6 +516,30 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
       ctx.insertHtml(`${html}<p><br></p>`);
     },
   },
+  {
+    id: 'editorial.delete',
+    title: 'Delete Current Block / Media Node',
+    category: 'editorial',
+    shortcut: 'Delete',
+    icon: 'Trash2',
+    description: 'Delete the selected video, media, embed, table, or active paragraph',
+    keywords: ['delete', 'remove', 'trash', 'clear', 'video', 'media', 'embed', 'cut', 'erase'],
+    execute: (ctx) => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const node = sel.anchorNode;
+        const block = (node instanceof HTMLElement ? node : node?.parentElement)?.closest<HTMLElement>(
+          'figure, details, table, blockquote, img, p, div'
+        );
+        if (block && ctx.editorRef?.current?.contains(block) && block !== ctx.editorRef.current) {
+          block.remove();
+          ctx.editorRef.current?.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+      }
+      ctx.executeCommand('delete');
+    },
+  },
 
   // ─── VIEW & REVIEW CATEGORY ───────────────────────────────────────────────
   {

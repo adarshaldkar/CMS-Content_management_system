@@ -11,6 +11,10 @@ import { MongoMediaRepository } from '../../repositories/mongo/mongo-media.repos
 import { mediaRepositoryProvider } from '../../repositories/repository.providers';
 import { PostgresService } from '../../database/postgres.service';
 import { AuditModule } from '../audit/audit.module';
+import { ImageInspectorService } from './image/image-inspector.service';
+import { ImagePolicyService } from './image/image-policy.service';
+import { ImageOptimizerService } from './image/image-optimizer.service';
+import { StorageService } from './storage/storage.service';
 
 @Module({
   imports: [
@@ -26,7 +30,16 @@ import { AuditModule } from '../audit/audit.module';
     PostgresMediaRepository,
     MongoMediaRepository,
     mediaRepositoryProvider,
+    ImageInspectorService,
+    ImagePolicyService,
+    ImageOptimizerService,
+    StorageService,
   ],
-  exports: [MediaService, mediaRepositoryProvider],
+  exports: [
+    MediaService,
+    ImageOptimizerService,
+    StorageService,
+    mediaRepositoryProvider,
+  ],
 })
 export class MediaModule {}

@@ -119,7 +119,7 @@ export function formatEmbedHtml(
   const includeTranscript = options.includeTranscript === true;
   const rawTranscript = data.transcript?.trim();
   const cleanedTranscript = rawTranscript
-    ? rawTranscript.replace(/\[\d{2}:\d{2}(?::\d{2})?\]\s*/g, '').trim()
+    ? rawTranscript.replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, '').trim()
     : '';
 
   const transcriptHtml =

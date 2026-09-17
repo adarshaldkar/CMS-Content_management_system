@@ -246,6 +246,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }, [refreshCursorState]);
 
   const openModal = useCallback((modalName: string, initialPayload?: any) => {
+    if (editorRef.current) {
+      const sel = window.getSelection();
+      if (
+        sel &&
+        sel.rangeCount > 0 &&
+        editorRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)
+      ) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+      }
+    }
     if (modalName === 'link') {
       handleOpenLinkPopover();
     } else if (modalName === 'mediaPicker') {
@@ -254,6 +264,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       setEmbedModalUrl(initialPayload || '');
       setEmbedModalOpen(true);
     } else if (modalName === 'videoUpload') {
+      setEmbedModalUrl(initialPayload || '');
       setVideoModalOpen(true);
     } else if (modalName === 'docImport') {
       setDocImportModalOpen(true);
@@ -449,6 +460,24 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // ─── Dynamic Click & In-Table Handle Detection ────────────────────────────
   const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
+
+    // Detect click on top-right Delete Video / Delete Transcript hover badge
+    const mediaBlock = target.closest<HTMLElement>(
+      'figure.cms-video-block, figure.cms-embed-block, figure.cms-native-video-block, details.cms-embed-transcript'
+    );
+    if (mediaBlock) {
+      const rect = mediaBlock.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      // If clicked inside the top-right delete badge area (top 45px, right 140px)
+      if (clickY <= 45 && clickX >= rect.width - 140) {
+        e.preventDefault();
+        e.stopPropagation();
+        mediaBlock.remove();
+        handleInput();
+        return;
+      }
+    }
 
     // Detect link click
     const anchor = target.closest('a') as HTMLAnchorElement | null;
@@ -1116,7 +1145,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           setVideoModalOpen(false);
           setEmbedModalUrl('');
         }}
-        onInsertVideo={(videoHtml) => insertHtml(videoHtml)}
+        onInsertVideo={(videoHtml) => {
+          if (editorRef.current) {
+            editorRef.current.focus();
+            if (savedRangeRef.current) {
+              const sel = window.getSelection();
+              if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(savedRangeRef.current);
+              }
+            }
+          }
+          insertHtml(videoHtml);
+        }}
       />
 
       <DocumentImportModal
@@ -1128,7 +1169,19 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       <TableBuilderModal
         isOpen={tableModalOpen}
         onClose={() => setTableModalOpen(false)}
-        onInsertTable={(tableHtml) => insertHtml(tableHtml)}
+        onInsertTable={(tableHtml) => {
+          if (editorRef.current) {
+            editorRef.current.focus();
+            if (savedRangeRef.current) {
+              const sel = window.getSelection();
+              if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(savedRangeRef.current);
+              }
+            }
+          }
+          insertHtml(tableHtml);
+        }}
       />
     </div>
   );

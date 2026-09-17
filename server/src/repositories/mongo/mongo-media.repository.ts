@@ -18,7 +18,7 @@ export class MongoMediaRepository implements IMediaRepository {
     private readonly mediaModel: Model<MediaDocument>,
   ) {}
 
-  private toDomain(doc: MediaDocument): Media {
+  private toDomain(doc: any): Media {
     return {
       id: doc._id.toString(),
       filename: doc.filename,
@@ -27,6 +27,8 @@ export class MongoMediaRepository implements IMediaRepository {
       size: doc.size,
       url: doc.url,
       uploadedBy: doc.uploadedBy,
+      variants: doc.variants || undefined,
+      optimization: doc.optimization || undefined,
       createdAt: doc.createdAt,
     };
   }
@@ -39,6 +41,8 @@ export class MongoMediaRepository implements IMediaRepository {
       size: data.size,
       url: data.url,
       uploadedBy: data.uploadedBy,
+      variants: data.variants || [],
+      optimization: data.optimization || null,
     });
     return this.toDomain(created);
   }

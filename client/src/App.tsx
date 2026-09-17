@@ -74,9 +74,14 @@ export default function App() {
             {/* 1. Public Editorial Layout */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<HomePage />} />
+              <Route path="/articles" element={<SearchPage />} />
               <Route path="/articles/:slug" element={<ArticleReaderPage />} />
               <Route path="/category/:slug" element={<CategoryArchivePage />} />
+              <Route path="/categories/:slug" element={<CategoryArchivePage />} />
+              <Route path="/categories" element={<SearchPage />} />
               <Route path="/tags/:slug" element={<TagArchivePage />} />
+              <Route path="/tag/:slug" element={<TagArchivePage />} />
+              <Route path="/tags" element={<SearchPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/feed" element={<ForYouFeedPage />} />
               <Route path="/newsletter/verify/:token" element={<NewsletterVerifyPage />} />

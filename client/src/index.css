@@ -731,5 +731,77 @@ p.cms-drop-cap::first-letter,
   margin: 2rem 0 !important;
 }
 
+/* 8. Editorial Media Block Delete Handle in Editor Canvas */
+.manuscript-editor figure.cms-video-block,
+.manuscript-editor figure.cms-embed-block,
+.manuscript-editor figure.cms-native-video-block,
+.manuscript-editor details.cms-embed-transcript {
+  position: relative !important;
+}
+
+.manuscript-editor figure.cms-video-block::after,
+.manuscript-editor figure.cms-embed-block::after,
+.manuscript-editor figure.cms-native-video-block::after {
+  content: '🗑️ Delete Video';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  backdrop-filter: blur(6px);
+  padding: 5px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.18s ease;
+  pointer-events: auto;
+  z-index: 30;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.manuscript-editor details.cms-embed-transcript::after {
+  content: '🗑️ Delete Transcript';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  backdrop-filter: blur(6px);
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.18s ease;
+  pointer-events: auto;
+  z-index: 30;
+}
+
+.manuscript-editor figure.cms-video-block:hover::after,
+.manuscript-editor figure.cms-embed-block:hover::after,
+.manuscript-editor figure.cms-native-video-block:hover::after,
+.manuscript-editor details.cms-embed-transcript:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.manuscript-editor figure.cms-video-block:hover::after:hover,
+.manuscript-editor figure.cms-embed-block:hover::after:hover,
+.manuscript-editor figure.cms-native-video-block:hover::after:hover,
+.manuscript-editor details.cms-embed-transcript:hover::after:hover {
+  background: #e11d48;
+  color: #ffffff;
+  border-color: #be123c;
+}
+
 
 

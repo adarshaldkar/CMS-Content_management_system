@@ -26,6 +26,12 @@ export class MediaSchemaClass {
   @Prop({ required: true, index: true })
   uploadedBy!: string;
 
+  @Prop({ type: Array, default: [] })
+  variants?: any[];
+
+  @Prop({ type: Object, default: null })
+  optimization?: any;
+
   createdAt!: Date;
 }
 

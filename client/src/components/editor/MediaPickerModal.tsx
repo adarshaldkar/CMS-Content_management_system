@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UploadCloud, Image as ImageIcon, X, Trash2, Loader2, Link2, Check } from 'lucide-react';
+import {
+  UploadCloud,
+  Image as ImageIcon,
+  X,
+  Trash2,
+  Loader2,
+  Link2,
+  Check,
+  Sparkles,
+  Layers,
+} from 'lucide-react';
 import { listMediaAssets, uploadMediaAsset, deleteMediaAsset } from '../../api/media.api';
-import type { Media } from '../../types';
+import type { Media, ImageVariant } from '../../types';
 
 interface MediaPickerModalProps {
   isOpen: boolean;
@@ -25,6 +35,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [customUrlError, setCustomUrlError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedForVariant, setSelectedForVariant] = useState<Media | null>(null);
 
   const fetchMedia = async () => {
     try {
@@ -44,30 +55,32 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       setUploadError(null);
       setCustomUrl('');
       setUrlPreviewError(false);
+      setSelectedForVariant(null);
     }
   }, [isOpen]);
 
-  // Escape key listener for accessible dismissal. stopImmediatePropagation()
-  // prevents the keystroke from also tripping sibling editors/modals
-  // (CE9: double-Escape cascade).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         e.stopImmediatePropagation();
         e.preventDefault();
-        onClose();
+        if (selectedForVariant) {
+          setSelectedForVariant(null);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, selectedForVariant]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds the maximum limit of 5 MB.');
+    if (file.size > 100 * 1024 * 1024) {
+      setUploadError('File size exceeds the maximum limit of 100 MB.');
       return;
     }
 
@@ -77,12 +90,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       const uploaded = await uploadMediaAsset(file);
       setMediaList((prev) => [uploaded, ...prev]);
       setActiveTab('library');
+      // If variants exist, prompt or choose best
       onSelect(uploaded.url, uploaded);
       onClose();
     } catch (err: any) {
       setUploadError(
         err.response?.data?.message ||
-          'Upload failed. Ensure the file is a valid image (PNG, JPEG, WebP, AVIF, GIF).',
+          'Upload failed. Ensure the file is a valid image (PNG, JPEG, WebP, AVIF, GIF) up to 100MB.',
       );
     } finally {
       setUploading(false);
@@ -96,7 +110,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       await deleteMediaAsset(id);
       setMediaList((prev) => prev.filter((m) => m.id !== id));
     } catch {
-      // silent — user can retry
+      // silent
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
@@ -149,7 +163,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           aria-labelledby="media-modal-title"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans"
         >
-          {/* Backdrop with pointer-only dismiss */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -159,7 +173,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Modal Dialog Card with Micro-Spring Motion */}
+          {/* Modal Dialog Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.97, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -172,10 +186,10 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-canvas-paper">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-crimson font-semibold mb-0.5">
-                  Editorial Media Library
+                  Editorial Asset Library
                 </p>
                 <h2 id="media-modal-title" className="font-editorial text-lg font-semibold text-ink-primary">
-                  Select or Insert Image
+                  {selectedForVariant ? 'Choose Derivative Size' : 'Select or Insert Image'}
                 </h2>
               </div>
               <button
@@ -188,253 +202,382 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               </button>
             </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-0 px-6 border-b border-border-subtle bg-white">
-          <button
-            onClick={() => setActiveTab('library')}
-            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
-              activeTab === 'library'
-                ? 'border-ink-primary text-ink-primary font-semibold'
-                : 'border-transparent text-ink-secondary hover:text-ink-primary'
-            }`}
-          >
-            Asset Library ({mediaList.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
-              activeTab === 'upload'
-                ? 'border-ink-primary text-ink-primary font-semibold'
-                : 'border-transparent text-ink-secondary hover:text-ink-primary'
-            }`}
-          >
-            Upload New File
-          </button>
-          <button
-            onClick={() => setActiveTab('url')}
-            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
-              activeTab === 'url'
-                ? 'border-ink-primary text-ink-primary font-semibold'
-                : 'border-transparent text-ink-secondary hover:text-ink-primary'
-            }`}
-          >
-            <Link2 className="w-3.5 h-3.5" />
-            <span>Cloudinary / Web URL</span>
-          </button>
-        </div>
+            {/* Tab Navigation (only when not in variant mode) */}
+            {!selectedForVariant && (
+              <div className="flex items-center gap-0 px-6 border-b border-border-subtle bg-white">
+                <button
+                  onClick={() => setActiveTab('library')}
+                  className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+                    activeTab === 'library'
+                      ? 'border-ink-primary text-ink-primary font-semibold'
+                      : 'border-transparent text-ink-secondary hover:text-ink-primary'
+                  }`}
+                >
+                  Asset Library ({mediaList.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('upload')}
+                  className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+                    activeTab === 'upload'
+                      ? 'border-ink-primary text-ink-primary font-semibold'
+                      : 'border-transparent text-ink-secondary hover:text-ink-primary'
+                  }`}
+                >
+                  Upload & Auto-Optimize
+                </button>
+                <button
+                  onClick={() => setActiveTab('url')}
+                  className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                    activeTab === 'url'
+                      ? 'border-ink-primary text-ink-primary font-semibold'
+                      : 'border-transparent text-ink-secondary hover:text-ink-primary'
+                  }`}
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span>Cloudinary / Web URL</span>
+                </button>
+              </div>
+            )}
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-canvas-paper">
-          {activeTab === 'url' && (
-            <form onSubmit={handleApplyCustomUrl} className="space-y-4 max-w-xl mx-auto py-4">
-              <div className="bg-white p-6 border border-border-subtle space-y-4" style={{ borderRadius: 2 }}>
-                <div>
-                  <label className="block text-xs font-medium text-ink-primary mb-1 font-mono uppercase tracking-wider">
-                    Direct Image or Cloudinary URL
-                  </label>
-                  <p className="text-[11px] text-ink-secondary mb-3">
-                    Paste any public image link from Cloudinary, Unsplash, or CDN.
-                  </p>
-                  <input
-                    type="url"
-                    value={customUrl}
-                    onChange={(e) => {
-                      setCustomUrl(e.target.value);
-                      setUrlPreviewError(false);
-                      setCustomUrlError(null);
-                    }}
-                    placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
-                    className="w-full px-3 py-2 text-xs border border-border-subtle focus:border-ink-primary bg-canvas-paper text-ink-primary focus:outline-none font-mono"
-                    style={{ borderRadius: 2 }}
-                    autoFocus
-                  />
-                </div>
-
-                {customUrlError && (
-                  <div
-                    className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono"
-                    style={{ borderRadius: 2 }}
-                  >
-                    {customUrlError}
-                  </div>
-                )}
-
-                {customUrl && (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">
-                      Preview
-                    </p>
-                    <div className="aspect-video w-full bg-slate-100 border border-border-subtle flex items-center justify-center overflow-hidden" style={{ borderRadius: 2 }}>
-                      {urlPreviewError ? (
-                        <div className="text-center p-4 text-rose-600 text-xs font-mono">
-                          Unable to load image from this URL. Please verify the link.
-                        </div>
-                      ) : (
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto p-6 bg-canvas-paper">
+              {/* Variant Picker View */}
+              {selectedForVariant ? (
+                <div className="space-y-4 max-w-xl mx-auto py-2">
+                  <div className="bg-white p-5 border border-border-subtle space-y-4" style={{ borderRadius: 2 }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-20 h-14 bg-slate-900 border border-border-subtle overflow-hidden shrink-0" style={{ borderRadius: 2 }}>
                         <img
-                          src={customUrl}
-                          alt="Preview"
-                          onError={() => setUrlPreviewError(true)}
+                          src={selectedForVariant.url}
+                          alt={selectedForVariant.filename}
                           className="w-full h-full object-cover"
                         />
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    disabled={!customUrl.trim() || urlPreviewError}
-                    className="px-5 py-2 bg-ink-primary hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide transition-colors flex items-center gap-1.5 font-mono"
-                    style={{ borderRadius: 2 }}
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Apply Image URL</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {activeTab === 'upload' && (
-            <div
-              className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-border-subtle hover:border-ink-secondary bg-white transition-colors"
-              style={{ borderRadius: 2 }}
-            >
-              <UploadCloud className="w-10 h-10 text-ink-secondary/60 mb-3" />
-              <h3 className="font-editorial text-base font-semibold text-ink-primary mb-1">
-                Upload image asset
-              </h3>
-              <p className="text-xs text-ink-secondary mb-4 text-center max-w-sm font-mono">
-                PNG, JPEG, WebP, AVIF, GIF · Max 5 MB
-              </p>
-
-              {uploadError && (
-                <div
-                  className="mb-4 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs"
-                  style={{ borderRadius: 2 }}
-                >
-                  {uploadError}
-                </div>
-              )}
-
-              <label
-                className="cursor-pointer px-5 py-2 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors flex items-center gap-2"
-                style={{ borderRadius: 2 }}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Verifying…
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud className="w-3.5 h-3.5" /> Select Local File
-                  </>
-                )}
-                <input
-                  type="file"
-                  accept="image/png, image/jpeg, image/webp, image/avif, image/gif"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-              </label>
-            </div>
-          )}
-
-          {activeTab === 'library' && (
-            <div>
-              {loading ? (
-                <div className="flex items-center justify-center py-16 text-ink-secondary gap-2 font-mono text-xs">
-                  <Loader2 className="w-4 h-4 animate-spin text-ink-primary" /> Loading assets…
-                </div>
-              ) : mediaList.length === 0 ? (
-                <div className="text-center py-16 text-ink-secondary">
-                  <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm font-editorial italic">No media assets in library yet.</p>
-                  <div className="mt-4 flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => setActiveTab('upload')}
-                      className="px-3 py-1.5 bg-ink-primary text-white text-xs font-medium hover:bg-slate-800 font-mono"
-                      style={{ borderRadius: 2 }}
-                    >
-                      Upload File
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('url')}
-                      className="px-3 py-1.5 border border-border-subtle bg-white text-ink-primary text-xs font-medium hover:bg-canvas-paper font-mono"
-                      style={{ borderRadius: 2 }}
-                    >
-                      Paste Image URL
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {mediaList.map((media) => (
-                    <div
-                      key={media.id}
-                      onClick={() => {
-                        onSelect(media.url, media);
-                        onClose();
-                      }}
-                      className="group relative border border-border-subtle hover:border-ink-primary bg-white overflow-hidden cursor-pointer transition-colors"
-                      style={{ borderRadius: 2 }}
-                    >
-                      <div className="aspect-video w-full bg-slate-100 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={media.url}
-                          alt={media.originalName}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
                       </div>
-                      <div className="p-2 border-t border-border-subtle bg-white">
-                        {confirmDeleteId === media.id ? (
-                          // Inline confirmation row
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-[10px] font-mono text-rose-600 shrink-0">Delete?</span>
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeleteConfirm(media.id, e)}
-                              disabled={deletingId === media.id}
-                              className="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-mono rounded-sm hover:bg-rose-700 disabled:opacity-60 shrink-0"
-                            >
-                              {deletingId === media.id ? '...' : 'Yes'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleDeleteCancel}
-                              className="px-2 py-0.5 border border-border-subtle text-[10px] font-mono rounded-sm hover:bg-slate-50 shrink-0"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <p className="text-[11px] font-mono text-ink-primary truncate max-w-[100px]">
-                              {media.originalName}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeleteRequest(media.id, e)}
-                              className="text-ink-secondary hover:text-rose-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Delete asset"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-mono font-semibold text-ink-primary truncate">
+                          {selectedForVariant.originalName || selectedForVariant.filename}
+                        </p>
+                        {selectedForVariant.optimization && (
+                          <p className="text-[11px] font-mono text-emerald-700 flex items-center gap-1 mt-0.5">
+                            <Sparkles size={11} />
+                            <span>{selectedForVariant.optimization.savingsPercent} bandwidth saved ({selectedForVariant.optimization.format.toUpperCase()})</span>
+                          </p>
                         )}
                       </div>
                     </div>
-                  ))}
+
+                    <p className="text-xs text-ink-secondary font-mono">
+                      Choose which optimized variant to insert into the document:
+                    </p>
+
+                    <div className="space-y-2">
+                      {(selectedForVariant.variants && selectedForVariant.variants.length > 0
+                        ? selectedForVariant.variants
+                        : [
+                            {
+                              kind: 'original' as const,
+                              width: selectedForVariant.optimization?.width || 0,
+                              height: selectedForVariant.optimization?.height || 0,
+                              mimeType: selectedForVariant.mimeType,
+                              sizeBytes: selectedForVariant.size,
+                              url: selectedForVariant.url,
+                            },
+                          ]
+                      ).map((v: ImageVariant, idx: number) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            onSelect(v.url, selectedForVariant);
+                            onClose();
+                          }}
+                          className="p-3 border border-border-subtle hover:border-ink-primary bg-canvas-paper hover:bg-white cursor-pointer transition-colors flex items-center justify-between"
+                          style={{ borderRadius: 2 }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-slate-200 text-slate-800 text-[10px] font-mono font-semibold uppercase rounded-xs">
+                              {v.kind}
+                            </span>
+                            <span className="text-xs font-mono text-ink-primary">
+                              {v.width > 0 ? `${v.width} × ${v.height} px` : 'Standard'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono text-ink-secondary">
+                              {(v.sizeBytes / 1024).toFixed(1)} KB
+                            </span>
+                            <button
+                              type="button"
+                              className="px-2.5 py-1 bg-ink-primary text-white text-[11px] font-mono hover:bg-slate-800 rounded-xs"
+                            >
+                              Insert
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-between pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedForVariant(null)}
+                        className="px-3 py-1.5 border border-border-subtle text-xs font-mono hover:bg-canvas-paper"
+                        style={{ borderRadius: 2 }}
+                      >
+                        Back to Library
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelect(selectedForVariant.url, selectedForVariant);
+                          onClose();
+                        }}
+                        className="px-4 py-1.5 bg-ink-primary text-white text-xs font-mono hover:bg-slate-800"
+                        style={{ borderRadius: 2 }}
+                      >
+                        Use Default ({selectedForVariant.url.includes('variant=') ? 'Optimized' : 'Original'})
+                      </button>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {activeTab === 'url' && (
+                    <form onSubmit={handleApplyCustomUrl} className="space-y-4 max-w-xl mx-auto py-4">
+                      <div className="bg-white p-6 border border-border-subtle space-y-4" style={{ borderRadius: 2 }}>
+                        <div>
+                          <label className="block text-xs font-medium text-ink-primary mb-1 font-mono uppercase tracking-wider">
+                            Direct Image or Cloudinary URL
+                          </label>
+                          <p className="text-[11px] text-ink-secondary mb-3">
+                            Paste any public image link from Cloudinary, Unsplash, or CDN.
+                          </p>
+                          <input
+                            type="url"
+                            value={customUrl}
+                            onChange={(e) => {
+                              setCustomUrl(e.target.value);
+                              setUrlPreviewError(false);
+                              setCustomUrlError(null);
+                            }}
+                            placeholder="https://res.cloudinary.com/... or https://images.unsplash.com/..."
+                            className="w-full px-3 py-2 text-xs border border-border-subtle focus:border-ink-primary bg-canvas-paper text-ink-primary focus:outline-none font-mono"
+                            style={{ borderRadius: 2 }}
+                            autoFocus
+                          />
+                        </div>
+
+                        {customUrlError && (
+                          <div
+                            className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono"
+                            style={{ borderRadius: 2 }}
+                          >
+                            {customUrlError}
+                          </div>
+                        )}
+
+                        {customUrl && (
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">
+                              Preview
+                            </p>
+                            <div className="aspect-video w-full bg-slate-100 border border-border-subtle flex items-center justify-center overflow-hidden" style={{ borderRadius: 2 }}>
+                              {urlPreviewError ? (
+                                <div className="text-center p-4 text-rose-600 text-xs font-mono">
+                                  Unable to load image from this URL. Please verify the link.
+                                </div>
+                              ) : (
+                                <img
+                                  src={customUrl}
+                                  alt="Preview"
+                                  onError={() => setUrlPreviewError(true)}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="submit"
+                            disabled={!customUrl.trim() || urlPreviewError}
+                            className="px-5 py-2 bg-ink-primary hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold tracking-wide transition-colors flex items-center gap-1.5 font-mono"
+                            style={{ borderRadius: 2 }}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Apply Image URL</span>
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+
+                  {activeTab === 'upload' && (
+                    <div
+                      className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-border-subtle hover:border-ink-secondary bg-white transition-colors"
+                      style={{ borderRadius: 2 }}
+                    >
+                      <UploadCloud className="w-10 h-10 text-ink-secondary/60 mb-3" />
+                      <h3 className="font-editorial text-base font-semibold text-ink-primary mb-1">
+                        Upload & Auto-Optimize Image
+                      </h3>
+                      <p className="text-xs text-ink-secondary mb-4 text-center max-w-sm font-mono">
+                        PNG, JPEG, WebP, AVIF, GIF · Up to 100 MB
+                      </p>
+
+                      {uploadError && (
+                        <div
+                          className="mb-4 px-4 py-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono"
+                          style={{ borderRadius: 2 }}
+                        >
+                          {uploadError}
+                        </div>
+                      )}
+
+                      <label
+                        className="cursor-pointer px-5 py-2 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold tracking-wide transition-colors flex items-center gap-2"
+                        style={{ borderRadius: 2 }}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Optimizing & Uploading…
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="w-3.5 h-3.5" /> Select Local File (up to 100MB)
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp, image/avif, image/gif"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {activeTab === 'library' && (
+                    <div>
+                      {loading ? (
+                        <div className="flex items-center justify-center py-16 text-ink-secondary gap-2 font-mono text-xs">
+                          <Loader2 className="w-4 h-4 animate-spin text-ink-primary" /> Loading assets…
+                        </div>
+                      ) : mediaList.length === 0 ? (
+                        <div className="text-center py-16 text-ink-secondary">
+                          <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                          <p className="text-sm font-editorial italic">No media assets in library yet.</p>
+                          <div className="mt-4 flex items-center justify-center gap-3">
+                            <button
+                              onClick={() => setActiveTab('upload')}
+                              className="px-3 py-1.5 bg-ink-primary text-white text-xs font-medium hover:bg-slate-800 font-mono"
+                              style={{ borderRadius: 2 }}
+                            >
+                              Upload File
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('url')}
+                              className="px-3 py-1.5 border border-border-subtle bg-white text-ink-primary text-xs font-medium hover:bg-canvas-paper font-mono"
+                              style={{ borderRadius: 2 }}
+                            >
+                              Paste Image URL
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {mediaList.map((media) => {
+                            const hasVariants = (media.variants && media.variants.length > 1);
+                            const savings = media.optimization?.savingsPercent;
+
+                            return (
+                              <div
+                                key={media.id}
+                                onClick={() => {
+                                  if (hasVariants) {
+                                    setSelectedForVariant(media);
+                                  } else {
+                                    onSelect(media.url, media);
+                                    onClose();
+                                  }
+                                }}
+                                className="group relative border border-border-subtle hover:border-ink-primary bg-white overflow-hidden cursor-pointer transition-colors flex flex-col justify-between"
+                                style={{ borderRadius: 2 }}
+                              >
+                                <div className="aspect-video w-full bg-slate-100 flex items-center justify-center overflow-hidden relative">
+                                  <img
+                                    src={media.url}
+                                    alt={media.originalName || media.filename}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                  {savings && (
+                                    <span className="absolute top-1 left-1 px-1 py-0.5 bg-emerald-900/90 text-emerald-200 text-[8px] font-mono rounded-xs flex items-center gap-0.5">
+                                      <Sparkles size={8} />
+                                      {savings}
+                                    </span>
+                                  )}
+                                  {hasVariants && (
+                                    <span className="absolute top-1 right-1 px-1 py-0.5 bg-slate-900/80 text-white text-[8px] font-mono rounded-xs flex items-center gap-0.5">
+                                      <Layers size={8} />
+                                      {media.variants?.length}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="p-2 border-t border-border-subtle bg-white">
+                                  {confirmDeleteId === media.id ? (
+                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <span className="text-[10px] font-mono text-rose-600 shrink-0">Delete?</span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleDeleteConfirm(media.id, e)}
+                                        disabled={deletingId === media.id}
+                                        className="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-mono rounded-sm hover:bg-rose-700 disabled:opacity-60 shrink-0"
+                                      >
+                                        {deletingId === media.id ? '...' : 'Yes'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleDeleteCancel}
+                                        className="px-2 py-0.5 border border-border-subtle text-[10px] font-mono rounded-sm hover:bg-slate-50 shrink-0"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-between">
+                                      <div className="truncate max-w-[110px]">
+                                        <p className="text-[11px] font-mono text-ink-primary truncate font-medium">
+                                          {media.originalName || media.filename}
+                                        </p>
+                                        <p className="text-[9px] font-mono text-ink-secondary">
+                                          {(media.size / 1024).toFixed(0)} KB · {media.optimization?.format?.toUpperCase() || media.mimeType.split('/')[1]?.toUpperCase()}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleDeleteRequest(media.id, e)}
+                                        className="text-ink-secondary hover:text-rose-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Delete asset"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-          )}
+          </motion.div>
         </div>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
+      )}
+    </AnimatePresence>
   );
 };

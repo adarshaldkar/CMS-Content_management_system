@@ -35,6 +35,13 @@ Thumbs.db
 archify/
 test/
 tests/
+client/tests/
+server/test/
+*.spec.ts
+*.test.ts
+*.test.tsx
+*.spec.js
+*.test.js
 test-fixtures/
 scripts/
 .cache/

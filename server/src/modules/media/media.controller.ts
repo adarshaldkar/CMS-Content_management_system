@@ -34,12 +34,12 @@ export class MediaController {
 
   @Post('upload')
   @UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
-  @ApiOperation({ summary: 'Upload an image asset (PNG, JPEG, WebP, AVIF, GIF)' })
+  @ApiOperation({ summary: 'Upload and auto-optimize an image asset (PNG, JPEG, WebP, AVIF, GIF up to 100MB)' })
   @ApiConsumes('multipart/form-data')
   @RequirePermissions(Permission.MEDIA_UPLOAD)
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB Limit
     }),
   )
   async upload(

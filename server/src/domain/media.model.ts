@@ -1,3 +1,27 @@
+export type ImageVariantKind = 'original' | 'hero' | 'article' | 'card' | 'thumbnail';
+
+export interface ImageVariant {
+  kind: ImageVariantKind;
+  width: number;
+  height: number;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  storageKey?: string;
+}
+
+export interface ImageOptimizationMeta {
+  originalSizeBytes: number;
+  optimizedSizeBytes: number;
+  savingsPercent: string;
+  width: number;
+  height: number;
+  format: string;
+  appliedEnhancements: string[];
+  isUpscaled?: boolean;
+  isDownscaled?: boolean;
+}
+
 export interface Media {
   id: string;
   filename: string;
@@ -7,6 +31,8 @@ export interface Media {
   url: string;
   uploadedBy: string;
   createdAt: Date;
+  variants?: ImageVariant[];
+  optimization?: ImageOptimizationMeta;
 }
 
 export interface CreateMediaDto {
@@ -16,4 +42,6 @@ export interface CreateMediaDto {
   size: number;
   url: string;
   uploadedBy: string;
+  variants?: ImageVariant[];
+  optimization?: ImageOptimizationMeta;
 }

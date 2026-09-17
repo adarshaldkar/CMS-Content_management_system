@@ -343,8 +343,25 @@ export const ArticleReaderPage: React.FC = () => {
       ? 'text-xl sm:text-2xl leading-relaxed'
       : 'text-base sm:text-lg leading-relaxed';
 
-  const containerWidthClass =
-    readerPrefs.readingWidth === 'wide' ? 'max-w-5xl' : 'max-w-4xl';
+  const hasToc = React.useMemo(() => {
+    if (!article?.content) return false;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(article.content, 'text/html');
+    const nodes = doc.querySelectorAll('h2, h3');
+    let count = 0;
+    nodes.forEach((n) => {
+      if ((n.textContent?.trim() || '').length > 2) count++;
+    });
+    return count >= 3;
+  }, [article?.content]);
+
+  const containerWidthClass = hasToc
+    ? readerPrefs.readingWidth === 'wide'
+      ? 'max-w-7xl'
+      : 'max-w-6xl'
+    : readerPrefs.readingWidth === 'wide'
+    ? 'max-w-4xl'
+    : 'max-w-3xl';
 
   return (
     <div className="font-sans text-ink-primary relative bg-canvas-paper min-h-screen">
@@ -358,12 +375,12 @@ export const ArticleReaderPage: React.FC = () => {
         previewSeconds={7}
       />
 
-      <div className={`mx-auto px-4 sm:px-6 py-12 ${containerWidthClass}`}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className={`mx-auto px-4 sm:px-6 lg:px-8 py-12 ${containerWidthClass}`}>
+        <div className={hasToc ? 'grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start' : 'w-full'}>
           {/* Main Article Content Column */}
           <article
             className={`space-y-8 transition-all duration-700 ${
-              article.content.includes('<h2') ? 'lg:col-span-8' : 'lg:col-span-12'
+              hasToc ? 'lg:col-span-8' : 'w-full max-w-full mx-auto'
             } ${
               isPaywallLocked && !isAuthenticated
                 ? 'filter blur-md select-none pointer-events-none opacity-40 scale-[0.99] max-h-[85vh] overflow-hidden'
@@ -556,7 +573,7 @@ export const ArticleReaderPage: React.FC = () => {
 
             {/* 4. Sanitized Content Body with Reader Preferences Applied */}
             <div
-              className={`prose prose-slate max-w-none space-y-6 pt-4 text-ink-primary ${proseTypographyClass} ${proseSizeClass}`}
+              className={`prose prose-slate max-w-none w-full space-y-6 pt-4 text-ink-primary ${proseTypographyClass} ${proseSizeClass}`}
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }}
             />
 
@@ -707,9 +724,11 @@ export const ArticleReaderPage: React.FC = () => {
           </article>
 
           {/* Sticky Table of Contents Sidebar (UI Phase 4) */}
-          <aside className="lg:col-span-4 sticky top-20">
-            <ArticleTableOfContents htmlContent={article.content} />
-          </aside>
+          {hasToc && (
+            <aside className="hidden lg:block lg:col-span-4 sticky top-24">
+              <ArticleTableOfContents htmlContent={article.content} />
+            </aside>
+          )}
         </div>
       </div>
     </div>

@@ -187,8 +187,8 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
         setOpenDropdown(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   const handleExecute = (cmd: EditorialCommand) => {
@@ -207,7 +207,7 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
       className="sticky top-0 z-30 w-full border-b border-border-subtle bg-white/95 backdrop-blur-md font-sans select-none"
     >
       {/* ─── Top Category Tabs ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 border-b border-slate-100 h-8 overflow-x-auto no-scrollbar">
+      <div className="flex items-center justify-between px-3 border-b border-slate-100 h-8">
         <div className="flex items-center gap-1">
 
           {CATEGORIES.map((cat) => {
@@ -216,24 +216,30 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
               <div key={cat.id} className="relative">
                 <button
                   type="button"
-                  onClick={() => setOpenDropdown(isOpen ? null : cat.id)}
-                  className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-xs transition-colors cursor-pointer ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenDropdown((prev) => (prev === cat.id ? null : cat.id));
+                  }}
+                  className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-xs transition-colors cursor-pointer select-none ${
                     isOpen
-                      ? 'bg-slate-100 text-accent-crimson font-semibold'
+                      ? 'bg-rose-50 text-accent-crimson font-semibold ring-1 ring-accent-crimson/20'
                       : 'text-ink-secondary hover:text-ink-primary hover:bg-slate-50'
                   }`}
                 >
                   <span>{cat.label}</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
+                  <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${isOpen ? 'rotate-180 text-accent-crimson' : 'opacity-60'}`} />
                 </button>
 
                 {/* Dropdown Menu */}
                 {isOpen && (
-                  <div className="absolute left-0 top-full mt-1 w-64 rounded-md border border-border-subtle bg-white shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                    <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-secondary border-b border-border-subtle mb-1">
-                      {cat.label} Tools
+                  <div
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="absolute left-0 top-full mt-1 w-64 rounded-md border border-slate-200 bg-white shadow-2xl py-1.5 z-[100] animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/5"
+                  >
+                    <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-500 border-b border-slate-100 mb-1 flex items-center justify-between">
+                      <span>{cat.label} Tools</span>
                     </div>
-                    <div className="space-y-0.5 px-1">
+                    <div className="space-y-0.5 px-1 max-h-80 overflow-y-auto">
                       {getCommandsForCategory(cat.id).map((cmd) => {
                         const Icon = ICON_MAP[cmd.icon] || Type;
                         return (
@@ -241,14 +247,14 @@ export const EditorialRibbon: React.FC<EditorialRibbonProps> = ({
                             key={cmd.id}
                             type="button"
                             onClick={() => handleExecute(cmd)}
-                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-ink-primary hover:bg-rose-50/80 hover:text-accent-crimson transition-colors cursor-pointer group"
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left text-xs text-ink-primary hover:bg-rose-50 hover:text-accent-crimson transition-colors cursor-pointer group"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <Icon className="h-3.5 w-3.5 text-ink-secondary group-hover:text-accent-crimson shrink-0" />
-                              <span className="truncate">{cmd.title}</span>
+                              <Icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-accent-crimson shrink-0" />
+                              <span className="truncate font-medium">{cmd.title}</span>
                             </div>
                             {cmd.shortcut && (
-                              <span className="font-mono text-[10px] text-ink-secondary bg-slate-100 px-1 py-0.5 rounded ml-2 shrink-0">
+                              <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded ml-2 shrink-0 group-hover:bg-rose-100 group-hover:text-rose-900">
                                 {cmd.shortcut}
                               </span>
                             )}

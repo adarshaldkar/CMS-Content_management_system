@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -19,6 +20,8 @@ import {
   type AuthUser,
   type Media,
   type PaginatedResult,
+  type ImageVariant,
+  type ImageOptimizationMeta,
 } from '../../domain/models';
 import { validateImageBuffer } from '../../common/utils/image-validator.util';
 import {
@@ -27,15 +30,20 @@ import {
 } from './utils/video-validator.util';
 import { AuditService } from '../audit/audit.service';
 import { OwnershipHelper } from '../../common/guards/ownership.guard';
+import { ImageOptimizerService } from './image/image-optimizer.service';
+import { StorageService } from './storage/storage.service';
 
 @Injectable()
 export class MediaService {
+  private readonly logger = new Logger(MediaService.name);
   private readonly uploadDir = path.resolve(process.cwd(), 'uploads');
 
   constructor(
     @Inject(MEDIA_REPOSITORY)
     private readonly mediaRepo: IMediaRepository,
     private readonly auditService: AuditService,
+    private readonly imageOptimizer: ImageOptimizerService,
+    private readonly storageService: StorageService,
   ) {
     if (!fs.existsSync(this.uploadDir)) {
       fs.mkdirSync(this.uploadDir, { recursive: true });
@@ -50,8 +58,9 @@ export class MediaService {
       throw new BadRequestException('No file provided for upload.');
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('File exceeds the maximum size limit of 5 MB.');
+    const MAX_IMAGE_SIZE = 100 * 1024 * 1024; // 100 MB Limit
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new BadRequestException('File exceeds the maximum allowable limit of 100 MB.');
     }
 
     // Binary file signature & magic number verification
@@ -71,21 +80,99 @@ export class MediaService {
     };
 
     const ext = mimeToExt[validation.detectedMime || ''] || 'jpg';
-    const randomizedName = `media-${crypto.randomUUID()}.${ext}`;
-    const filePath = path.join(this.uploadDir, randomizedName);
+    const fileBaseId = `media-${crypto.randomUUID()}`;
+    const originalFilename = `${fileBaseId}-original.${ext}`;
 
-    // Save binary securely to local disk
-    await fs.promises.writeFile(filePath, file.buffer);
+    // 1. Save original master
+    const originalAsset = await this.storageService.saveFile(
+      originalFilename,
+      file.buffer,
+      validation.detectedMime || file.mimetype,
+    );
 
-    const publicUrl = `/uploads/${randomizedName}`;
+    let finalMainUrl = originalAsset.url;
+    let finalMainFilename = originalFilename;
+    let finalMainMimeType = validation.detectedMime || file.mimetype;
+    let finalMainSize = file.size;
+    let variants: ImageVariant[] = [
+      {
+        kind: 'original',
+        width: 0,
+        height: 0,
+        mimeType: finalMainMimeType,
+        sizeBytes: file.size,
+        url: originalAsset.url,
+        storageKey: originalAsset.storageKey,
+      },
+    ];
+    let optimizationMeta: ImageOptimizationMeta | undefined;
+
+    // 2. Run Image Intelligence Pipeline for non-GIF static images
+    if (validation.detectedMime !== 'image/gif') {
+      try {
+        const optimizedResult = await this.imageOptimizer.processImage(
+          file.buffer,
+          file.originalname,
+          fileBaseId,
+        );
+
+        // Save Master WebP Derivative
+        const masterWebpAsset = await this.storageService.saveFile(
+          optimizedResult.masterFilename,
+          optimizedResult.masterBuffer,
+          optimizedResult.masterMimeType,
+        );
+
+        finalMainUrl = masterWebpAsset.url;
+        finalMainFilename = optimizedResult.masterFilename;
+        finalMainMimeType = optimizedResult.masterMimeType;
+        finalMainSize = optimizedResult.optimizedSizeBytes;
+
+        // Save responsive derivatives (Hero, Article, Card, Thumbnail)
+        for (const variant of optimizedResult.variants) {
+          const variantAsset = await this.storageService.saveFile(
+            variant.filename,
+            variant.buffer,
+            variant.mimeType,
+          );
+
+          variants.push({
+            kind: variant.kind,
+            width: variant.width,
+            height: variant.height,
+            mimeType: variant.mimeType,
+            sizeBytes: variant.sizeBytes,
+            url: variantAsset.url,
+            storageKey: variantAsset.storageKey,
+          });
+        }
+
+        optimizationMeta = {
+          originalSizeBytes: optimizedResult.originalSizeBytes,
+          optimizedSizeBytes: optimizedResult.optimizedSizeBytes,
+          savingsPercent: optimizedResult.savingsPercent,
+          width: optimizedResult.width,
+          height: optimizedResult.height,
+          format: 'webp',
+          appliedEnhancements: optimizedResult.appliedEnhancements,
+          isUpscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('UPSCALE')),
+          isDownscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('DOWNSCALE')),
+        };
+      } catch (err: any) {
+        this.logger.error(`Image Intelligence Pipeline error: ${err.message}`, err.stack);
+        // Graceful fallback to original file if processing fails
+      }
+    }
 
     const media = await this.mediaRepo.create({
-      filename: randomizedName,
+      filename: finalMainFilename,
       originalName: path.basename(file.originalname).slice(0, 150),
-      mimeType: validation.detectedMime || file.mimetype,
-      size: file.size,
-      url: publicUrl,
+      mimeType: finalMainMimeType,
+      size: finalMainSize,
+      url: finalMainUrl,
       uploadedBy: user.id,
+      variants,
+      optimization: optimizationMeta,
     });
 
     await this.auditService.log({
@@ -94,9 +181,12 @@ export class MediaService {
       resource: `Media:${media.id}`,
       result: 'SUCCESS',
       metadata: {
-        filename: randomizedName,
-        size: file.size,
+        filename: finalMainFilename,
+        size: finalMainSize,
+        originalSize: file.size,
+        savingsPercent: optimizationMeta?.savingsPercent || '0%',
         mimeType: media.mimeType,
+        variantsCount: variants.length,
       },
     });
 
@@ -109,8 +199,6 @@ export class MediaService {
     limit = 24,
     forceOwn = false,
   ): Promise<PaginatedResult<Media>> {
-    // forceOwn=true means: always show only this user's uploads (used by editor media picker)
-    // forceOwn=false: admins/editors can see all (used by admin media library page)
     const canReadAll =
       !forceOwn &&
       (user.role === UserRole.SUPER_ADMIN ||
@@ -141,13 +229,15 @@ export class MediaService {
     // Delete database record
     await this.mediaRepo.delete(id);
 
-    // Delete disk file
-    const filePath = path.join(this.uploadDir, media.filename);
-    if (fs.existsSync(filePath)) {
-      try {
-        await fs.promises.unlink(filePath);
-      } catch {
-        // Safe ignore
+    // Delete local master file
+    await this.storageService.deleteLocalFile(media.filename);
+
+    // Delete local variant files if any
+    if (media.variants && Array.isArray(media.variants)) {
+      for (const variant of media.variants) {
+        if (variant.storageKey) {
+          await this.storageService.deleteLocalFile(variant.storageKey);
+        }
       }
     }
 
@@ -162,7 +252,6 @@ export class MediaService {
       throw new BadRequestException('No video file provided for upload.');
     }
 
-    // 100 MB Limit
     const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_VIDEO_SIZE) {
       throw new BadRequestException('Video exceeds maximum allowable limit of 100 MB.');
@@ -178,10 +267,12 @@ export class MediaService {
 
     const ext = validation.format || 'mp4';
     const randomizedName = `video-${crypto.randomUUID()}.${ext}`;
-    const filePath = path.join(this.uploadDir, randomizedName);
-
-    // Save video binary safely
-    await fs.promises.writeFile(filePath, file.buffer);
+    
+    const asset = await this.storageService.saveFile(
+      randomizedName,
+      file.buffer,
+      file.mimetype || `video/${ext}`,
+    );
 
     const media = await this.mediaRepo.create({
       filename: randomizedName,
@@ -226,7 +317,6 @@ export class MediaService {
       throw new NotFoundException('Video media asset not found.');
     }
 
-    // Path Traversal Security: sanitize basename
     const safeFilename = path.basename(media.filename);
     const filePath = path.join(this.uploadDir, safeFilename);
 
