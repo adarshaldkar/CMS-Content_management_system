@@ -36,10 +36,34 @@ export class MySqlService implements OnModuleDestroy {
               avatar_url TEXT,
               bio TEXT,
               preferred_topics JSON,
+              is_email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+              email_verification_token VARCHAR(255) NULL,
+              email_verification_expires_at TIMESTAMP NULL,
+              accepted_terms_version VARCHAR(50) NULL,
+              accepted_terms_at TIMESTAMP NULL,
+              notification_preferences JSON NULL,
+              password_reset_token VARCHAR(255) NULL,
+              password_reset_expires_at TIMESTAMP NULL,
               created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              deleted_at TIMESTAMP NULL
             );
           `);
+
+          const userAlters = [
+            'ALTER TABLE cms_users ADD COLUMN is_email_verified BOOLEAN NOT NULL DEFAULT FALSE',
+            'ALTER TABLE cms_users ADD COLUMN email_verification_token VARCHAR(255) NULL',
+            'ALTER TABLE cms_users ADD COLUMN email_verification_expires_at TIMESTAMP NULL',
+            'ALTER TABLE cms_users ADD COLUMN accepted_terms_version VARCHAR(50) NULL',
+            'ALTER TABLE cms_users ADD COLUMN accepted_terms_at TIMESTAMP NULL',
+            'ALTER TABLE cms_users ADD COLUMN notification_preferences JSON NULL',
+            'ALTER TABLE cms_users ADD COLUMN password_reset_token VARCHAR(255) NULL',
+            'ALTER TABLE cms_users ADD COLUMN password_reset_expires_at TIMESTAMP NULL',
+            'ALTER TABLE cms_users ADD COLUMN deleted_at TIMESTAMP NULL',
+          ];
+          for (const alter of userAlters) {
+            try { await this.pool.query(alter); } catch {}
+          }
 
           await this.pool.query(`
             CREATE TABLE IF NOT EXISTS categories (

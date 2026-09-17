@@ -306,6 +306,10 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
     return this.activeRepo.findByPasswordResetToken(tokenHash);
   }
 
+  async findByEmailVerificationToken(tokenHash: string): Promise<import('../../domain/models').User | null> {
+    return this.activeRepo.findByEmailVerificationToken(tokenHash);
+  }
+
   async clearPasswordResetToken(userId: string): Promise<void> {
     return this.activeRepo.clearPasswordResetToken(userId);
   }

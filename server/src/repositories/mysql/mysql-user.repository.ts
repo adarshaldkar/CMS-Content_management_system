@@ -24,6 +24,17 @@ export class MySqlUserRepository implements IUserRepository {
       preferredTopics = [];
     }
 
+    let notificationPreferences: any = undefined;
+    try {
+      if (typeof row.notification_preferences === 'string') {
+        notificationPreferences = JSON.parse(row.notification_preferences);
+      } else if (row.notification_preferences) {
+        notificationPreferences = row.notification_preferences;
+      }
+    } catch {
+      notificationPreferences = undefined;
+    }
+
     return {
       id: row.id,
       email: row.email,
@@ -34,6 +45,12 @@ export class MySqlUserRepository implements IUserRepository {
       preferredTopics,
       role: (row.role as UserRole) || UserRole.AUTHOR,
       isActive: Boolean(row.is_active),
+      isEmailVerified: Boolean(row.is_email_verified),
+      emailVerificationToken: row.email_verification_token || undefined,
+      emailVerificationExpiresAt: row.email_verification_expires_at ? new Date(row.email_verification_expires_at) : null,
+      acceptedTermsVersion: row.accepted_terms_version || undefined,
+      acceptedTermsAt: row.accepted_terms_at ? new Date(row.accepted_terms_at) : null,
+      notificationPreferences,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
@@ -110,8 +127,8 @@ export class MySqlUserRepository implements IUserRepository {
     const isActive = data.isActive !== undefined ? data.isActive : true;
 
     await this.mysql.pool.query(
-      `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics, is_email_verified, email_verification_token, email_verification_expires_at, accepted_terms_version, accepted_terms_at, notification_preferences)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.email,
@@ -122,6 +139,12 @@ export class MySqlUserRepository implements IUserRepository {
         data.avatarUrl || null,
         data.bio || null,
         JSON.stringify(data.preferredTopics || []),
+        data.isEmailVerified ? 1 : 0,
+        data.emailVerificationToken || null,
+        data.emailVerificationExpiresAt || null,
+        data.acceptedTermsVersion || null,
+        data.acceptedTermsAt || null,
+        data.notificationPreferences ? JSON.stringify(data.notificationPreferences) : null,
       ],
     );
 
@@ -157,6 +180,34 @@ export class MySqlUserRepository implements IUserRepository {
       updates.push('preferred_topics = ?');
       params.push(JSON.stringify(data.preferredTopics));
     }
+    if (data.isEmailVerified !== undefined) {
+      updates.push('is_email_verified = ?');
+      params.push(data.isEmailVerified ? 1 : 0);
+    }
+    if (data.emailVerificationToken !== undefined) {
+      updates.push('email_verification_token = ?');
+      params.push(data.emailVerificationToken);
+    }
+    if (data.emailVerificationExpiresAt !== undefined) {
+      updates.push('email_verification_expires_at = ?');
+      params.push(data.emailVerificationExpiresAt);
+    }
+    if (data.acceptedTermsVersion !== undefined) {
+      updates.push('accepted_terms_version = ?');
+      params.push(data.acceptedTermsVersion);
+    }
+    if (data.acceptedTermsAt !== undefined) {
+      updates.push('accepted_terms_at = ?');
+      params.push(data.acceptedTermsAt);
+    }
+    if (data.notificationPreferences !== undefined) {
+      updates.push('notification_preferences = ?');
+      params.push(JSON.stringify(data.notificationPreferences));
+    }
+    if (data.passwordHash !== undefined) {
+      updates.push('password_hash = ?');
+      params.push(data.passwordHash);
+    }
 
     if (updates.length > 0) {
       await this.mysql.pool.query(
@@ -171,7 +222,7 @@ export class MySqlUserRepository implements IUserRepository {
   async softDelete(id: string): Promise<boolean> {
     await this.mysql.ensureSchema();
     const [res] = await this.mysql.pool.query(
-      'UPDATE cms_users SET is_active = 0 WHERE id = ?',
+      'UPDATE cms_users SET is_active = 0, deleted_at = NOW() WHERE id = ?',
       [id],
     ) as any;
     return res?.affectedRows > 0;
@@ -189,6 +240,16 @@ export class MySqlUserRepository implements IUserRepository {
     await this.mysql.ensureSchema();
     const [rows] = await this.mysql.pool.query(
       'SELECT * FROM cms_users WHERE password_reset_token = ? AND password_reset_expires_at > NOW() AND deleted_at IS NULL LIMIT 1',
+      [tokenHash],
+    ) as any;
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    return row ? this.mapRowToUser(row) : null;
+  }
+
+  async findByEmailVerificationToken(tokenHash: string): Promise<import('../../domain/models').User | null> {
+    await this.mysql.ensureSchema();
+    const [rows] = await this.mysql.pool.query(
+      'SELECT * FROM cms_users WHERE email_verification_token = ? AND email_verification_expires_at > NOW() AND deleted_at IS NULL LIMIT 1',
       [tokenHash],
     ) as any;
     const row = Array.isArray(rows) ? rows[0] : rows;

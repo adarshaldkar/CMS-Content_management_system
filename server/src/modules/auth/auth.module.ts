@@ -25,6 +25,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 
+import { TurnstileService } from './turnstile.service';
+
 @Module({
   imports: [
     ConfigModule,
@@ -37,6 +39,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
   controllers: [AuthController],
   providers: [
     AuthService,
+    TurnstileService,
     PostgresService,
     PostgresSessionRepository,
     MongoSessionRepository,
@@ -50,6 +53,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
   ],
   exports: [
     AuthService,
+    TurnstileService,
     JwtAuthGuard,
     CsrfGuard,
     PermissionsGuard,

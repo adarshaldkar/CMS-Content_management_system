@@ -9,6 +9,17 @@ export enum UserRole {
   USER = 'USER',
 }
 
+export interface UserNotificationPreferences {
+  emailSecurityAlerts: boolean;
+  emailAccountActivity: boolean;
+  emailEditorialUpdates: boolean;
+  emailNewsletter: boolean;
+  emailMarketing: boolean;
+  browserBreakingNews: boolean;
+  browserComments: boolean;
+  browserMentions: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -19,6 +30,12 @@ export interface User {
   preferredTopics?: string[] | null;
   role: UserRole;
   isActive: boolean;
+  isEmailVerified?: boolean;
+  emailVerificationToken?: string | null;
+  emailVerificationExpiresAt?: Date | null;
+  acceptedTermsVersion?: string | null;
+  acceptedTermsAt?: Date | null;
+  notificationPreferences?: UserNotificationPreferences;
   passwordResetToken?: string | null;
   passwordResetExpiresAt?: Date | null;
   createdAt: Date;
@@ -35,6 +52,12 @@ export interface CreateUserDto {
   preferredTopics?: string[] | null;
   role?: UserRole;
   isActive?: boolean;
+  isEmailVerified?: boolean;
+  emailVerificationToken?: string | null;
+  emailVerificationExpiresAt?: Date | null;
+  acceptedTermsVersion?: string | null;
+  acceptedTermsAt?: Date | null;
+  notificationPreferences?: UserNotificationPreferences;
 }
 
 export interface UpdateUserDto {
@@ -46,6 +69,12 @@ export interface UpdateUserDto {
   preferredTopics?: string[] | null;
   role?: UserRole;
   isActive?: boolean;
+  isEmailVerified?: boolean;
+  emailVerificationToken?: string | null;
+  emailVerificationExpiresAt?: Date | null;
+  acceptedTermsVersion?: string | null;
+  acceptedTermsAt?: Date | null;
+  notificationPreferences?: UserNotificationPreferences;
   passwordResetToken?: string | null;
   passwordResetExpiresAt?: Date | null;
 }
@@ -66,6 +95,10 @@ export interface AuthUser {
   role: UserRole;
   permissions: Permission[];
   isActive: boolean;
+  isEmailVerified?: boolean;
+  acceptedTermsVersion?: string | null;
+  acceptedTermsAt?: Date | null;
+  notificationPreferences?: UserNotificationPreferences;
 }
 
 export interface JwtAccessPayload {

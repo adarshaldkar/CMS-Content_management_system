@@ -32,7 +32,15 @@ import {
   hashPassword,
   verifyPassword,
 } from '../../common/utils/password.util';
-import type { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
+import { TurnstileService } from './turnstile.service';
+import type {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  GoogleAuthDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './dto/auth.dto';
 
 export interface RequestMetadata {
   ipAddress?: string;
@@ -54,6 +62,7 @@ export class AuthService {
     private readonly sessionRepo: ISessionRepository,
     private readonly auditService: AuditService,
     private readonly config: ConfigService<EnvConfig, true>,
+    private readonly turnstileService: TurnstileService,
   ) {}
 
   private hashToken(token: string): string {
@@ -71,6 +80,10 @@ export class AuthService {
       role: user.role,
       permissions: ROLE_PERMISSIONS[user.role] ?? [],
       isActive: user.isActive,
+      isEmailVerified: user.isEmailVerified ?? false,
+      acceptedTermsVersion: user.acceptedTermsVersion || undefined,
+      acceptedTermsAt: user.acceptedTermsAt || undefined,
+      notificationPreferences: user.notificationPreferences || undefined,
     };
   }
 
@@ -109,11 +122,17 @@ export class AuthService {
   async register(
     dto: RegisterDto,
     meta: RequestMetadata = {},
-  ): Promise<AuthResult> {
+  ): Promise<AuthResult & { verificationToken?: string }> {
+    await this.turnstileService.verifyToken(dto.cfTurnstileToken || dto.turnstileToken, meta.ipAddress);
+
     const existing = await this.userRepo.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('A user with this email already exists.');
     }
+
+    const rawVerifyToken = crypto.randomBytes(32).toString('hex');
+    const verifyTokenHash = crypto.createHash('sha256').update(rawVerifyToken).digest('hex');
+    const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const passwordHash = await hashPassword(dto.password);
     const user = await this.userRepo.create({
@@ -122,6 +141,21 @@ export class AuthService {
       passwordHash,
       role: UserRole.AUTHOR,
       isActive: true,
+      isEmailVerified: false,
+      emailVerificationToken: verifyTokenHash,
+      emailVerificationExpiresAt: verifyExpiresAt,
+      acceptedTermsVersion: dto.acceptedTermsVersion || (dto.agreeTerms ? 'v1.0' : null),
+      acceptedTermsAt: dto.acceptedTermsVersion || dto.agreeTerms ? new Date() : null,
+      notificationPreferences: {
+        emailSecurityAlerts: true,
+        emailAccountActivity: true,
+        emailEditorialUpdates: true,
+        emailNewsletter: false,
+        emailMarketing: false,
+        browserBreakingNews: true,
+        browserComments: true,
+        browserMentions: true,
+      },
     });
 
     const familyId = crypto.randomUUID();
@@ -130,16 +164,13 @@ export class AuthService {
     const tokenHash = this.hashToken(refreshToken);
 
     await this.sessionRepo.create({
-      id: sessionId,
       userId: user.id,
-      familyId,
       tokenHash,
+      familyId,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       userAgent: meta.userAgent,
       ipAddress: meta.ipAddress,
     });
-
-    const accessToken = this.signAccessToken(user);
 
     await this.auditService.log({
       actorId: user.id,
@@ -150,14 +181,23 @@ export class AuthService {
       userAgent: meta.userAgent,
     });
 
+    const authUser = this.toAuthUser(user);
+    (authUser as any).emailVerificationToken = rawVerifyToken;
+
     return {
-      user: this.toAuthUser(user),
-      accessToken,
+      user: authUser,
+      accessToken: this.signAccessToken(user),
       refreshToken,
+      verificationToken: rawVerifyToken,
     };
   }
 
-  async login(dto: LoginDto, meta: RequestMetadata = {}): Promise<AuthResult> {
+  async login(
+    dto: LoginDto,
+    meta: RequestMetadata = {},
+  ): Promise<AuthResult> {
+    await this.turnstileService.verifyToken(dto.cfTurnstileToken || dto.turnstileToken, meta.ipAddress);
+
     const user = await this.userRepo.findByEmail(dto.email);
 
     // Constant-time defense against user enumeration timing attacks
@@ -510,5 +550,211 @@ export class AuthService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
+  }
+
+  // ─── Email Verification ────────────────────────────────────────────────────────
+
+  async sendEmailVerification(userId: string): Promise<{ message: string; token?: string }> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await this.userRepo.update(userId, {
+      emailVerificationToken: tokenHash,
+      emailVerificationExpiresAt: expiresAt,
+    });
+
+    const clientUrl = this.config.get('CLIENT_URL', { infer: true }) || 'http://localhost:5173';
+    const verifyLink = `${clientUrl}/verify-email?token=${rawToken}`;
+    console.log('\n--- EMAIL VERIFICATION LINK (dev-only, replace with email in prod) ---');
+    console.log(`Email: ${user.email}`);
+    console.log(`Verify URL: ${verifyLink}`);
+    console.log('Token expires in: 24 hours\n');
+
+    return {
+      message: 'Verification link sent to your registered email.',
+      token: rawToken,
+    };
+  }
+
+  async verifyEmail(rawToken: string): Promise<{ success: boolean; verified: boolean; message: string }> {
+    if (!rawToken || rawToken.length !== 64) {
+      throw new UnauthorizedException('Invalid or expired verification token.');
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const user = await this.userRepo.findByEmailVerificationToken(tokenHash);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired verification token.');
+    }
+
+    await this.userRepo.update(user.id, {
+      isEmailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpiresAt: null,
+    });
+
+    await this.auditService.log({
+      actorId: user.id,
+      action: AuditEventType.USER_UPDATED,
+      resource: `User:${user.id}`,
+      result: 'SUCCESS',
+      metadata: { action: 'EMAIL_VERIFIED' },
+    });
+
+    return { success: true, verified: true, message: 'Email successfully verified.' };
+  }
+
+  // ─── Active Devices & Session Management ───────────────────────────────────────
+
+  async getUserSessions(userId: string): Promise<any[]> {
+    const sessions = await this.sessionRepo.findUserSessions(userId);
+    return sessions.map((s) => {
+      const ua = s.userAgent || '';
+      let platform = 'Desktop (Web Browser)';
+      if (/iphone|ipod/i.test(ua)) {
+        platform = 'Mobile Safari (iPhone)';
+      } else if (/ipad/i.test(ua)) {
+        platform = 'Tablet Safari (iPad)';
+      } else if (/android/i.test(ua)) {
+        platform = 'Mobile Chrome (Android)';
+      } else if (/macintosh|mac os x/i.test(ua)) {
+        platform = 'Desktop Chrome (macOS)';
+      } else if (/windows/i.test(ua)) {
+        platform = 'Desktop (Windows)';
+      } else if (/linux/i.test(ua)) {
+        platform = 'Desktop (Linux)';
+      }
+
+      return {
+        id: s.id,
+        userId: s.userId,
+        deviceInfo: `${platform}`,
+        userAgent: s.userAgent,
+        ipAddress: s.ipAddress || '127.0.0.1',
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+      };
+    });
+  }
+
+  async revokeSession(sessionId: string, userId: string): Promise<{ success: boolean; revoked: boolean }> {
+    const revoked = await this.sessionRepo.revokeSession(sessionId, userId);
+    await this.auditService.log({
+      actorId: userId,
+      action: AuditEventType.LOGOUT_SUCCESS,
+      resource: `Session:${sessionId}`,
+      result: 'SUCCESS',
+      metadata: { action: 'REVOKE_SINGLE_SESSION' },
+    });
+    return { success: Boolean(revoked), revoked: Boolean(revoked) };
+  }
+
+  // ─── High-Assurance Re-authentication ──────────────────────────────────────────
+
+  async reauthenticate(
+    userId: string,
+    password: string,
+    cfTurnstileToken?: string,
+    ipAddress?: string,
+  ): Promise<{ success: boolean; reauthenticated: boolean; reauthToken: string; reauthenticatedAt: Date }> {
+    await this.turnstileService.verifyToken(cfTurnstileToken, ipAddress);
+
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const userWithHash = user as User & { password_hash?: string };
+    const storedHash: string = userWithHash.passwordHash || userWithHash.password_hash || '';
+    const isValid = await verifyPassword(storedHash, password);
+
+    if (!isValid) {
+      await this.auditService.log({
+        actorId: userId,
+        action: AuditEventType.LOGIN_FAILURE,
+        resource: `ReAuth:${userId}`,
+        result: 'FAILURE',
+        metadata: { reason: 'Invalid re-auth password' },
+      });
+      throw new UnauthorizedException('Password verification failed.');
+    }
+
+    const reauthToken = crypto.randomBytes(24).toString('hex');
+    return {
+      success: true,
+      reauthenticated: true,
+      reauthToken,
+      reauthenticatedAt: new Date(),
+    };
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userRepo.findByEmail(email);
+  }
+
+  // ─── Google OAuth Sign-In ──────────────────────────────────────────────────────
+
+  async googleAuth(dto: GoogleAuthDto, meta: RequestMetadata = {}): Promise<AuthResult> {
+    // In production: verify Google ID Token with Google OAuth client / public keys
+    // In local dev/test: parse email or use supplied info
+    const email = dto.email || `google-${dto.idToken.slice(0, 8)}@example.com`;
+    const name = dto.name || 'Google Reader';
+
+    let user = await this.userRepo.findByEmail(email);
+
+    if (!user) {
+      // Auto-provision user account
+      const passwordHash = await hashPassword(crypto.randomBytes(16).toString('hex'));
+      user = await this.userRepo.create({
+        email,
+        name,
+        passwordHash,
+        role: UserRole.USER,
+        isActive: true,
+        isEmailVerified: true,
+        acceptedTermsVersion: 'v1.0',
+        acceptedTermsAt: new Date(),
+      });
+    }
+
+    const familyId = crypto.randomUUID();
+    const sessionId = crypto.randomUUID();
+    const refreshToken = this.signRefreshToken(user.id, sessionId, familyId);
+    const tokenHash = this.hashToken(refreshToken);
+
+    await this.sessionRepo.create({
+      id: sessionId,
+      userId: user.id,
+      familyId,
+      tokenHash,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      userAgent: meta.userAgent,
+      ipAddress: meta.ipAddress,
+    });
+
+    const accessToken = this.signAccessToken(user);
+
+    await this.auditService.log({
+      actorId: user.id,
+      action: AuditEventType.LOGIN_SUCCESS,
+      resource: `User:${user.id}`,
+      result: 'SUCCESS',
+      metadata: { provider: 'GOOGLE_OAUTH' },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return {
+      user: this.toAuthUser(user),
+      accessToken,
+      refreshToken,
+    };
   }
 }

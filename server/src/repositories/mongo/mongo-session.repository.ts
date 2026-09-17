@@ -121,4 +121,19 @@ export class MongoSessionRepository implements ISessionRepository {
       .exec();
     return result.modifiedCount;
   }
+
+  async findUserSessions(userId: string): Promise<RefreshTokenSession[]> {
+    const docs = await this.sessionModel
+      .find({ userId, isRevoked: false, expiresAt: { $gt: new Date() } })
+      .sort({ createdAt: -1 })
+      .exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async revokeSession(sessionId: string, userId: string): Promise<boolean> {
+    const result = await this.sessionModel
+      .updateOne({ _id: sessionId, userId }, { $set: { isRevoked: true } })
+      .exec();
+    return result.modifiedCount > 0;
+  }
 }

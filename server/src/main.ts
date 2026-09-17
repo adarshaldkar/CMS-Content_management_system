@@ -151,5 +151,8 @@ async function bootstrap() {
   }
 }
 
-void bootstrap();
+bootstrap().catch((err) => {
+  console.error('[FATAL BOOT ERROR]', err);
+  process.exit(1);
+});
 

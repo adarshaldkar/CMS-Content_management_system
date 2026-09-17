@@ -196,4 +196,22 @@ export class PostgresSessionRepository implements ISessionRepository {
     );
     return result.rowCount ?? 0;
   }
+
+  async findUserSessions(userId: string): Promise<RefreshTokenSession[]> {
+    await this.ensureSchema();
+    const result = await this.postgres.pool.query<SessionRow>(
+      'SELECT * FROM cms_refresh_sessions WHERE user_id = $1 AND is_revoked = false AND expires_at > now() ORDER BY created_at DESC',
+      [userId],
+    );
+    return result.rows.map((row) => this.toDomain(row));
+  }
+
+  async revokeSession(sessionId: string, userId: string): Promise<boolean> {
+    await this.ensureSchema();
+    const result = await this.postgres.pool.query(
+      'UPDATE cms_refresh_sessions SET is_revoked = true WHERE id = $1 AND user_id = $2',
+      [sessionId, userId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
 }

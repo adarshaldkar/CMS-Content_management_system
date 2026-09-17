@@ -10,7 +10,7 @@ import {
 } from '../../../repositories/interfaces/media.repository.interface';
 import { ImageOptimizerService } from './image-optimizer.service';
 import { StorageService } from '../storage/storage.service';
-import type { ImageVariant } from '../../../domain/models';
+import type { ImageVariant, UsageProfile } from '../../../domain/models';
 
 export interface ImageProcessingJobData {
   mediaId: string;
@@ -122,7 +122,7 @@ export class ImageProcessor extends WorkerHost {
           isDownscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('DOWNSCALE')),
         },
         aspectRatio,
-        usageProfile,
+        usageProfile: usageProfile ? (usageProfile as UsageProfile) : undefined,
         processingStatus: 'READY',
       });
 

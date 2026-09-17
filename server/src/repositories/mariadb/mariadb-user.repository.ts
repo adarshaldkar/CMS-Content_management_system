@@ -27,6 +27,17 @@ export class MariaDbUserRepository implements IUserRepository {
       preferredTopics = [];
     }
 
+    let notificationPreferences: any = undefined;
+    try {
+      if (typeof row.notification_preferences === 'string') {
+        notificationPreferences = JSON.parse(row.notification_preferences);
+      } else if (row.notification_preferences) {
+        notificationPreferences = row.notification_preferences;
+      }
+    } catch {
+      notificationPreferences = undefined;
+    }
+
     return {
       id: row.id,
       email: row.email,
@@ -37,6 +48,12 @@ export class MariaDbUserRepository implements IUserRepository {
       preferredTopics,
       role: (row.role as UserRole) || UserRole.AUTHOR,
       isActive: Boolean(row.is_active),
+      isEmailVerified: Boolean(row.is_email_verified),
+      emailVerificationToken: row.email_verification_token || undefined,
+      emailVerificationExpiresAt: row.email_verification_expires_at ? new Date(row.email_verification_expires_at) : null,
+      acceptedTermsVersion: row.accepted_terms_version || undefined,
+      acceptedTermsAt: row.accepted_terms_at ? new Date(row.accepted_terms_at) : null,
+      notificationPreferences,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
@@ -192,6 +209,16 @@ export class MariaDbUserRepository implements IUserRepository {
     await this.mariadb.ensureSchema();
     const [rows] = await this.mariadb.pool.query(
       'SELECT * FROM cms_users WHERE password_reset_token = ? AND password_reset_expires_at > NOW() AND deleted_at IS NULL LIMIT 1',
+      [tokenHash],
+    ) as any;
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    return row ? this.mapRowToUser(row) : null;
+  }
+
+  async findByEmailVerificationToken(tokenHash: string): Promise<import('../../domain/models').User | null> {
+    await this.mariadb.ensureSchema();
+    const [rows] = await this.mariadb.pool.query(
+      'SELECT * FROM cms_users WHERE email_verification_token = ? AND email_verification_expires_at > NOW() AND deleted_at IS NULL LIMIT 1',
       [tokenHash],
     ) as any;
     const row = Array.isArray(rows) ? rows[0] : rows;

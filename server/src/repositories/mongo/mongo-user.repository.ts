@@ -31,6 +31,14 @@ export class MongoUserRepository implements IUserRepository {
       preferredTopics: (doc as any).preferredTopics || [],
       role: doc.role,
       isActive: doc.isActive,
+      isEmailVerified: (doc as any).isEmailVerified ?? false,
+      emailVerificationToken: (doc as any).emailVerificationToken,
+      emailVerificationExpiresAt: (doc as any).emailVerificationExpiresAt,
+      acceptedTermsVersion: (doc as any).acceptedTermsVersion,
+      acceptedTermsAt: (doc as any).acceptedTermsAt,
+      notificationPreferences: (doc as any).notificationPreferences || undefined,
+      passwordResetToken: (doc as any).passwordResetToken,
+      passwordResetExpiresAt: (doc as any).passwordResetExpiresAt,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
       deletedAt: doc.deletedAt,
@@ -94,6 +102,10 @@ export class MongoUserRepository implements IUserRepository {
       preferredTopics: data.preferredTopics ?? [],
       role: data.role ?? UserRole.USER,
       isActive: data.isActive ?? true,
+      isEmailVerified: data.isEmailVerified ?? false,
+      acceptedTermsVersion: data.acceptedTermsVersion ?? null,
+      acceptedTermsAt: data.acceptedTermsAt ?? null,
+      notificationPreferences: data.notificationPreferences ?? null,
     });
     return this.toDomain(doc);
   }
@@ -138,6 +150,17 @@ export class MongoUserRepository implements IUserRepository {
       .findOne({
         passwordResetToken: tokenHash,
         passwordResetExpiresAt: { $gt: new Date() },
+        deletedAt: null,
+      })
+      .exec();
+    return doc ? this.toDomain(doc) : null;
+  }
+
+  async findByEmailVerificationToken(tokenHash: string): Promise<User | null> {
+    const doc = await this.userModel
+      .findOne({
+        emailVerificationToken: tokenHash,
+        emailVerificationExpiresAt: { $gt: new Date() },
         deletedAt: null,
       })
       .exec();

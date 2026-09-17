@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Req,
@@ -20,10 +22,14 @@ import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
+  GoogleAuthDto,
   LoginDto,
+  ReauthenticateDto,
   RegisterDto,
+  ResendVerificationDto,
   ResetPasswordDto,
   UpdateProfileDto,
+  VerifyEmailDto,
 } from './dto/auth.dto';
 import { CurrentUser, Public } from '../../common/decorators/security.decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -68,7 +74,7 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ user: AuthUser }> {
+  ): Promise<{ user: AuthUser; accessToken: string }> {
     const meta = {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
@@ -83,7 +89,7 @@ export class AuthController {
       this.isCookieSecure(),
     );
 
-    return { user: result.user };
+    return { user: result.user, accessToken: result.accessToken };
   }
 
   @Public()
@@ -95,7 +101,7 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ user: AuthUser }> {
+  ): Promise<{ user: AuthUser; accessToken: string }> {
     const meta = {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
@@ -109,6 +115,32 @@ export class AuthController {
       this.isProduction(),
       this.isCookieSecure(),
       Boolean(dto.rememberMe),
+    );
+
+    return { user: result.user, accessToken: result.accessToken };
+  }
+
+  @Public()
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log in with Google OAuth credentials' })
+  async googleLogin(
+    @Body() dto: GoogleAuthDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ user: AuthUser }> {
+    const meta = {
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    };
+
+    const result = await this.authService.googleAuth(dto, meta);
+    setAuthCookies(
+      res,
+      result.accessToken,
+      result.refreshToken,
+      this.isProduction(),
+      this.isCookieSecure(),
     );
 
     return { user: result.user };
@@ -185,6 +217,68 @@ export class AuthController {
     clearAuthCookies(res, this.isProduction(), this.isCookieSecure());
 
     return { success: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  @ApiOperation({ summary: 'Get list of all active device sessions for current user' })
+  async getSessions(@CurrentUser() user: AuthUser): Promise<any[]> {
+    return this.authService.getUserSessions(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions/:sessionId')
+  @ApiOperation({ summary: 'Revoke a specific active device session remotely' })
+  async revokeSession(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ success: boolean; revoked: boolean }> {
+    return this.authService.revokeSession(sessionId, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('reauthenticate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'High-assurance password re-authentication for sensitive actions' })
+  async reauthenticate(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ReauthenticateDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.reauthenticate(
+      user.id,
+      dto.password,
+      dto.cfTurnstileToken || dto.turnstileToken,
+      req.ip,
+    );
+  }
+
+  @Public()
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend email verification link' })
+  async resendVerification(
+    @Body() dto: ResendVerificationDto,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    if (user?.id) {
+      return this.authService.sendEmailVerification(user.id);
+    }
+    if (dto?.email) {
+      const targetUser = await this.authService.findByEmail(dto.email);
+      if (targetUser) {
+        return this.authService.sendEmailVerification(targetUser.id);
+      }
+    }
+    return { message: 'If the account exists, a verification link has been dispatched.' };
+  }
+
+  @Public()
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email address with verification token' })
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
   }
 
   @UseGuards(JwtAuthGuard)

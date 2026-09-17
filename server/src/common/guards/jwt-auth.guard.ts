@@ -40,7 +40,12 @@ export class JwtAuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request>();
     const cookies = request.cookies || {};
-    const token = cookies['__Host-access'] || cookies['access_token'];
+    const authHeader = request.headers['authorization'] || (request.headers as any)['Authorization'];
+    const bearerToken =
+      authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7).trim()
+        : null;
+    const token = cookies['__Host-access'] || cookies['access_token'] || bearerToken;
 
     if (!token) {
       throw new UnauthorizedException('Authentication required.');

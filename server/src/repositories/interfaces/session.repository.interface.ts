@@ -19,4 +19,6 @@ export interface ISessionRepository {
   ): Promise<RotationResult>;
   revokeFamily(familyId: string): Promise<number>;
   revokeAllUserSessions(userId: string): Promise<number>;
+  findUserSessions(userId: string): Promise<RefreshTokenSession[]>;
+  revokeSession(sessionId: string, userId: string): Promise<boolean>;
 }

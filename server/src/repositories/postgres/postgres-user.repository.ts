@@ -64,11 +64,18 @@ export class PostgresUserRepository implements IUserRepository {
         ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS preferred_topics text[] DEFAULT '{}';
         ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS password_reset_token text;
         ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS password_reset_expires_at timestamptz;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS is_email_verified boolean DEFAULT false;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS email_verification_token text;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS email_verification_expires_at timestamptz;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS accepted_terms_version text;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS accepted_terms_at timestamptz;
+        ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS notification_preferences jsonb;
 
         CREATE INDEX IF NOT EXISTS idx_cms_users_role ON cms_users(role);
         CREATE INDEX IF NOT EXISTS idx_cms_users_is_active ON cms_users(is_active);
         CREATE INDEX IF NOT EXISTS idx_cms_users_created_at ON cms_users(created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_cms_users_reset_token ON cms_users(password_reset_token) WHERE password_reset_token IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_cms_users_verify_token ON cms_users(email_verification_token) WHERE email_verification_token IS NOT NULL;
       `,
       )
       .then(() => undefined);
@@ -76,7 +83,7 @@ export class PostgresUserRepository implements IUserRepository {
     await this.ready;
   }
 
-  private toDomain(row: UserRow): User {
+  private toDomain(row: any): User {
     return {
       id: row.id,
       email: row.email,
@@ -87,6 +94,12 @@ export class PostgresUserRepository implements IUserRepository {
       preferredTopics: row.preferred_topics || [],
       role: row.role as UserRole,
       isActive: row.is_active,
+      isEmailVerified: row.is_email_verified ?? false,
+      emailVerificationToken: row.email_verification_token,
+      emailVerificationExpiresAt: row.email_verification_expires_at,
+      acceptedTermsVersion: row.accepted_terms_version,
+      acceptedTermsAt: row.accepted_terms_at,
+      notificationPreferences: row.notification_preferences || undefined,
       passwordResetToken: row.password_reset_token,
       passwordResetExpiresAt: row.password_reset_expires_at,
       createdAt: row.created_at,
@@ -161,8 +174,12 @@ export class PostgresUserRepository implements IUserRepository {
   async create(data: CreateUserDto): Promise<User> {
     await this.ensureSchema();
     const result = await this.postgres.pool.query<UserRow>(
-      `INSERT INTO cms_users (email, name, password_hash, bio, avatar_url, preferred_topics, role, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO cms_users (
+         email, name, password_hash, bio, avatar_url, preferred_topics, role, is_active,
+         is_email_verified, email_verification_token, email_verification_expires_at,
+         accepted_terms_version, accepted_terms_at, notification_preferences
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         data.email.toLowerCase(),
@@ -173,6 +190,12 @@ export class PostgresUserRepository implements IUserRepository {
         data.preferredTopics ?? [],
         data.role ?? UserRole.USER,
         data.isActive ?? true,
+        data.isEmailVerified ?? false,
+        data.emailVerificationToken ?? null,
+        data.emailVerificationExpiresAt ?? null,
+        data.acceptedTermsVersion ?? null,
+        data.acceptedTermsAt ?? null,
+        data.notificationPreferences ? JSON.stringify(data.notificationPreferences) : null,
       ],
     );
     return this.toDomain(result.rows[0]);
@@ -191,16 +214,26 @@ export class PostgresUserRepository implements IUserRepository {
       preferredTopics: 'preferred_topics',
       role: 'role',
       isActive: 'is_active',
+      isEmailVerified: 'is_email_verified',
+      emailVerificationToken: 'email_verification_token',
+      emailVerificationExpiresAt: 'email_verification_expires_at',
+      acceptedTermsVersion: 'accepted_terms_version',
+      acceptedTermsAt: 'accepted_terms_at',
+      notificationPreferences: 'notification_preferences',
+      passwordResetToken: 'password_reset_token',
+      passwordResetExpiresAt: 'password_reset_expires_at',
     };
 
     for (const [field, column] of Object.entries(columnByField) as Array<
       [keyof UpdateUserDto, string]
     >) {
       if (data[field] !== undefined) {
-        const value =
-          field === 'email' && data.email
-            ? data.email.toLowerCase()
-            : data[field];
+        let value: any = data[field];
+        if (field === 'email' && data.email) {
+          value = data.email.toLowerCase();
+        } else if (field === 'notificationPreferences' && data.notificationPreferences) {
+          value = JSON.stringify(data.notificationPreferences);
+        }
         values.push(value);
         updates.push(`${column} = $${values.length}`);
       }
@@ -244,6 +277,18 @@ export class PostgresUserRepository implements IUserRepository {
       `SELECT * FROM cms_users
        WHERE password_reset_token = $1
          AND password_reset_expires_at > now()
+         AND deleted_at IS NULL`,
+      [tokenHash],
+    );
+    return result.rows[0] ? this.toDomain(result.rows[0]) : null;
+  }
+
+  async findByEmailVerificationToken(tokenHash: string): Promise<User | null> {
+    await this.ensureSchema();
+    const result = await this.postgres.pool.query<UserRow>(
+      `SELECT * FROM cms_users
+       WHERE email_verification_token = $1
+         AND email_verification_expires_at > now()
          AND deleted_at IS NULL`,
       [tokenHash],
     );

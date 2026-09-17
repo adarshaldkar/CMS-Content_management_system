@@ -28,6 +28,22 @@ export class RegisterDto {
   @Matches(/[0-9]/, { message: 'Password must include at least one number.' })
   @Matches(/[^A-Za-z0-9]/, { message: 'Password must include at least one special character.' })
   password!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  agreeTerms?: boolean;
+
+  @IsOptional()
+  @IsString()
+  cfTurnstileToken?: string;
+
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string;
+
+  @IsOptional()
+  @IsString()
+  acceptedTermsVersion?: string;
 }
 
 export class LoginDto {
@@ -43,6 +59,18 @@ export class LoginDto {
   @IsOptional()
   @IsBoolean()
   rememberMe?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  agreeTerms?: boolean;
+
+  @IsOptional()
+  @IsString()
+  cfTurnstileToken?: string;
+
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string;
 }
 
 export class UpdateProfileDto {
@@ -89,6 +117,14 @@ export class ForgotPasswordDto {
   @IsEmail({}, { message: 'A valid email address is required.' })
   @MaxLength(254)
   email!: string;
+
+  @IsOptional()
+  @IsString()
+  cfTurnstileToken?: string;
+
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string;
 }
 
 export class ResetPasswordDto {
@@ -104,4 +140,48 @@ export class ResetPasswordDto {
   @Matches(/[0-9]/, { message: 'Password must include at least one number.' })
   @Matches(/[^A-Za-z0-9]/, { message: 'Password must include at least one special character.' })
   newPassword!: string;
+}
+
+export class VerifyEmailDto {
+  @IsString()
+  @MinLength(1, { message: 'Verification token is required.' })
+  token!: string;
+}
+
+export class ResendVerificationDto {
+  @IsOptional()
+  @IsEmail({}, { message: 'A valid email address is required.' })
+  email?: string;
+}
+
+export class ReauthenticateDto {
+  @IsString()
+  @MinLength(1, { message: 'Password is required.' })
+  password!: string;
+
+  @IsOptional()
+  @IsString()
+  cfTurnstileToken?: string;
+
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string;
+}
+
+export class GoogleAuthDto {
+  @IsString()
+  @MinLength(1, { message: 'Google ID token is required.' })
+  idToken!: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  agreeTerms?: boolean;
 }

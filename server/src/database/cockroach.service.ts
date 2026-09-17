@@ -37,9 +37,28 @@ export class CockroachDbService implements OnModuleDestroy {
               avatar_url text,
               bio text,
               preferred_topics jsonb,
+              is_email_verified boolean NOT NULL DEFAULT false,
+              email_verification_token text,
+              email_verification_expires_at timestamptz,
+              accepted_terms_version text,
+              accepted_terms_at timestamptz,
+              notification_preferences jsonb,
+              password_reset_token text,
+              password_reset_expires_at timestamptz,
               created_at timestamptz NOT NULL DEFAULT now(),
-              updated_at timestamptz NOT NULL DEFAULT now()
+              updated_at timestamptz NOT NULL DEFAULT now(),
+              deleted_at timestamptz
             );
+
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS is_email_verified boolean NOT NULL DEFAULT false;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS email_verification_token text;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS email_verification_expires_at timestamptz;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS accepted_terms_version text;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS accepted_terms_at timestamptz;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS notification_preferences jsonb;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS password_reset_token text;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS password_reset_expires_at timestamptz;
+            ALTER TABLE cms_users ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
             CREATE TABLE IF NOT EXISTS categories (
               id text PRIMARY KEY,

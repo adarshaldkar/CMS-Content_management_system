@@ -34,6 +34,24 @@ export class UserSchemaClass {
   @Prop({ default: true })
   isActive!: boolean;
 
+  @Prop({ default: false })
+  isEmailVerified?: boolean;
+
+  @Prop({ type: String, default: null })
+  emailVerificationToken?: string | null;
+
+  @Prop({ type: Date, default: null })
+  emailVerificationExpiresAt?: Date | null;
+
+  @Prop({ type: String, default: null })
+  acceptedTermsVersion?: string | null;
+
+  @Prop({ type: Date, default: null })
+  acceptedTermsAt?: Date | null;
+
+  @Prop({ type: Object, default: null })
+  notificationPreferences?: any;
+
   @Prop({ type: Date, default: null })
   deletedAt!: Date | null;
 

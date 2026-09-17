@@ -22,6 +22,8 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { EmbedsModule } from './modules/embeds/embeds.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { LegalModule } from './modules/legal/legal.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { DocumentsModule } from './modules/documents/documents.module';
     NewsletterModule,
     EmbedsModule,
     DocumentsModule,
+    LegalModule,
+    PrivacyModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

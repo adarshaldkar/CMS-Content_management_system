@@ -133,6 +133,10 @@ export class ClickHouseUserRepository implements IUserRepository {
     return null; // ClickHouse does not store password reset tokens
   }
 
+  async findByEmailVerificationToken(_tokenHash: string): Promise<import('../../domain/models').User | null> {
+    return null; // ClickHouse does not store email verification tokens
+  }
+
   async clearPasswordResetToken(_userId: string): Promise<void> {
     // No-op: ClickHouse is OLAP-only
   }
