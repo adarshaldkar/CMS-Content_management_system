@@ -315,7 +315,7 @@ export class WorkflowService {
     if (this.publishingQueue) {
       if (finalTargetStatus === ContentStatus.SCHEDULED && updatePayload.scheduledAt) {
         const delayMs = Math.max(0, new Date(updatePayload.scheduledAt).getTime() - Date.now());
-        const jobId = `job:publish:${updated.id}:${updated.version}`;
+        const jobId = `job_publish_${updated.id}_${updated.version}`;
         try {
           await this.publishingQueue.add(
             JOB_NAMES.PUBLISH_SCHEDULED_ARTICLE,

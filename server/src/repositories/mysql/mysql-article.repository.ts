@@ -43,6 +43,8 @@ export class MySqlArticleRepository implements IArticleRepository {
       reviewNote: row.review_note || null,
       scheduledAt: row.scheduled_at ? new Date(row.scheduled_at) : null,
       publishedAt: row.published_at ? new Date(row.published_at) : null,
+      publishingSlotId: row.publishing_slot_id || null,
+      autoDispatched: Boolean(row.auto_dispatched),
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
       deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
@@ -122,8 +124,8 @@ export class MySqlArticleRepository implements IArticleRepository {
     const status = data.status || 'draft';
 
     await this.mysql.pool.query(
-      `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids, published_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids, scheduled_at, published_at, publishing_slot_id, auto_dispatched)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.title,
@@ -140,7 +142,10 @@ export class MySqlArticleRepository implements IArticleRepository {
         data.seoDescription || null,
         data.reviewNote || null,
         JSON.stringify(data.tagIds || []),
+        data.scheduledAt ? new Date(data.scheduledAt) : null,
         status === 'published' ? new Date() : null,
+        data.publishingSlotId || null,
+        data.autoDispatched ? 1 : 0,
       ],
     );
 
@@ -199,6 +204,22 @@ export class MySqlArticleRepository implements IArticleRepository {
     if (data.reviewNote !== undefined) {
       updates.push('review_note = ?');
       params.push(data.reviewNote);
+    }
+    if (data.scheduledAt !== undefined) {
+      updates.push('scheduled_at = ?');
+      params.push(data.scheduledAt ? new Date(data.scheduledAt) : null);
+    }
+    if (data.publishedAt !== undefined) {
+      updates.push('published_at = ?');
+      params.push(data.publishedAt ? new Date(data.publishedAt) : null);
+    }
+    if (data.publishingSlotId !== undefined) {
+      updates.push('publishing_slot_id = ?');
+      params.push(data.publishingSlotId);
+    }
+    if (data.autoDispatched !== undefined) {
+      updates.push('auto_dispatched = ?');
+      params.push(data.autoDispatched ? 1 : 0);
     }
 
     if (updates.length > 0) {

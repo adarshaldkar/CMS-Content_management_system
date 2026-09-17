@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -5,7 +6,7 @@ export type PublishingSlotDocument = HydratedDocument<PublishingSlotSchemaClass>
 
 @Schema({ collection: 'publishing_slots', timestamps: true })
 export class PublishingSlotSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true })
@@ -41,7 +42,7 @@ export const PublishingSlotSchema =
 
 @Schema({ collection: 'author_slot_assignments', timestamps: true })
 export class AuthorSlotAssignmentSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true, unique: true })

@@ -98,10 +98,10 @@ export class PostgresCommentRepository implements ICommentRepository {
       params.push(filters.authorId);
     }
     if (filters.status) {
-      conditions.push(`status = $${i++}`);
+      conditions.push(`LOWER(status) = LOWER($${i++})`);
       params.push(filters.status);
     } else {
-      conditions.push(`status = 'visible'`);
+      conditions.push(`LOWER(status) = 'visible'`);
     }
 
     const page = filters.page || 1;

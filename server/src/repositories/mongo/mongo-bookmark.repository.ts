@@ -33,8 +33,35 @@ export class MongoBookmarkRepository implements IBookmarkRepository {
       this.bookmarkModel.countDocuments({ userId }).exec(),
     ]);
 
+    const articleIds = docs.map((d) => d.articleId);
+    const articles = articleIds.length > 0 ? await this.bookmarkModel.db
+      .collection('articles')
+      .find({ $or: [{ _id: { $in: articleIds as any } }, { slug: { $in: articleIds } }] } as any)
+      .toArray() : [];
+
+    const articleMap = new Map(articles.map((a: any) => [a._id?.toString() || a.id, a]));
+
+    const items = docs.map((doc) => {
+      const b = this.toDomain(doc);
+      const art = articleMap.get(b.articleId);
+      if (art) {
+        b.article = {
+          id: art.id || art._id?.toString(),
+          title: art.title,
+          slug: art.slug,
+          description: art.description || null,
+          coverImage: art.coverImage || null,
+          readingTimeMinutes: art.readingTimeMinutes || 1,
+          category: art.category || null,
+          authorName: art.authorName || null,
+          createdAt: art.createdAt,
+        };
+      }
+      return b;
+    });
+
     return {
-      items: docs.map((doc) => this.toDomain(doc)),
+      items,
       total,
       page,
       limit,

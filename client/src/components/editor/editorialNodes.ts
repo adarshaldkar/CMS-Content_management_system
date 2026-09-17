@@ -100,6 +100,111 @@ export const editorialNodes = {
   },
 
   /**
+   * Generates HTML for an Editorial Fact Box / Key Takeaways Block
+   */
+  createFactBox(title?: string, items?: string[]): string {
+    const cleanTitle = title?.trim() || 'Key Facts & Findings';
+    const factItems = (items && items.length > 0 ? items : [
+      'Verified finding based on primary investigative records.',
+      'Data independently audited across all six persistence nodes.',
+      'Key metric represents a 45% increase compared to previous quarter.'
+    ]).map((it) => `<li>${it.trim()}</li>`).join('\n    ');
+
+    return `<aside class="cms-fact-box" data-node="factBox">
+  <header class="cms-fact-box-header">
+    <span class="cms-fact-box-icon">📊</span>
+    <strong>${cleanTitle}</strong>
+  </header>
+  <ul class="cms-fact-box-list">
+    ${factItems}
+  </ul>
+</aside>`;
+  },
+
+  /**
+   * Generates HTML for an Urgent Warning / Editorial Advisory Banner
+   */
+  createWarning(title?: string, message?: string): string {
+    const cleanTitle = title?.trim() || 'Urgent Editorial Notice';
+    const cleanMsg = message?.trim() || 'This reporting pertains to rapidly developing breaking events. Details will be updated as corroborated by the desk.';
+
+    return `<div class="cms-warning-banner" data-node="warning">
+  <div class="cms-warning-header">
+    <span class="cms-warning-icon">⚠️</span>
+    <strong>${cleanTitle}</strong>
+  </div>
+  <p class="cms-warning-text">${cleanMsg}</p>
+</div>`;
+  },
+
+  /**
+   * Generates HTML for a Chronological Milestone Timeline
+   */
+  createTimeline(title?: string, events?: Array<{ time: string; desc: string }>): string {
+    const cleanTitle = title?.trim() || 'Chronological Timeline';
+    const timelineEvents = (events && events.length > 0 ? events : [
+      { time: '08:00 AM', desc: 'Initial investigation report received by editorial board.' },
+      { time: '11:30 AM', desc: 'Corroborating records confirmed through public data registry.' },
+      { time: '02:15 PM', desc: 'Official statement delivered and integrated into the manuscript.' }
+    ]).map((ev) => `  <div class="cms-timeline-item">
+    <span class="cms-timeline-badge">${ev.time}</span>
+    <div class="cms-timeline-body"><p>${ev.desc}</p></div>
+  </div>`).join('\n');
+
+    return `<div class="cms-timeline-block" data-node="timeline">
+  <header class="cms-timeline-header">
+    <span class="cms-timeline-icon">⏱️</span>
+    <strong>${cleanTitle}</strong>
+  </header>
+  <div class="cms-timeline-items">
+${timelineEvents}
+  </div>
+</div>`;
+  },
+
+  /**
+   * Generates HTML for a Curated Related Stories Block
+   */
+  createRelatedStories(title?: string, stories?: Array<{ title: string; category: string; url: string; author: string }>): string {
+    const cleanTitle = title?.trim() || 'Related Coverage & In-Depth Dispatches';
+    const storyCards = (stories && stories.length > 0 ? stories : [
+      { title: 'The Architecture of Modern Editorial Systems', category: 'INVESTIGATION', url: '#', author: 'Editorial Board' },
+      { title: 'Distributed Persistence & Zero-Data Loss Workflows', category: 'TECHNOLOGY', url: '#', author: 'Systems Desk' }
+    ]).map((st) => `    <div class="cms-related-card">
+      <span class="cms-related-badge">${st.category}</span>
+      <h4 class="cms-related-title"><a href="${st.url}">${st.title}</a></h4>
+      <span class="cms-related-byline">By ${st.author}</span>
+    </div>`).join('\n');
+
+    return `<aside class="cms-related-stories-block" data-node="relatedStories">
+  <header class="cms-related-header">
+    <span class="cms-related-icon">📰</span>
+    <strong>${cleanTitle}</strong>
+  </header>
+  <div class="cms-related-grid">
+${storyCards}
+  </div>
+</aside>`;
+  },
+
+  /**
+   * Generates HTML for an Inline Source Citation Block
+   */
+  createCitation(quote: string, source: string, url?: string): string {
+    const cleanQuote = quote.trim() || 'Primary source statement corroborated by independent records.';
+    const cleanSource = source.trim() || 'Official Gazette Investigative Archive';
+    const linkHtml = url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${cleanSource}</a>` : cleanSource;
+
+    return `<div class="cms-citation-block" data-node="citation">
+  <span class="cms-citation-icon">📌</span>
+  <div class="cms-citation-content">
+    <span class="cms-citation-quote">“${cleanQuote}”</span>
+    <span class="cms-citation-source">— Source: ${linkHtml}</span>
+  </div>
+</div>`;
+  },
+
+  /**
    * Generates HTML for an Editorial Section Divider
    */
   createDivider(style: DividerStyle = 'asterism'): string {

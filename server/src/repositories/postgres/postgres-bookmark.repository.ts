@@ -9,6 +9,14 @@ interface BookmarkRow extends QueryResultRow {
   user_id: string;
   article_id: string;
   created_at: Date;
+  article_title?: string;
+  article_slug?: string;
+  article_description?: string;
+  article_cover_image?: string;
+  article_reading_time_minutes?: number;
+  article_category?: string;
+  article_author_name?: string;
+  article_created_at?: Date;
 }
 
 @Injectable()
@@ -41,6 +49,17 @@ export class PostgresBookmarkRepository implements IBookmarkRepository {
       userId: row.user_id,
       articleId: row.article_id,
       createdAt: row.created_at,
+      article: row.article_title ? {
+        id: row.article_id,
+        title: row.article_title,
+        slug: row.article_slug || '',
+        description: row.article_description || null,
+        coverImage: row.article_cover_image || null,
+        readingTimeMinutes: row.article_reading_time_minutes || 1,
+        category: row.article_category || null,
+        authorName: row.article_author_name || null,
+        createdAt: row.article_created_at,
+      } : undefined,
     };
   }
 
@@ -49,7 +68,14 @@ export class PostgresBookmarkRepository implements IBookmarkRepository {
     const offset = (page - 1) * limit;
     const [{ rows }, { rows: countRows }] = await Promise.all([
       this.postgres.pool.query<BookmarkRow>(
-        `SELECT * FROM bookmarks WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+        `SELECT b.id, b.user_id, b.article_id, b.created_at,
+                a.title as article_title, a.slug as article_slug, a.description as article_description,
+                a.cover_image as article_cover_image, a.reading_time_minutes as article_reading_time_minutes,
+                a.category_id as article_category, a.author_id as article_author_name, a.created_at as article_created_at
+         FROM bookmarks b
+         LEFT JOIN articles a ON b.article_id = a.id::text
+         WHERE b.user_id = $1
+         ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
         [userId, limit, offset],
       ),
       this.postgres.pool.query<{ total: string }>(

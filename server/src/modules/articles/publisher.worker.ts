@@ -296,7 +296,7 @@ export class PublisherWorker extends WorkerHost implements OnModuleInit {
         } else if (this.publishingQueue) {
           // Future schedule: ensure delayed BullMQ job exists
           const delayMs = Math.max(0, scheduledTime.getTime() - now.getTime());
-          const jobId = `job:publish:${article.id}:${article.version}`;
+          const jobId = `job_publish_${article.id}_${article.version}`;
           await this.publishingQueue.add(
             JOB_NAMES.PUBLISH_SCHEDULED_ARTICLE,
             {

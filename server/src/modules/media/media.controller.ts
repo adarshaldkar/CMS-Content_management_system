@@ -106,6 +106,13 @@ export class MediaController {
     }
   }
 
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
+  @ApiOperation({ summary: 'Get details and processing status of a single media asset' })
+  async getOne(@Param('id') id: string): Promise<Media> {
+    return this.mediaService.getMedia(id);
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
   @ApiOperation({ summary: 'List uploaded media assets' })

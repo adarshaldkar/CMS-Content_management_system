@@ -410,10 +410,78 @@ export class SeamlessPublishingSlotRepository
   }
 
   async getQueuedArticlesCount(slotId: string): Promise<number> {
+    const engine = activeEngine();
+    if (engine === 'mariadb' && this.mariadb) {
+      const [rows] = (await this.mariadb.pool.query(
+        'SELECT COUNT(*) as total FROM articles WHERE publishing_slot_id = ? AND status = ?',
+        [slotId, 'scheduled'],
+      )) as any;
+      return Number(rows?.[0]?.total ?? 0);
+    }
+    if (engine === 'mysql' && this.mysql) {
+      const [rows] = (await this.mysql.pool.query(
+        'SELECT COUNT(*) as total FROM articles WHERE publishing_slot_id = ? AND status = ?',
+        [slotId, 'scheduled'],
+      )) as any;
+      return Number(rows?.[0]?.total ?? 0);
+    }
+    if (engine === 'cockroach' && this.cockroach) {
+      const { rows } = await this.cockroach.pool.query(
+        'SELECT COUNT(*) as total FROM articles WHERE publishing_slot_id = $1 AND status = $2',
+        [slotId, 'scheduled'],
+      );
+      return Number(rows?.[0]?.total ?? 0);
+    }
     return this.activeRepo.getQueuedArticlesCount(slotId);
   }
 
   async getUpcomingScheduledArticles(limit = 10): Promise<any[]> {
+    const engine = activeEngine();
+    if (engine === 'mariadb' && this.mariadb) {
+      const [rows] = (await this.mariadb.pool.query(
+        `SELECT a.id, a.title, a.slug, a.status, a.scheduled_at as scheduledAt, a.cover_image as coverImage, a.author_id as authorId,
+                u.name as authorName, u.avatar_url as authorAvatar,
+                s.name as slotName, s.dispatch_time as slotDispatchTime
+         FROM articles a
+         LEFT JOIN cms_users u ON u.id = a.author_id
+         LEFT JOIN cms_publishing_slots s ON s.id = a.publishing_slot_id
+         WHERE a.status = 'scheduled'
+         ORDER BY a.scheduled_at ASC
+         LIMIT ?`,
+        [limit],
+      )) as any;
+      return rows || [];
+    }
+    if (engine === 'mysql' && this.mysql) {
+      const [rows] = (await this.mysql.pool.query(
+        `SELECT a.id, a.title, a.slug, a.status, a.scheduled_at as scheduledAt, a.cover_image as coverImage, a.author_id as authorId,
+                u.name as authorName, u.avatar_url as authorAvatar,
+                s.name as slotName, s.dispatch_time as slotDispatchTime
+         FROM articles a
+         LEFT JOIN cms_users u ON u.id = a.author_id
+         LEFT JOIN cms_publishing_slots s ON s.id = a.publishing_slot_id
+         WHERE a.status = 'scheduled'
+         ORDER BY a.scheduled_at ASC
+         LIMIT ?`,
+        [limit],
+      )) as any;
+      return rows || [];
+    }
+    if (engine === 'cockroach' && this.cockroach) {
+      const { rows } = await this.cockroach.pool.query(
+        `SELECT a.id, a.title, a.slug, a.status, a.scheduled_at as "scheduledAt", a.cover_image as "coverImage", a.author_id as "authorId",
+                u.name as "authorName", u.avatar_url as "authorAvatar",
+                s.name as "slotName", s.dispatch_time as "slotDispatchTime"
+         FROM articles a
+         LEFT JOIN cms_users u ON u.id = a.author_id
+         LEFT JOIN cms_publishing_slots s ON s.id = a.publishing_slot_id
+         WHERE a.status = 'scheduled'
+         ORDER BY a.scheduled_at ASC NULLS LAST
+         LIMIT $1`,
+        [limit],
+      );
+      return rows || [];
+    }
     return this.activeRepo.getUpcomingScheduledArticles(limit);
   }
 }

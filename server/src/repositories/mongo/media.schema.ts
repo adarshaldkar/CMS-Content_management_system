@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -5,7 +6,7 @@ export type MediaDocument = HydratedDocument<MediaSchemaClass>;
 
 @Schema({ collection: 'media', timestamps: { createdAt: true, updatedAt: false } })
 export class MediaSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true })
@@ -31,6 +32,21 @@ export class MediaSchemaClass {
 
   @Prop({ type: Object, default: null })
   optimization?: any;
+
+  @Prop({ type: String, default: 'READY' })
+  processingStatus?: string;
+
+  @Prop({ type: Number })
+  aspectRatio?: number;
+
+  @Prop({ type: String })
+  usageProfile?: string;
+
+  @Prop({ type: String })
+  storageKey?: string;
+
+  @Prop({ type: String })
+  cdnUrl?: string;
 
   createdAt!: Date;
 }

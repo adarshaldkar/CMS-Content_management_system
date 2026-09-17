@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -5,7 +6,7 @@ export type CommentDocument = HydratedDocument<CommentSchemaClass>;
 
 @Schema({ collection: 'comments', timestamps: true })
 export class CommentSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true, index: true })

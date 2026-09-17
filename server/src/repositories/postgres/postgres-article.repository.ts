@@ -136,6 +136,8 @@ export class PostgresArticleRepository implements IArticleRepository {
       reviewNote: row.review_note,
       scheduledAt: row.scheduled_at,
       publishedAt: row.published_at,
+      publishingSlotId: (row as any).publishing_slot_id || null,
+      autoDispatched: Boolean((row as any).auto_dispatched),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       deletedAt: row.deleted_at,
@@ -452,6 +454,14 @@ export class PostgresArticleRepository implements IArticleRepository {
     if (data.publishedAt !== undefined) {
       values.push(data.publishedAt);
       fields.push(`published_at = $${values.length}`);
+    }
+    if (data.publishingSlotId !== undefined) {
+      values.push(data.publishingSlotId);
+      fields.push(`publishing_slot_id = $${values.length}`);
+    }
+    if (data.autoDispatched !== undefined) {
+      values.push(data.autoDispatched);
+      fields.push(`auto_dispatched = $${values.length}`);
     }
 
     values.push(id);

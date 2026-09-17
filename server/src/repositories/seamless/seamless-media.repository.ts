@@ -89,6 +89,13 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
           size: media.size,
           url: media.url,
           uploadedBy: media.uploadedBy,
+          processingStatus: media.processingStatus,
+          aspectRatio: media.aspectRatio,
+          usageProfile: media.usageProfile,
+          storageKey: media.storageKey,
+          cdnUrl: media.cdnUrl,
+          variants: media.variants,
+          optimization: media.optimization,
         })
         .catch((e) => this.logger.debug(`Peer media sync note: ${e.message}`));
     }
@@ -112,6 +119,13 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
           size: peerMedia.size,
           url: peerMedia.url,
           uploadedBy: peerMedia.uploadedBy,
+          processingStatus: peerMedia.processingStatus,
+          aspectRatio: peerMedia.aspectRatio,
+          usageProfile: peerMedia.usageProfile,
+          storageKey: peerMedia.storageKey,
+          cdnUrl: peerMedia.cdnUrl,
+          variants: peerMedia.variants,
+          optimization: peerMedia.optimization,
         });
       }
     } catch (err: any) {
@@ -123,6 +137,14 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
 
   async findMany(filters: MediaFilters): Promise<PaginatedResult<Media>> {
     return this.activeRepo.findMany(filters);
+  }
+
+  async update(id: string, updates: Partial<Media>): Promise<Media | null> {
+    const updated = await this.activeRepo.update(id, updates);
+    for (const store of this.peerStores) {
+      store.update(id, updates).catch(() => {});
+    }
+    return updated;
   }
 
   async delete(id: string): Promise<boolean> {

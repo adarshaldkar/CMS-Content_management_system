@@ -5,13 +5,23 @@ import { Bookmark, History, Trash2, X, ArrowRight, Clock } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { apiClient } from '../../api/client';
 import { ArticleCardSkeleton } from '../../components/common/SkeletonLoader';
-import type { Article, PaginatedResult } from '../../types';
 
 interface BookmarkItem {
   id: string;
   userId: string;
   articleId: string;
   createdAt: string;
+  article?: {
+    id: string;
+    title: string;
+    slug: string;
+    description?: string | null;
+    coverImage?: string | null;
+    readingTimeMinutes?: number;
+    category?: string | null;
+    authorName?: string | null;
+    createdAt?: string;
+  };
 }
 
 interface BookmarksResponse {
@@ -56,7 +66,7 @@ export const UserLibraryPage: React.FC = () => {
     setReadingHistory([]);
   };
 
-  // ── Real bookmarks from API ──────────────────────────────────────────────────
+  // ── Real populated bookmarks directly from API ──────────────────────────────
   const { data: bookmarksData, isLoading: isLoadingBookmarks } = useQuery({
     queryKey: ['myBookmarks', user?.id],
     queryFn: async () => {
@@ -68,34 +78,14 @@ export const UserLibraryPage: React.FC = () => {
     enabled: Boolean(user?.id) && activeTab === 'bookmarks',
   });
 
-  // ── Fetch article details for each bookmark ──────────────────────────────────
-  const bookmarkArticleIds = (bookmarksData?.items || []).map((b) => b.articleId);
-  const { data: articlesData } = useQuery({
-    queryKey: ['bookmarkArticles', bookmarkArticleIds.join(',')],
-    queryFn: async () => {
-      if (bookmarkArticleIds.length === 0) return { items: [] };
-      // Fetch all published articles and filter by bookmark IDs
-      const { data } = await apiClient.get<PaginatedResult<Article>>('/articles', {
-        params: { limit: 100, status: 'published' },
-      });
-      return data;
-    },
-    enabled: bookmarkArticleIds.length > 0,
-  });
-
   const removeBookmarkMutation = useMutation({
     mutationFn: async (articleId: string) => {
       await apiClient.delete(`/articles/${articleId}/bookmark`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myBookmarks'] });
-      queryClient.invalidateQueries({ queryKey: ['bookmarkArticles'] });
     },
   });
-
-  const bookmarkedArticles = (articlesData?.items || []).filter((a) =>
-    bookmarkArticleIds.includes(a.id),
-  );
 
   const bookmarks = bookmarksData?.items || [];
   const isLoading = isLoadingBookmarks;
@@ -168,8 +158,7 @@ export const UserLibraryPage: React.FC = () => {
           ) : (
             <div className="divide-y divide-border-subtle">
               {bookmarks.map((bookmark) => {
-                // Find corresponding article data
-                const article = bookmarkedArticles.find((a) => a.id === bookmark.articleId);
+                const article = bookmark.article;
                 const savedAt = new Date(bookmark.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -198,7 +187,7 @@ export const UserLibraryPage: React.FC = () => {
                             <span className="font-mono text-[10px] uppercase tracking-wider text-ink-secondary">
                               Article
                             </span>
-                            {article.readingTimeMinutes > 0 && (
+                            {Boolean(article.readingTimeMinutes && article.readingTimeMinutes > 0) && (
                               <>
                                 <span className="font-mono text-[10px] text-border-subtle">·</span>
                                 <span className="font-mono text-[10px] text-ink-secondary">

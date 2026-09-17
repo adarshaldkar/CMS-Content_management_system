@@ -31,6 +31,7 @@ export class MongoRevisionRepository implements IRevisionRepository {
 
   async create(data: CreateRevisionDto): Promise<ArticleRevision> {
     const created = await this.revisionModel.create({
+      _id: (data as any).id || (data as any)._id || undefined,
       articleId: data.articleId,
       version: data.version,
       title: data.title,

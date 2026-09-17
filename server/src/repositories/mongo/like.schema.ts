@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -5,7 +6,7 @@ export type LikeDocument = HydratedDocument<LikeSchemaClass>;
 
 @Schema({ collection: 'likes', timestamps: true })
 export class LikeSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true, index: true })

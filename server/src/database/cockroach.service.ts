@@ -70,10 +70,15 @@ export class CockroachDbService implements OnModuleDestroy {
               tag_ids jsonb,
               scheduled_at timestamptz,
               published_at timestamptz,
+              publishing_slot_id text,
+              auto_dispatched boolean NOT NULL DEFAULT false,
               created_at timestamptz NOT NULL DEFAULT now(),
               updated_at timestamptz NOT NULL DEFAULT now(),
               deleted_at timestamptz
             );
+
+            ALTER TABLE articles ADD COLUMN IF NOT EXISTS publishing_slot_id text;
+            ALTER TABLE articles ADD COLUMN IF NOT EXISTS auto_dispatched boolean NOT NULL DEFAULT false;
 
             CREATE TABLE IF NOT EXISTS article_revisions (
               id text PRIMARY KEY,

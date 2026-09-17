@@ -14,6 +14,17 @@ import {
   Minus,
   Film,
   Type,
+  BarChart2,
+  Clock,
+  Newspaper,
+  BookmarkCheck,
+  MessageSquareQuote,
+  Bookmark,
+  Code,
+  List,
+  ListOrdered,
+  Highlighter,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { EDITORIAL_COMMANDS, type EditorialCommand } from './commandRegistry';
 
@@ -40,6 +51,17 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Minus,
   Film,
   Type,
+  BarChart2,
+  Clock,
+  Newspaper,
+  BookmarkCheck,
+  MessageSquareQuote,
+  Bookmark,
+  Code,
+  List,
+  ListOrdered,
+  Highlighter,
+  LinkIcon,
 };
 
 export const SlashCommandPalette: React.FC<SlashCommandPaletteProps> = ({

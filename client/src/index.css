@@ -731,6 +731,223 @@ p.cms-drop-cap::first-letter,
   margin: 2rem 0 !important;
 }
 
+/* ─── Gazette Interactive Editorial Blocks ────────────────────────────── */
+/* 1. Fact Box & Analytical Key Takeaways */
+.cms-fact-box,
+.prose .cms-fact-box {
+  margin: 2rem 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+.cms-fact-box-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  padding-bottom: 0.6rem !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.cms-fact-box-list {
+  margin: 0 !important;
+  padding-left: 1.25rem !important;
+  font-size: 0.875rem !important;
+  line-height: 1.65 !important;
+  color: #334155 !important;
+}
+
+.cms-fact-box-list li {
+  margin-bottom: 0.4rem !important;
+}
+
+/* 2. Warning & Editorial Advisory Banner */
+.cms-warning-banner,
+.prose .cms-warning-banner {
+  margin: 2rem 0 !important;
+  padding: 1rem 1.25rem !important;
+  background: #fffbeb !important;
+  border: 1px solid #fef3c7 !important;
+  border-left: 4px solid #f59e0b !important;
+  border-radius: 6px !important;
+}
+
+.cms-warning-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  color: #92400e !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.cms-warning-text {
+  margin: 0 !important;
+  font-size: 0.85rem !important;
+  line-height: 1.55 !important;
+  color: #78350f !important;
+}
+
+/* 3. Chronological Timeline Block */
+.cms-timeline-block,
+.prose .cms-timeline-block {
+  margin: 2.5rem 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+
+.cms-timeline-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin-bottom: 1rem !important;
+}
+
+.cms-timeline-items {
+  position: relative !important;
+  padding-left: 1rem !important;
+  border-left: 2px solid #e2e8f0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important;
+}
+
+.cms-timeline-item {
+  position: relative !important;
+}
+
+.cms-timeline-badge {
+  display: inline-block !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  padding: 0.15rem 0.45rem !important;
+  border-radius: 4px !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.cms-timeline-body p {
+  margin: 0 !important;
+  font-size: 0.85rem !important;
+  color: #334155 !important;
+  line-height: 1.5 !important;
+}
+
+/* 4. Curated Related Stories Block */
+.cms-related-stories-block,
+.prose .cms-related-stories-block {
+  margin: 2.5rem 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+
+.cms-related-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin-bottom: 1rem !important;
+}
+
+.cms-related-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 1rem !important;
+}
+
+.cms-related-card {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 1rem !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  text-decoration: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.cms-related-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+  transform: translateY(-1px) !important;
+}
+
+.cms-related-badge {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  color: #8b0000 !important;
+  letter-spacing: 0.06em !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.cms-related-title {
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  line-height: 1.4 !important;
+  margin: 0 0 0.5rem 0 !important;
+}
+
+.cms-related-byline {
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+}
+
+/* 5. Statement Citation Block */
+.cms-citation-block,
+.prose .cms-citation-block {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.75rem !important;
+  margin: 1.5rem 0 !important;
+  padding: 0.85rem 1.15rem !important;
+  background: #f8fafc !important;
+  border-left: 3px solid #64748b !important;
+  border-radius: 4px !important;
+}
+
+.cms-citation-icon {
+  font-size: 1rem !important;
+}
+
+.cms-citation-content {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.25rem !important;
+}
+
+.cms-citation-quote {
+  font-style: italic !important;
+  font-size: 0.875rem !important;
+  color: #1e293b !important;
+}
+
+.cms-citation-source {
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  font-weight: 600 !important;
+}
+
 /* 8. Editorial Media Block Delete Handle in Editor Canvas */
 .manuscript-editor figure.cms-video-block,
 .manuscript-editor figure.cms-embed-block,

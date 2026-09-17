@@ -1,4 +1,6 @@
 export type ImageVariantKind = 'original' | 'hero' | 'article' | 'card' | 'thumbnail';
+export type ProcessingStatus = 'UPLOADED' | 'VALIDATING' | 'PROCESSING' | 'READY' | 'FAILED';
+export type UsageProfile = 'HERO' | 'ARTICLE' | 'CARD' | 'THUMBNAIL' | 'EDITORIAL' | 'AVATAR' | 'COVER';
 
 export interface ImageVariant {
   kind: ImageVariantKind;
@@ -31,17 +33,28 @@ export interface Media {
   url: string;
   uploadedBy: string;
   createdAt: Date;
+  processingStatus?: ProcessingStatus;
+  aspectRatio?: number;
+  usageProfile?: UsageProfile;
+  storageKey?: string;
+  cdnUrl?: string;
   variants?: ImageVariant[];
   optimization?: ImageOptimizationMeta;
 }
 
 export interface CreateMediaDto {
+  id?: string;
   filename: string;
   originalName: string;
   mimeType: string;
   size: number;
   url: string;
   uploadedBy: string;
+  processingStatus?: ProcessingStatus;
+  aspectRatio?: number;
+  usageProfile?: UsageProfile;
+  storageKey?: string;
+  cdnUrl?: string;
   variants?: ImageVariant[];
   optimization?: ImageOptimizationMeta;
 }

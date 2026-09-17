@@ -49,6 +49,11 @@ export class PostgresMediaRepository implements IMediaRepository {
 
         ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS variants jsonb DEFAULT '[]'::jsonb;
         ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS optimization jsonb;
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS processing_status text DEFAULT 'READY';
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS aspect_ratio numeric;
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS usage_profile text;
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS storage_key text;
+        ALTER TABLE cms_media ADD COLUMN IF NOT EXISTS cdn_url text;
 
         CREATE INDEX IF NOT EXISTS idx_media_uploaded_by ON cms_media(uploaded_by);
         CREATE INDEX IF NOT EXISTS idx_media_created_at ON cms_media(created_at DESC);
@@ -70,6 +75,11 @@ export class PostgresMediaRepository implements IMediaRepository {
       uploadedBy: row.uploaded_by,
       variants: row.variants || undefined,
       optimization: row.optimization || undefined,
+      processingStatus: row.processing_status || 'READY',
+      aspectRatio: row.aspect_ratio != null ? Number(row.aspect_ratio) : undefined,
+      usageProfile: row.usage_profile || undefined,
+      storageKey: row.storage_key || undefined,
+      cdnUrl: row.cdn_url || undefined,
       createdAt: row.created_at,
     };
   }
@@ -79,8 +89,9 @@ export class PostgresMediaRepository implements IMediaRepository {
     const result = await this.postgres.pool.query<MediaRow>(
       `
       INSERT INTO cms_media (
-        filename, original_name, mime_type, size, url, uploaded_by, variants, optimization
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        filename, original_name, mime_type, size, url, uploaded_by, variants, optimization,
+        processing_status, aspect_ratio, usage_profile, storage_key, cdn_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
       `,
       [
@@ -92,9 +103,61 @@ export class PostgresMediaRepository implements IMediaRepository {
         data.uploadedBy,
         JSON.stringify(data.variants || []),
         data.optimization ? JSON.stringify(data.optimization) : null,
+        data.processingStatus || 'READY',
+        data.aspectRatio ?? null,
+        data.usageProfile ?? null,
+        data.storageKey ?? null,
+        data.cdnUrl ?? null,
       ],
     );
     return this.toDomain(result.rows[0]);
+  }
+
+  async update(id: string, updates: Partial<Media>): Promise<Media | null> {
+    await this.ensureSchema();
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    const fieldMap: Record<string, string> = {
+      filename: 'filename',
+      originalName: 'original_name',
+      mimeType: 'mime_type',
+      size: 'size',
+      url: 'url',
+      uploadedBy: 'uploaded_by',
+      processingStatus: 'processing_status',
+      aspectRatio: 'aspect_ratio',
+      usageProfile: 'usage_profile',
+      storageKey: 'storage_key',
+      cdnUrl: 'cdn_url',
+    };
+
+    for (const [key, val] of Object.entries(updates)) {
+      if (val === undefined) continue;
+      if (key === 'variants') {
+        setClauses.push(`variants = $${idx++}`);
+        values.push(JSON.stringify(val));
+      } else if (key === 'optimization') {
+        setClauses.push(`optimization = $${idx++}`);
+        values.push(val ? JSON.stringify(val) : null);
+      } else if (fieldMap[key]) {
+        setClauses.push(`${fieldMap[key]} = $${idx++}`);
+        values.push(val);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return this.findById(id);
+    }
+
+    values.push(id);
+    const result = await this.postgres.pool.query<MediaRow>(
+      `UPDATE cms_media SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values,
+    );
+
+    return result.rows[0] ? this.toDomain(result.rows[0]) : null;
   }
 
   async findById(id: string): Promise<Media | null> {

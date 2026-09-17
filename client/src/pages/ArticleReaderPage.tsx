@@ -7,15 +7,20 @@ import {
   Check,
   Clock,
   Copy,
+  CornerDownRight,
+  Flag,
   Heart,
   Linkedin,
   Mail,
   MessageSquare,
+  Reply,
   Send,
   Share2,
+  Trash2,
   Twitter,
   UserPlus,
   UserCheck,
+  X,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
@@ -40,11 +45,13 @@ const DataJournalismCanvas = React.lazy(() =>
 interface CommentItem {
   id: string;
   articleId: string;
+  parentId?: string | null;
   authorId: string;
   authorName: string;
   authorAvatar?: string | null;
   body?: string;
   content?: string; // fallback
+  status?: string;
   createdAt: string;
 }
 
@@ -60,6 +67,8 @@ export const ArticleReaderPage: React.FC = () => {
   const [shareDropdownOpen, setShareDropdownOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   // Timed Paywall Lock State for Unauthenticated Guests
   const [isPaywallLocked, setIsPaywallLocked] = useState(false);
@@ -107,7 +116,7 @@ export const ArticleReaderPage: React.FC = () => {
           },
           ...filtered,
         ].slice(0, 50);
-        localStorage.setItem('gazette_reading_history_v1', JSON.stringify(updated));
+        localStorage.setItem('gazette_reading_history', JSON.stringify(updated));
       } catch {}
     }
   }, [article?.id, article?.title, article?.slug, article?.description, article?.categorySlug, article?.readingTimeMinutes]);
@@ -217,20 +226,36 @@ export const ArticleReaderPage: React.FC = () => {
     },
   });
 
-  // 7. Post Comment Mutation
+  // 7. Post Comment / Reply Mutation
   const postCommentMutation = useMutation({
-    mutationFn: async (bodyText: string) => {
+    mutationFn: async ({ bodyText, parentId }: { bodyText: string; parentId?: string | null }) => {
       const { data } = await apiClient.post<CommentItem>(`/articles/${article?.id}/comments`, {
         body: bodyText,
+        parentId: parentId || undefined,
       });
       return data;
     },
     onSuccess: (newComment) => {
       queryClient.setQueryData(['articleComments', article?.id], (old: CommentItem[] = []) => [
-        newComment,
         ...old,
+        newComment,
       ]);
       setCommentText('');
+      setReplyText('');
+      setReplyingToId(null);
+    },
+  });
+
+  // 8. Delete Comment Mutation
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      await apiClient.delete(`/comments/${commentId}`);
+      return commentId;
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData(['articleComments', article?.id], (old: CommentItem[] = []) =>
+        old.filter((c) => c.id !== deletedId),
+      );
     },
   });
 
@@ -302,7 +327,13 @@ export const ArticleReaderPage: React.FC = () => {
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim()) return;
-    postCommentMutation.mutate(commentText.trim());
+    postCommentMutation.mutate({ bodyText: commentText.trim() });
+  };
+
+  const handleReplySubmit = (parentId: string, e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+    postCommentMutation.mutate({ bodyText: replyText.trim(), parentId });
   };
 
   if (isLoading) {
@@ -695,29 +726,186 @@ export const ArticleReaderPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Comments List */}
-              <div className="space-y-0 divide-y divide-border-subtle pt-2">
+              {/* Threaded Comments List */}
+              <div className="space-y-4 pt-2">
                 {comments.length === 0 ? (
                   <p className="py-6 text-sm text-ink-secondary font-editorial italic">
                     No comments yet. Be the first to share your perspective.
                   </p>
                 ) : (
-                  comments.map((comment) => (
-                    <div key={comment.id} className="py-4 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-ink-primary">{comment.authorName}</span>
-                        <span className="text-[11px] font-mono text-ink-secondary">
-                          {new Date(comment.createdAt).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-ink-primary leading-relaxed">
-                        {comment.body || comment.content}
-                      </p>
-                    </div>
-                  ))
+                  (() => {
+                    const rootComments = comments.filter((c) => !c.parentId);
+                    const getReplies = (parentId: string) =>
+                      comments.filter((c) => c.parentId === parentId);
+
+                    return rootComments.map((comment) => {
+                      const replies = getReplies(comment.id);
+                      const isReplying = replyingToId === comment.id;
+                      const canDelete =
+                        user?.id === comment.authorId ||
+                        Boolean(user?.role && ['admin', 'super_admin', 'editor', 'ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(user.role));
+
+                      return (
+                        <div
+                          key={comment.id}
+                          className="bg-white border border-border-subtle p-4 rounded-sm space-y-3 transition-colors"
+                        >
+                          {/* Comment Header */}
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-ink-primary text-white flex items-center justify-center font-bold text-[10px] uppercase font-mono">
+                                {comment.authorName?.charAt(0) || 'U'}
+                              </div>
+                              <span className="font-semibold text-ink-primary font-sans">
+                                {comment.authorName}
+                              </span>
+                              {comment.authorId === article.authorId && (
+                                <span className="text-[9px] font-mono uppercase bg-accent-crimson/10 text-accent-crimson px-1.5 py-0.5 rounded font-semibold">
+                                  Author
+                                </span>
+                              )}
+                              <span className="text-border-subtle">·</span>
+                              <span className="text-[11px] font-mono text-ink-secondary">
+                                {new Date(comment.createdAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Delete Button */}
+                            {canDelete && (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Delete this comment?')) {
+                                    deleteCommentMutation.mutate(comment.id);
+                                  }
+                                }}
+                                disabled={deleteCommentMutation.isPending}
+                                className="text-ink-secondary hover:text-red-600 transition-colors p-1"
+                                title="Delete comment"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Comment Body */}
+                          <p className="text-xs text-ink-primary leading-relaxed pl-8">
+                            {comment.body || comment.content}
+                          </p>
+
+                          {/* Comment Actions */}
+                          <div className="flex items-center gap-4 pl-8 pt-1">
+                            {isAuthenticated && (
+                              <button
+                                onClick={() => {
+                                  setReplyingToId(isReplying ? null : comment.id);
+                                  setReplyText('');
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] font-mono text-ink-secondary hover:text-ink-primary transition-colors"
+                              >
+                                <Reply size={11} />
+                                <span>{isReplying ? 'Cancel' : 'Reply'}</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Inline Reply Composer */}
+                          {isReplying && (
+                            <form
+                              onSubmit={(e) => handleReplySubmit(comment.id, e)}
+                              className="ml-8 mt-2 space-y-2 border-l-2 border-accent-crimson pl-3 py-1"
+                            >
+                              <textarea
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder={`Replying to ${comment.authorName}…`}
+                                rows={2}
+                                autoFocus
+                                className="w-full p-2.5 text-xs bg-slate-50 border border-border-subtle focus:outline-none focus:border-ink-primary font-sans rounded-sm"
+                              />
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setReplyingToId(null)}
+                                  className="px-3 py-1 text-xs text-ink-secondary hover:text-ink-primary font-mono"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={!replyText.trim() || postCommentMutation.isPending}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-ink-primary hover:bg-slate-800 text-white text-xs font-semibold font-mono rounded-sm disabled:opacity-40"
+                                >
+                                  <span>{postCommentMutation.isPending ? 'Sending…' : 'Send Reply'}</span>
+                                  <Send size={10} />
+                                </button>
+                              </div>
+                            </form>
+                          )}
+
+                          {/* Nested Replies List */}
+                          {replies.length > 0 && (
+                            <div className="ml-8 mt-3 space-y-3 border-l-2 border-border-subtle pl-4 pt-1">
+                              {replies.map((reply) => {
+                                const canDeleteReply =
+                                  user?.id === reply.authorId ||
+                                  Boolean(user?.role && ['admin', 'super_admin', 'editor', 'ADMIN', 'SUPER_ADMIN', 'EDITOR'].includes(user.role));
+
+                                return (
+                                  <div key={reply.id} className="space-y-1.5 py-1">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-full bg-slate-200 text-ink-primary flex items-center justify-center font-bold text-[9px] uppercase font-mono">
+                                          {reply.authorName?.charAt(0) || 'U'}
+                                        </div>
+                                        <span className="font-semibold text-ink-primary font-sans text-xs">
+                                          {reply.authorName}
+                                        </span>
+                                        {reply.authorId === article.authorId && (
+                                          <span className="text-[9px] font-mono uppercase bg-accent-crimson/10 text-accent-crimson px-1.5 py-0.5 rounded font-semibold">
+                                            Author
+                                          </span>
+                                        )}
+                                        <span className="text-border-subtle">·</span>
+                                        <span className="text-[10px] font-mono text-ink-secondary">
+                                          {new Date(reply.createdAt).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                          })}
+                                        </span>
+                                      </div>
+
+                                      {canDeleteReply && (
+                                        <button
+                                          onClick={() => {
+                                            if (confirm('Delete this reply?')) {
+                                              deleteCommentMutation.mutate(reply.id);
+                                            }
+                                          }}
+                                          disabled={deleteCommentMutation.isPending}
+                                          className="text-ink-secondary hover:text-red-600 transition-colors p-1"
+                                          title="Delete reply"
+                                        >
+                                          <Trash2 size={11} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-ink-primary leading-relaxed pl-7">
+                                      {reply.body || reply.content}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()
                 )}
               </div>
             </section>

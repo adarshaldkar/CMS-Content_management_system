@@ -50,7 +50,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
       {
         name: 'default',
         ttl: 60000,
-        limit: 1000, // Standard API reading and browsing operations
+        limit: process.env.THROTTLE_LIMIT ? parseInt(process.env.THROTTLE_LIMIT, 10) : 50000,
       },
     ]),
   ],

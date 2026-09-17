@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
@@ -5,7 +6,7 @@ export type RevisionDocument = HydratedDocument<RevisionSchemaClass>;
 
 @Schema({ collection: 'article_revisions', timestamps: { createdAt: true, updatedAt: false } })
 export class RevisionSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true, index: true })

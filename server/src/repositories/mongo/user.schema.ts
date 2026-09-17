@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { UserRole } from '../../domain/models';
@@ -6,7 +7,7 @@ export type UserDocument = HydratedDocument<UserSchemaClass>;
 
 @Schema({ collection: 'users', timestamps: true })
 export class UserSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ required: true, unique: true, lowercase: true, trim: true })

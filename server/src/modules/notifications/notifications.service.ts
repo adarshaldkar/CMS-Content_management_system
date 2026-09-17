@@ -40,7 +40,7 @@ export class NotificationsService {
       dto.type,
       dto.resourceId,
       dto.actorId || 'system',
-    ].join(':');
+    ].join('_');
     const job = await this.notificationQueue.add(JOB_NAMES.DISPATCH_NOTIFICATION, { dto }, {
       jobId,
       attempts: 5,

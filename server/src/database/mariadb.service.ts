@@ -73,11 +73,20 @@ export class MariaDbService implements OnModuleDestroy {
               tag_ids JSON,
               scheduled_at TIMESTAMP NULL,
               published_at TIMESTAMP NULL,
+              publishing_slot_id VARCHAR(36) NULL,
+              auto_dispatched BOOLEAN NOT NULL DEFAULT FALSE,
               created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               deleted_at TIMESTAMP NULL
             );
           `);
+
+          try {
+            await this.pool.query('ALTER TABLE articles ADD COLUMN publishing_slot_id VARCHAR(36) NULL');
+          } catch {}
+          try {
+            await this.pool.query('ALTER TABLE articles ADD COLUMN auto_dispatched BOOLEAN NOT NULL DEFAULT FALSE');
+          } catch {}
 
           await this.pool.query(`
             CREATE TABLE IF NOT EXISTS article_revisions (

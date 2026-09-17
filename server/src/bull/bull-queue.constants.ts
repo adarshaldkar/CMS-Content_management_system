@@ -4,6 +4,7 @@ export const QUEUE_NAMES = {
   NEWSLETTER_BROADCAST: 'newsletter-broadcast',
   MESH_RECONCILIATION: 'mesh-reconciliation',
   ANALYTICS_ROLLUP: 'analytics-rollup',
+  IMAGE_PROCESSING: 'image-processing',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -14,6 +15,7 @@ export const ALL_QUEUES: QueueName[] = [
   QUEUE_NAMES.NEWSLETTER_BROADCAST,
   QUEUE_NAMES.MESH_RECONCILIATION,
   QUEUE_NAMES.ANALYTICS_ROLLUP,
+  QUEUE_NAMES.IMAGE_PROCESSING,
 ];
 
 export const JOB_NAMES = {
@@ -24,4 +26,5 @@ export const JOB_NAMES = {
   DISPATCH_NEWSLETTER_BATCH: 'dispatch-newsletter-batch',
   REPLAY_SECONDARY_WRITE: 'replay-secondary-write',
   ANALYTICS_HOURLY_ROLLUP: 'analytics-hourly-rollup',
+  PROCESS_IMAGE_OPTIMIZATION: 'process-image-optimization',
 } as const;

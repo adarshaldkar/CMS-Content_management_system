@@ -59,10 +59,10 @@ export class CockroachCommentRepository implements ICommentRepository {
       params.push(filters.authorId);
     }
     if (filters.status) {
-      conditions.push(`c.status = $${idx++}`);
+      conditions.push(`LOWER(c.status) = LOWER($${idx++})`);
       params.push(filters.status);
     } else {
-      conditions.push("c.status = 'visible'");
+      conditions.push("LOWER(c.status) = 'visible'");
     }
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
@@ -139,7 +139,7 @@ export class CockroachCommentRepository implements ICommentRepository {
   async countByArticle(articleId: string): Promise<number> {
     await this.cockroach.ensureSchema();
     const { rows } = await this.cockroach.pool.query(
-      "SELECT COUNT(*) as total FROM comments WHERE article_id = $1 AND deleted_at IS NULL AND status = 'visible'",
+      "SELECT COUNT(*) as total FROM comments WHERE article_id = $1 AND deleted_at IS NULL AND LOWER(status) = 'visible'",
       [articleId],
     );
     return parseInt(rows[0]?.total || '0', 10);

@@ -449,6 +449,68 @@ export const EDITORIAL_COMMANDS: EditorialCommand[] = [
     },
   },
   {
+    id: 'insert.factBox',
+    title: 'Fact Box & Key Findings',
+    category: 'insert',
+    icon: 'BarChart2',
+    description: 'Structured key facts, data bullet points, and analytical takeaways',
+    keywords: ['factbox', 'facts', 'findings', 'stats', 'data', 'takeaways', 'bullet', 'box'],
+    execute: (ctx) => {
+      const html = editorialNodes.createFactBox('Key Facts & Findings');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
+    id: 'insert.warning',
+    title: 'Warning & Editorial Advisory',
+    category: 'insert',
+    icon: 'AlertTriangle',
+    description: 'Urgent notice, developing story advisory, or crucial disclaimer banner',
+    keywords: ['warning', 'alert', 'advisory', 'notice', 'disclaimer', 'caution', 'urgent'],
+    execute: (ctx) => {
+      const html = editorialNodes.createWarning('Urgent Editorial Notice');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
+    id: 'insert.timeline',
+    title: 'Chronological Timeline',
+    category: 'insert',
+    icon: 'Clock',
+    description: 'Chronological sequence of investigative milestones or events',
+    keywords: ['timeline', 'chronology', 'milestones', 'events', 'history', 'sequence', 'time'],
+    execute: (ctx) => {
+      const html = editorialNodes.createTimeline('Chronological Timeline');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
+    id: 'insert.relatedStories',
+    title: 'Related Stories & Coverage',
+    category: 'insert',
+    icon: 'Newspaper',
+    description: 'Curated related dispatch cards and cross-article links',
+    keywords: ['related', 'stories', 'coverage', 'articles', 'links', 'cards', 'recommendations'],
+    execute: (ctx) => {
+      const html = editorialNodes.createRelatedStories('Related Coverage & In-Depth Dispatches');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
+    id: 'insert.citation',
+    title: 'Source / Statement Citation',
+    category: 'insert',
+    icon: 'BookmarkCheck',
+    description: 'Attributed statement with verified publication source link',
+    keywords: ['citation', 'source', 'attribution', 'statement', 'credit', 'reference'],
+    execute: (ctx) => {
+      const sel = window.getSelection();
+      const text = sel ? sel.toString().trim() : '';
+      const html = editorialNodes.createCitation(text || 'Primary source statement corroborated by independent records.', 'Official Gazette Investigative Archive');
+      ctx.insertHtml(`${html}<p><br></p>`);
+    },
+  },
+  {
     id: 'insert.asterism',
     title: 'Asterism Section Divider (⁂)',
     category: 'insert',

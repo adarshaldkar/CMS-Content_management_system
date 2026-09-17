@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { BullModule } from '@nestjs/bullmq';
+import { QUEUE_NAMES } from '../../bull/bull-queue.constants';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import {
@@ -15,10 +17,12 @@ import { ImageInspectorService } from './image/image-inspector.service';
 import { ImagePolicyService } from './image/image-policy.service';
 import { ImageOptimizerService } from './image/image-optimizer.service';
 import { StorageService } from './storage/storage.service';
+import { ImageProcessor } from './image/image.processor';
 
 @Module({
   imports: [
     AuditModule,
+    BullModule.registerQueue({ name: QUEUE_NAMES.IMAGE_PROCESSING }),
     MongooseModule.forFeature([
       { name: MediaSchemaClass.name, schema: MediaSchema },
     ]),
@@ -34,6 +38,7 @@ import { StorageService } from './storage/storage.service';
     ImagePolicyService,
     ImageOptimizerService,
     StorageService,
+    ImageProcessor,
   ],
   exports: [
     MediaService,

@@ -43,6 +43,8 @@ export class MongoArticleRepository implements IArticleRepository {
       reviewNote: doc.reviewNote ?? null,
       scheduledAt: doc.scheduledAt ?? null,
       publishedAt: doc.publishedAt,
+      publishingSlotId: doc.publishingSlotId ?? null,
+      autoDispatched: Boolean(doc.autoDispatched),
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
       deletedAt: doc.deletedAt,
@@ -148,8 +150,9 @@ export class MongoArticleRepository implements IArticleRepository {
     };
   }
 
-  async create(data: CreateArticleDto): Promise<Article> {
+  async create(data: CreateArticleDto & { id?: string; _id?: string }): Promise<Article> {
     const doc = await this.articleModel.create({
+      ...(data.id || data._id ? { _id: data.id || data._id } : {}),
       ...data,
       version: 1,
       wordCount: data.wordCount ?? 0,

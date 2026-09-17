@@ -49,6 +49,17 @@ export interface Bookmark {
   userId: string;
   articleId: string;
   createdAt: Date;
+  article?: {
+    id: string;
+    title: string;
+    slug: string;
+    description?: string | null;
+    coverImage?: string | null;
+    readingTimeMinutes?: number;
+    category?: string | null;
+    authorName?: string | null;
+    createdAt?: Date | string;
+  };
 }
 
 export interface CreateBookmarkDto {

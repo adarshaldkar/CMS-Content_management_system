@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 import { AuditEventType } from '../../domain/models';
@@ -6,7 +7,7 @@ export type AuditLogDocument = HydratedDocument<AuditLogSchemaClass>;
 
 @Schema({ collection: 'audit_logs', timestamps: { createdAt: true, updatedAt: false } })
 export class AuditLogSchemaClass {
-  @Prop({ type: String })
+  @Prop({ type: String, default: () => randomUUID() })
   _id?: string;
 
   @Prop({ type: String, default: null, index: true })

@@ -29,6 +29,11 @@ export class MongoMediaRepository implements IMediaRepository {
       uploadedBy: doc.uploadedBy,
       variants: doc.variants || undefined,
       optimization: doc.optimization || undefined,
+      processingStatus: doc.processingStatus || 'READY',
+      aspectRatio: doc.aspectRatio,
+      usageProfile: doc.usageProfile,
+      storageKey: doc.storageKey,
+      cdnUrl: doc.cdnUrl,
       createdAt: doc.createdAt,
     };
   }
@@ -43,8 +48,20 @@ export class MongoMediaRepository implements IMediaRepository {
       uploadedBy: data.uploadedBy,
       variants: data.variants || [],
       optimization: data.optimization || null,
+      processingStatus: data.processingStatus || 'READY',
+      aspectRatio: data.aspectRatio,
+      usageProfile: data.usageProfile,
+      storageKey: data.storageKey,
+      cdnUrl: data.cdnUrl,
     });
     return this.toDomain(created);
+  }
+
+  async update(id: string, updates: Partial<Media>): Promise<Media | null> {
+    const updated = await this.mediaModel
+      .findByIdAndUpdate(id, { $set: updates }, { new: true })
+      .exec();
+    return updated ? this.toDomain(updated) : null;
   }
 
   async findById(id: string): Promise<Media | null> {

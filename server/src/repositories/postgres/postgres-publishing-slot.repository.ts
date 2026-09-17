@@ -245,7 +245,7 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
         s.name as slot_name,
         s.dispatch_time as slot_dispatch_time
       FROM cms_author_slot_assignments m
-      JOIN cms_users u ON u.id::text = m.author_id::text
+      LEFT JOIN cms_users u ON u.id::text = m.author_id::text
       JOIN cms_publishing_slots s ON s.id = m.slot_id
       ORDER BY m.created_at DESC
     `;
@@ -264,7 +264,7 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
         s.name as slot_name,
         s.dispatch_time as slot_dispatch_time
       FROM cms_author_slot_assignments m
-      JOIN cms_users u ON u.id::text = m.author_id::text
+      LEFT JOIN cms_users u ON u.id::text = m.author_id::text
       JOIN cms_publishing_slots s ON s.id = m.slot_id
       WHERE m.author_id::text = $1::text
       LIMIT 1
@@ -336,7 +336,7 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
         u.name as author_name, u.avatar_url as author_avatar,
         s.name as slot_name, s.dispatch_time as slot_dispatch_time
       FROM articles a
-      JOIN cms_users u ON u.id::text = a.author_id::text
+      LEFT JOIN cms_users u ON u.id::text = a.author_id::text
       LEFT JOIN cms_publishing_slots s ON s.id::text = a.publishing_slot_id::text
       WHERE a.status = 'scheduled'
       ORDER BY a.scheduled_at ASC NULLS LAST

@@ -92,7 +92,9 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
     // 1. Other main store(s) — Postgres and/or Mongo depending on active engine
     for (const store of this.peerStores) {
       tasks.push(
-        store.create({
+        (store as any).create({
+          id: article.id,
+          _id: article.id,
           title: article.title,
           slug: article.slug,
           description: article.description,
@@ -108,7 +110,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
           seoDescription: article.seoDescription,
           reviewNote: article.reviewNote,
           scheduledAt: article.scheduledAt,
-        }).catch((e) => this.logger.debug(`Peer article sync note: ${e.message}`)),
+        }).catch((e: any) => this.logger.debug(`Peer article sync note: ${e.message}`)),
       );
     }
 
@@ -120,16 +122,16 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
    * the peer store's `update` (mutating an existing document) rather than the
    * `create`-based `replicateToAll`, which would throw on duplicate keys.
    */
-  private async replicateUpdateToAll(id: string, data: UpdateArticleDto): Promise<void> {
+  private async replicateUpdateToAll(article: Article, data: UpdateArticleDto): Promise<void> {
     const tasks: Promise<any>[] = [];
 
     for (const store of this.peerStores) {
       tasks.push(
-        store.update(id, data).catch((e) => this.logger.debug(`Peer article update sync note: ${e.message}`)),
+        store.update(article.id, data).catch((e) => this.logger.debug(`Peer article update sync note: ${e.message}`)),
       );
     }
 
-    await this.replicateRawEngines(data as Article);
+    await this.replicateRawEngines(article);
   }
 
   private async replicateRawEngines(article: Article): Promise<void> {
@@ -139,9 +141,9 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
     if (this.mariadb) {
       tasks.push(
         this.mariadb.pool.query(
-          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), description=VALUES(description), status=VALUES(status), version=VALUES(version), word_count=VALUES(word_count), reading_time_minutes=VALUES(reading_time_minutes), cover_image=VALUES(cover_image), category_id=VALUES(category_id);`,
+          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids, scheduled_at, published_at, publishing_slot_id, auto_dispatched)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), description=VALUES(description), status=VALUES(status), version=VALUES(version), word_count=VALUES(word_count), reading_time_minutes=VALUES(reading_time_minutes), cover_image=VALUES(cover_image), category_id=VALUES(category_id), scheduled_at=VALUES(scheduled_at), published_at=VALUES(published_at), publishing_slot_id=VALUES(publishing_slot_id), auto_dispatched=VALUES(auto_dispatched);`,
           [
             article.id,
             article.title,
@@ -159,6 +161,10 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
             article.seoDescription || null,
             article.reviewNote || null,
             JSON.stringify(article.tagIds || []),
+            article.scheduledAt ? new Date(article.scheduledAt) : null,
+            article.publishedAt ? new Date(article.publishedAt) : null,
+            article.publishingSlotId || null,
+            article.autoDispatched ? 1 : 0,
           ],
         ).catch((e: any) => this.logger.warn(`MariaDB article sync failed: ${e.message}`)),
       );
@@ -168,9 +174,9 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
     if (this.mysql) {
       tasks.push(
         this.mysql.pool.query(
-          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), description=VALUES(description), status=VALUES(status), version=VALUES(version), word_count=VALUES(word_count), reading_time_minutes=VALUES(reading_time_minutes), cover_image=VALUES(cover_image), category_id=VALUES(category_id);`,
+          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids, scheduled_at, published_at, publishing_slot_id, auto_dispatched)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), description=VALUES(description), status=VALUES(status), version=VALUES(version), word_count=VALUES(word_count), reading_time_minutes=VALUES(reading_time_minutes), cover_image=VALUES(cover_image), category_id=VALUES(category_id), scheduled_at=VALUES(scheduled_at), published_at=VALUES(published_at), publishing_slot_id=VALUES(publishing_slot_id), auto_dispatched=VALUES(auto_dispatched);`,
           [
             article.id,
             article.title,
@@ -188,6 +194,10 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
             article.seoDescription || null,
             article.reviewNote || null,
             JSON.stringify(article.tagIds || []),
+            article.scheduledAt ? new Date(article.scheduledAt) : null,
+            article.publishedAt ? new Date(article.publishedAt) : null,
+            article.publishingSlotId || null,
+            article.autoDispatched ? 1 : 0,
           ],
         ).catch((e: any) => this.logger.warn(`MySQL article sync failed: ${e.message}`)),
       );
@@ -197,9 +207,9 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
     if (this.cockroach) {
       tasks.push(
         this.cockroach.pool.query(
-          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-           ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title, content=EXCLUDED.content, description=EXCLUDED.description, status=EXCLUDED.status, version=EXCLUDED.version, word_count=EXCLUDED.word_count, reading_time_minutes=EXCLUDED.reading_time_minutes, cover_image=EXCLUDED.cover_image, category_id=EXCLUDED.category_id, updated_at=now();`,
+          `INSERT INTO articles (id, title, slug, description, content, author_id, category_id, cover_image, status, version, word_count, reading_time_minutes, seo_title, seo_description, review_note, tag_ids, scheduled_at, published_at, publishing_slot_id, auto_dispatched)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+           ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title, content=EXCLUDED.content, description=EXCLUDED.description, status=EXCLUDED.status, version=EXCLUDED.version, word_count=EXCLUDED.word_count, reading_time_minutes=EXCLUDED.reading_time_minutes, cover_image=EXCLUDED.cover_image, category_id=EXCLUDED.category_id, scheduled_at=EXCLUDED.scheduled_at, published_at=EXCLUDED.published_at, publishing_slot_id=EXCLUDED.publishing_slot_id, auto_dispatched=EXCLUDED.auto_dispatched, updated_at=now();`,
           [
             article.id,
             article.title,
@@ -217,6 +227,10 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
             article.seoDescription || null,
             article.reviewNote || null,
             JSON.stringify(article.tagIds || []),
+            article.scheduledAt ? new Date(article.scheduledAt) : null,
+            article.publishedAt ? new Date(article.publishedAt) : null,
+            article.publishingSlotId || null,
+            article.autoDispatched || false,
           ],
         ).catch((e: any) => this.logger.warn(`CockroachDB article sync failed: ${e.message}`)),
       );
@@ -331,7 +345,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
 
   async update(id: string, data: UpdateArticleDto): Promise<Article> {
     const article = await this.activeRepo.update(id, data);
-    this.replicateUpdateToAll(id, data).catch((e) => this.logger.warn(`Multi-DB Article update sync failed: ${e.message}`));
+    this.replicateUpdateToAll(article, data).catch((e) => this.logger.warn(`Multi-DB Article update sync failed: ${e.message}`));
     return article;
   }
 
@@ -340,7 +354,7 @@ export class SeamlessArticleRepository implements IArticleRepository, IRuntimeSw
     if (note) {
       await this.activeRepo.update(id, { reviewNote: note }).catch(() => {});
     }
-    this.replicateUpdateToAll(id, { status }).catch((e) => this.logger.warn(`Multi-DB Article status sync failed: ${e.message}`));
+    this.replicateUpdateToAll(article, { status }).catch((e) => this.logger.warn(`Multi-DB Article status sync failed: ${e.message}`));
     return article;
   }
 

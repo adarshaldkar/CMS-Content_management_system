@@ -34,7 +34,7 @@ async function bootstrap() {
   // and audit IP logging see real client addresses behind a reverse proxy)
   (app.getHttpAdapter().getInstance() as express.Express).set(
     'trust proxy',
-    nodeEnv === 'production' ? 1 : false,
+    true,
   );
 
   // Security heads-up: flag connection strings that embed plain-text credentials.

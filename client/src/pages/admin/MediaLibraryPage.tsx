@@ -343,7 +343,7 @@ export const MediaLibraryPage: React.FC = () => {
                   <span>Generated Responsive Variants ({selectedMedia.variants?.length || 1})</span>
                 </h3>
                 <p className="text-[11px] text-ink-secondary">
-                  Ready-to-use derivative URLs for responsive $\text{<picture>}$ and $\text{srcset}$ tags:
+                  Ready-to-use derivative URLs for responsive picture and srcset tags:
                 </p>
 
                 <div className="border border-border-subtle bg-white overflow-hidden" style={{ borderRadius: 2 }}>

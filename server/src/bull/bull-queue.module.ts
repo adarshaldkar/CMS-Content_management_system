@@ -84,6 +84,15 @@ import { QUEUE_NAMES } from './bull-queue.constants';
           removeOnFail: false,
         },
       },
+      {
+        name: QUEUE_NAMES.IMAGE_PROCESSING,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: 500,
+          removeOnFail: false,
+        },
+      },
     ),
   ],
   exports: [BullModule],

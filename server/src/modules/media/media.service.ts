@@ -6,9 +6,12 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { QUEUE_NAMES, JOB_NAMES } from '../../bull/bull-queue.constants';
 import {
   MEDIA_REPOSITORY,
   type IMediaRepository,
@@ -37,6 +40,7 @@ import { StorageService } from './storage/storage.service';
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
   private readonly uploadDir = path.resolve(process.cwd(), 'uploads');
+  private readonly tempDir = path.resolve(process.cwd(), 'uploads', 'temp');
 
   constructor(
     @Inject(MEDIA_REPOSITORY)
@@ -44,9 +48,14 @@ export class MediaService {
     private readonly auditService: AuditService,
     private readonly imageOptimizer: ImageOptimizerService,
     private readonly storageService: StorageService,
+    @InjectQueue(QUEUE_NAMES.IMAGE_PROCESSING)
+    private readonly imageQueue: Queue,
   ) {
     if (!fs.existsSync(this.uploadDir)) {
       fs.mkdirSync(this.uploadDir, { recursive: true });
+    }
+    if (!fs.existsSync(this.tempDir)) {
+      fs.mkdirSync(this.tempDir, { recursive: true });
     }
   }
 
@@ -77,119 +86,152 @@ export class MediaService {
       'image/gif': 'gif',
       'image/webp': 'webp',
       'image/avif': 'avif',
+      'image/svg+xml': 'svg',
     };
 
     const ext = mimeToExt[validation.detectedMime || ''] || 'jpg';
     const fileBaseId = `media-${crypto.randomUUID()}`;
     const originalFilename = `${fileBaseId}-original.${ext}`;
 
-    // 1. Save original master
+    // 1. Save original master file
     const originalAsset = await this.storageService.saveFile(
       originalFilename,
       file.buffer,
       validation.detectedMime || file.mimetype,
     );
 
-    let finalMainUrl = originalAsset.url;
-    let finalMainFilename = originalFilename;
-    let finalMainMimeType = validation.detectedMime || file.mimetype;
-    let finalMainSize = file.size;
-    let variants: ImageVariant[] = [
-      {
-        kind: 'original',
-        width: 0,
-        height: 0,
-        mimeType: finalMainMimeType,
-        sizeBytes: file.size,
-        url: originalAsset.url,
-        storageKey: originalAsset.storageKey,
-      },
-    ];
-    let optimizationMeta: ImageOptimizationMeta | undefined;
+    // Initial media record in database
+    const initialMedia = await this.mediaRepo.create({
+      filename: originalFilename,
+      originalName: path.basename(file.originalname).slice(0, 150),
+      mimeType: validation.detectedMime || file.mimetype,
+      size: file.size,
+      url: originalAsset.url,
+      uploadedBy: user.id,
+      variants: [
+        {
+          kind: 'original',
+          width: 0,
+          height: 0,
+          mimeType: validation.detectedMime || file.mimetype,
+          sizeBytes: file.size,
+          url: originalAsset.url,
+          storageKey: originalAsset.storageKey,
+        },
+      ],
+      processingStatus: validation.detectedMime === 'image/gif' || validation.detectedMime === 'image/svg+xml' ? 'READY' : 'PROCESSING',
+    });
 
-    // 2. Run Image Intelligence Pipeline for non-GIF static images
-    if (validation.detectedMime !== 'image/gif') {
+    // 2. Dispatch BullMQ async job for non-GIF static image optimization
+    if (validation.detectedMime !== 'image/gif' && validation.detectedMime !== 'image/svg+xml') {
+      const tempFilePath = path.join(this.tempDir, `temp-${crypto.randomUUID()}.${ext}`);
+      fs.writeFileSync(tempFilePath, file.buffer);
+
       try {
-        const optimizedResult = await this.imageOptimizer.processImage(
-          file.buffer,
-          file.originalname,
-          fileBaseId,
+        await this.imageQueue.add(
+          JOB_NAMES.PROCESS_IMAGE_OPTIMIZATION,
+          {
+            mediaId: initialMedia.id,
+            tempFilePath,
+            originalName: file.originalname,
+            mimeType: validation.detectedMime || file.mimetype,
+          },
+          { attempts: 3, backoff: { type: 'exponential', delay: 2000 } },
         );
-
-        // Save Master WebP Derivative
-        const masterWebpAsset = await this.storageService.saveFile(
-          optimizedResult.masterFilename,
-          optimizedResult.masterBuffer,
-          optimizedResult.masterMimeType,
-        );
-
-        finalMainUrl = masterWebpAsset.url;
-        finalMainFilename = optimizedResult.masterFilename;
-        finalMainMimeType = optimizedResult.masterMimeType;
-        finalMainSize = optimizedResult.optimizedSizeBytes;
-
-        // Save responsive derivatives (Hero, Article, Card, Thumbnail)
-        for (const variant of optimizedResult.variants) {
-          const variantAsset = await this.storageService.saveFile(
-            variant.filename,
-            variant.buffer,
-            variant.mimeType,
+      } catch (err: any) {
+        this.logger.warn(`Failed to enqueue image processing job to BullMQ, falling back to sync processing: ${err.message}`);
+        // Synchronous fallback if BullMQ/Redis is temporarily unavailable
+        try {
+          const optimizedResult = await this.imageOptimizer.processImage(
+            file.buffer,
+            file.originalname,
+            fileBaseId,
+          );
+          const masterWebpAsset = await this.storageService.saveFile(
+            optimizedResult.masterFilename,
+            optimizedResult.masterBuffer,
+            optimizedResult.masterMimeType,
           );
 
-          variants.push({
-            kind: variant.kind,
-            width: variant.width,
-            height: variant.height,
-            mimeType: variant.mimeType,
-            sizeBytes: variant.sizeBytes,
-            url: variantAsset.url,
-            storageKey: variantAsset.storageKey,
-          });
-        }
+          const variants: ImageVariant[] = [
+            {
+              kind: 'original',
+              width: optimizedResult.width,
+              height: optimizedResult.height,
+              mimeType: validation.detectedMime || file.mimetype,
+              sizeBytes: file.size,
+              url: originalAsset.url,
+              storageKey: originalAsset.storageKey,
+            },
+          ];
 
-        optimizationMeta = {
-          originalSizeBytes: optimizedResult.originalSizeBytes,
-          optimizedSizeBytes: optimizedResult.optimizedSizeBytes,
-          savingsPercent: optimizedResult.savingsPercent,
-          width: optimizedResult.width,
-          height: optimizedResult.height,
-          format: 'webp',
-          appliedEnhancements: optimizedResult.appliedEnhancements,
-          isUpscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('UPSCALE')),
-          isDownscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('DOWNSCALE')),
-        };
-      } catch (err: any) {
-        this.logger.error(`Image Intelligence Pipeline error: ${err.message}`, err.stack);
-        // Graceful fallback to original file if processing fails
+          for (const variant of optimizedResult.variants) {
+            const variantAsset = await this.storageService.saveFile(
+              variant.filename,
+              variant.buffer,
+              variant.mimeType,
+            );
+            variants.push({
+              kind: variant.kind,
+              width: variant.width,
+              height: variant.height,
+              mimeType: variant.mimeType,
+              sizeBytes: variant.sizeBytes,
+              url: variantAsset.url,
+              storageKey: variantAsset.storageKey,
+            });
+          }
+
+          const updated = await this.mediaRepo.update(initialMedia.id, {
+            filename: optimizedResult.masterFilename,
+            mimeType: optimizedResult.masterMimeType,
+            size: optimizedResult.optimizedSizeBytes,
+            url: masterWebpAsset.url,
+            variants,
+            optimization: {
+              originalSizeBytes: optimizedResult.originalSizeBytes,
+              optimizedSizeBytes: optimizedResult.optimizedSizeBytes,
+              savingsPercent: optimizedResult.savingsPercent,
+              width: optimizedResult.width,
+              height: optimizedResult.height,
+              format: 'webp',
+              appliedEnhancements: optimizedResult.appliedEnhancements,
+              isUpscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('UPSCALE')),
+              isDownscaled: optimizedResult.appliedEnhancements.some((e) => e.includes('DOWNSCALE')),
+            },
+            aspectRatio: Number((optimizedResult.width / Math.max(1, optimizedResult.height)).toFixed(4)),
+            processingStatus: 'READY',
+          });
+          if (updated) return updated;
+        } catch (syncErr: any) {
+          this.logger.error(`Sync fallback processing error: ${syncErr.message}`);
+        } finally {
+          if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+        }
       }
     }
-
-    const media = await this.mediaRepo.create({
-      filename: finalMainFilename,
-      originalName: path.basename(file.originalname).slice(0, 150),
-      mimeType: finalMainMimeType,
-      size: finalMainSize,
-      url: finalMainUrl,
-      uploadedBy: user.id,
-      variants,
-      optimization: optimizationMeta,
-    });
 
     await this.auditService.log({
       actorId: user.id,
       action: AuditEventType.MEDIA_UPLOADED,
-      resource: `Media:${media.id}`,
+      resource: `Media:${initialMedia.id}`,
       result: 'SUCCESS',
       metadata: {
-        filename: finalMainFilename,
-        size: finalMainSize,
-        originalSize: file.size,
-        savingsPercent: optimizationMeta?.savingsPercent || '0%',
-        mimeType: media.mimeType,
-        variantsCount: variants.length,
+        filename: originalFilename,
+        size: file.size,
+        mimeType: initialMedia.mimeType,
+        processingStatus: initialMedia.processingStatus,
       },
     });
 
+    return initialMedia;
+  }
+
+  async getMedia(id: string): Promise<Media> {
+    const media = await this.mediaRepo.findById(id);
+    if (!media) {
+      throw new NotFoundException('Media asset not found.');
+    }
     return media;
   }
 
