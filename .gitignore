@@ -43,6 +43,7 @@ test/
 tests/
 client/tests/
 server/test/
+server/tests/
 test-fixtures/
 test-results/
 coverage/
@@ -51,6 +52,7 @@ playwright-report/
 blob-report/
 .cache/
 scripts/
+server/scripts/
 archify/
 *.spec.ts
 *.test.ts
