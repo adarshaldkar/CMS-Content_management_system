@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cookie, Shield, Check, X, Sliders, ChevronRight } from 'lucide-react';
 
-interface CookiePreferences {
+interface CookiePreferences extends Record<string, boolean> {
   strictlyNecessary: boolean;
   analytics: boolean;
   functional: boolean;

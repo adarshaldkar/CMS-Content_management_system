@@ -21,5 +21,6 @@ export * from './publishing-slot.model';
 export * from './notification.model';
 export * from './newsletter.model';
 export * from './consent.model';
+export * from './conversation.model';
 
 

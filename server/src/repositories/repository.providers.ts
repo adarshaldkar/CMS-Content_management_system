@@ -61,6 +61,10 @@ import {
   CONSENT_REPOSITORY,
   type IConsentRepository,
 } from './interfaces/consent.repository.interface';
+import {
+  CONVERSATION_REPOSITORY,
+  type IConversationRepository,
+} from './interfaces/conversation.repository.interface';
 import type { SupportedDbName } from './repository-proxy';
 
 // PostgreSQL Repositories
@@ -79,6 +83,7 @@ import { PostgresPublishingSlotRepository } from './postgres/postgres-publishing
 import { PostgresNotificationRepository } from './postgres/postgres-notification.repository';
 import { PostgresNewsletterRepository } from './postgres/postgres-newsletter.repository';
 import { PostgresConsentRepository } from './postgres/postgres-consent.repository';
+import { PostgresConversationRepository } from './postgres/postgres-conversation.repository';
 
 // MongoDB Repositories
 import { MongoArticleRepository } from './mongo/mongo-article.repository';
@@ -96,6 +101,7 @@ import { MongoPublishingSlotRepository } from './mongo/mongo-publishing-slot.rep
 import { MongoNotificationRepository } from './mongo/mongo-notification.repository';
 import { MongoNewsletterRepository } from './mongo/mongo-newsletter.repository';
 import { MongoConsentRepository } from './mongo/mongo-consent.repository';
+import { MongoConversationRepository } from './mongo/mongo-conversation.repository';
 
 // MariaDB Repositories
 import { MariaDbUserRepository } from './mariadb/mariadb-user.repository';
@@ -158,6 +164,7 @@ import { SeamlessPublishingSlotRepository } from './seamless/seamless-publishing
 import { SeamlessNotificationRepository } from './seamless/seamless-notification.repository';
 import { SeamlessNewsletterRepository } from './seamless/seamless-newsletter.repository';
 import { SeamlessConsentRepository } from './seamless/seamless-consent.repository';
+import { SeamlessConversationRepository } from './seamless/seamless-conversation.repository';
 
 // Runtime-Switchable Registry
 import { RepositoryRegistryService } from './repository-registry.service';
@@ -803,6 +810,20 @@ export const consentRepositoryProvider: FactoryProvider<IConsentRepository> = {
   },
 };
 
+export const conversationRepositoryProvider: FactoryProvider<IConversationRepository> = {
+  provide: CONVERSATION_REPOSITORY,
+  inject: [
+    PostgresConversationRepository,
+    MongoConversationRepository,
+  ],
+  useFactory: (
+    postgresRepo: PostgresConversationRepository,
+    mongoRepo: MongoConversationRepository,
+  ): IConversationRepository => {
+    return new SeamlessConversationRepository(postgresRepo, mongoRepo);
+  },
+};
+
 export const ALL_DATABASE_REPOSITORIES = [
   // PostgreSQL
   PostgresUserRepository,
@@ -819,6 +840,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   PostgresNotificationRepository,
   PostgresNewsletterRepository,
   PostgresConsentRepository,
+  PostgresConversationRepository,
 
   // MongoDB
   MongoUserRepository,
@@ -836,6 +858,7 @@ export const ALL_DATABASE_REPOSITORIES = [
   MongoNotificationRepository,
   MongoNewsletterRepository,
   MongoConsentRepository,
+  MongoConversationRepository,
 
   // MariaDB
   MariaDbUserRepository,

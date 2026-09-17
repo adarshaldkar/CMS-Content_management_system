@@ -5,6 +5,7 @@ export const QUEUE_NAMES = {
   MESH_RECONCILIATION: 'mesh-reconciliation',
   ANALYTICS_ROLLUP: 'analytics-rollup',
   IMAGE_PROCESSING: 'image-processing',
+  BROADCAST_FANOUT: 'broadcast-fanout',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -16,6 +17,7 @@ export const ALL_QUEUES: QueueName[] = [
   QUEUE_NAMES.MESH_RECONCILIATION,
   QUEUE_NAMES.ANALYTICS_ROLLUP,
   QUEUE_NAMES.IMAGE_PROCESSING,
+  QUEUE_NAMES.BROADCAST_FANOUT,
 ];
 
 export const JOB_NAMES = {
@@ -27,4 +29,5 @@ export const JOB_NAMES = {
   REPLAY_SECONDARY_WRITE: 'replay-secondary-write',
   ANALYTICS_HOURLY_ROLLUP: 'analytics-hourly-rollup',
   PROCESS_IMAGE_OPTIMIZATION: 'process-image-optimization',
+  DISPATCH_BROADCAST_BATCH: 'dispatch-broadcast-batch',
 } as const;
