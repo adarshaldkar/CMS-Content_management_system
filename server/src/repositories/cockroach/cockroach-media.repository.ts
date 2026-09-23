@@ -77,10 +77,17 @@ export class CockroachMediaRepository implements IMediaRepository {
 
   async create(data: CreateMediaDto): Promise<Media> {
     await this.cockroach.ensureSchema();
-    const id = randomUUID();
+    const id = data.id || randomUUID();
     await this.cockroach.pool.query(
       `INSERT INTO media_assets (id, filename, original_name, mime_type, size_bytes, url, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         filename = EXCLUDED.filename,
+         original_name = EXCLUDED.original_name,
+         mime_type = EXCLUDED.mime_type,
+         size_bytes = EXCLUDED.size_bytes,
+         url = EXCLUDED.url,
+         uploaded_by = EXCLUDED.uploaded_by`,
       [
         id,
         data.filename,

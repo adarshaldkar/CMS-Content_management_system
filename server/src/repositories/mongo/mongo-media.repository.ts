@@ -40,6 +40,7 @@ export class MongoMediaRepository implements IMediaRepository {
 
   async create(data: CreateMediaDto): Promise<Media> {
     const created = await this.mediaModel.create({
+      ...(data.id ? { _id: data.id } : {}),
       filename: data.filename,
       originalName: data.originalName,
       mimeType: data.mimeType,

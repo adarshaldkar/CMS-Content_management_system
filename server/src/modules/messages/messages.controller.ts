@@ -38,6 +38,15 @@ export class MessagesController {
     return this.messagesService.getUnreadCount(user.id);
   }
 
+  @Get('recipients')
+  @ApiOperation({ summary: 'Search and list potential message recipients (staff, authors, editors)' })
+  async getRecipients(
+    @CurrentUser() user: AuthUser,
+    @Query('search') search?: string,
+  ) {
+    return this.messagesService.searchRecipients(user.id, search);
+  }
+
   @Get('conversations')
   @ApiOperation({ summary: 'List user conversations with unread indicators and filtering' })
   async getUserConversations(

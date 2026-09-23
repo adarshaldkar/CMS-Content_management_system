@@ -75,10 +75,17 @@ export class MariaDbMediaRepository implements IMediaRepository {
 
   async create(data: CreateMediaDto): Promise<Media> {
     await this.mariadb.ensureSchema();
-    const id = randomUUID();
+    const id = data.id || randomUUID();
     await this.mariadb.pool.query(
-      `INSERT INTO media_assets (id, filename, original_name, mime_type, size_bytes, url, uploaded_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       `INSERT INTO media_assets (id, filename, original_name, mime_type, size_bytes, url, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          filename = VALUES(filename),
+          original_name = VALUES(original_name),
+          mime_type = VALUES(mime_type),
+          size_bytes = VALUES(size_bytes),
+          url = VALUES(url),
+          uploaded_by = VALUES(uploaded_by)`,
       [
         id,
         data.filename,

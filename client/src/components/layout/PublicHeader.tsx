@@ -8,6 +8,7 @@ import {
   Compass,
   Edit3,
   Flame,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Search,
@@ -175,6 +176,14 @@ export const PublicHeader: React.FC = () => {
                         >
                           <Flame size={15} />
                           <span>For You Feed</span>
+                        </Link>
+                        <Link
+                          to="/inbox"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                        >
+                          <Inbox size={15} />
+                          <span>Gazette Inbox</span>
                         </Link>
                         <Link
                           to="/library"

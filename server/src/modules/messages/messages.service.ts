@@ -62,6 +62,26 @@ export class MessagesService {
       .replace(/onerror=/gi, 'data-onerror=');
   }
 
+  async searchRecipients(
+    currentUserId: string,
+    search?: string,
+  ): Promise<{ id: string; name: string; email: string; role: string; avatarUrl?: string | null }[]> {
+    const result = await this.userRepo.findMany({
+      search,
+      isActive: true,
+      limit: 30,
+    });
+    return result.items
+      .filter((u) => u.id !== currentUserId)
+      .map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        avatarUrl: u.avatarUrl ?? null,
+      }));
+  }
+
   /**
    * Publish real-time messaging event to Redis
    */

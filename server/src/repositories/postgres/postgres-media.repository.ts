@@ -86,6 +86,48 @@ export class PostgresMediaRepository implements IMediaRepository {
 
   async create(data: CreateMediaDto): Promise<Media> {
     await this.ensureSchema();
+    if (data.id) {
+      const result = await this.postgres.pool.query<MediaRow>(
+        `
+        INSERT INTO cms_media (
+          id, filename, original_name, mime_type, size, url, uploaded_by, variants, optimization,
+          processing_status, aspect_ratio, usage_profile, storage_key, cdn_url
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (id) DO UPDATE SET
+          filename = EXCLUDED.filename,
+          original_name = EXCLUDED.original_name,
+          mime_type = EXCLUDED.mime_type,
+          size = EXCLUDED.size,
+          url = EXCLUDED.url,
+          uploaded_by = EXCLUDED.uploaded_by,
+          variants = EXCLUDED.variants,
+          optimization = EXCLUDED.optimization,
+          processing_status = EXCLUDED.processing_status,
+          aspect_ratio = EXCLUDED.aspect_ratio,
+          usage_profile = EXCLUDED.usage_profile,
+          storage_key = EXCLUDED.storage_key,
+          cdn_url = EXCLUDED.cdn_url
+        RETURNING *
+        `,
+        [
+          data.id,
+          data.filename,
+          data.originalName,
+          data.mimeType,
+          data.size,
+          data.url,
+          data.uploadedBy,
+          JSON.stringify(data.variants || []),
+          data.optimization ? JSON.stringify(data.optimization) : null,
+          data.processingStatus || 'READY',
+          data.aspectRatio ?? null,
+          data.usageProfile ?? null,
+          data.storageKey ?? null,
+          data.cdnUrl ?? null,
+        ],
+      );
+      return this.toDomain(result.rows[0]);
+    }
     const result = await this.postgres.pool.query<MediaRow>(
       `
       INSERT INTO cms_media (

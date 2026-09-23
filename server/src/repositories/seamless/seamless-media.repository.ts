@@ -78,11 +78,20 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
     return activeEngine() === 'mongodb' ? this.postgresStore : this.mongoStore;
   }
 
+  private get allSecondaryStores(): IMediaRepository[] {
+    const targets = [...this.peerStores];
+    if (this.mariadbRepo && this.activeRepo !== this.mariadbRepo) targets.push(this.mariadbRepo);
+    if (this.mysqlRepo && this.activeRepo !== this.mysqlRepo) targets.push(this.mysqlRepo);
+    if (this.cockroachRepo && this.activeRepo !== this.cockroachRepo) targets.push(this.cockroachRepo);
+    return targets;
+  }
+
   async create(data: CreateMediaDto): Promise<Media> {
     const media = await this.activeRepo.create(data);
-    for (const store of this.peerStores) {
+    for (const store of this.allSecondaryStores) {
       store
         .create({
+          id: media.id,
           filename: media.filename,
           originalName: media.originalName,
           mimeType: media.mimeType,
@@ -110,9 +119,10 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
       const peerMedia = await this.jitReadPeer.findById(id);
       if (peerMedia) {
         this.logger.log(
-          `[Seamless Sync] JIT replicating media "${peerMedia.originalName}" from ${this.peerDbName} to ${this.activeDbName}`,
+          `[Seamless Sync] JIT replicating media "${peerMedia.originalName}" (${peerMedia.id}) from ${this.peerDbName} to ${this.activeDbName}`,
         );
         return await this.activeRepo.create({
+          id: peerMedia.id,
           filename: peerMedia.filename,
           originalName: peerMedia.originalName,
           mimeType: peerMedia.mimeType,
@@ -141,7 +151,7 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
 
   async update(id: string, updates: Partial<Media>): Promise<Media | null> {
     const updated = await this.activeRepo.update(id, updates);
-    for (const store of this.peerStores) {
+    for (const store of this.allSecondaryStores) {
       store.update(id, updates).catch(() => {});
     }
     return updated;
@@ -149,7 +159,7 @@ export class SeamlessMediaRepository implements IMediaRepository, IRuntimeSwitch
 
   async delete(id: string): Promise<boolean> {
     const result = await this.activeRepo.delete(id);
-    for (const store of this.peerStores) {
+    for (const store of this.allSecondaryStores) {
       store.delete(id).catch(() => {});
     }
     return result;

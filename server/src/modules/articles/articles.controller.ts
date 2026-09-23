@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -96,8 +97,12 @@ export class ArticlesController {
   @Cacheable(300)
   @Get('slug/:slug')
   @ApiOperation({ summary: 'Get a published article by slug' })
-  async getBySlug(@Param('slug') slug: string): Promise<Article | null> {
-    return this.articleService.findBySlug(slug);
+  async getBySlug(@Param('slug') slug: string): Promise<Article> {
+    const article = await this.articleService.findBySlug(slug);
+    if (!article || article.status !== ContentStatus.PUBLISHED) {
+      throw new NotFoundException('Article not found.');
+    }
+    return article;
   }
 
   @Get('id/:id')

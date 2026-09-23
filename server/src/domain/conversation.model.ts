@@ -5,7 +5,13 @@ export type ConversationType =
   | 'EDITORIAL_INQUIRY'
   | 'SUPPORT_TICKET'
   | 'SECURITY_BULLETIN'
-  | 'DMCA_DISPUTE';
+  | 'DMCA_DISPUTE'
+  | 'PLATFORM_ANNOUNCEMENT'
+  | 'EDITORIAL_MEMO'
+  | 'PEER_REVIEW'
+  | 'FACT_CHECK'
+  | 'CORRECTION_NOTICE'
+  | 'POLICY_UPDATE';
 
 export type ConversationStatus = 'ACTIVE' | 'RESOLVED' | 'CLOSED' | 'ARCHIVED';
 

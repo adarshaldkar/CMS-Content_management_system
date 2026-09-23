@@ -1,5 +1,5 @@
 // client/src/components/inbox/GazetteInbox.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, RefreshCw } from 'lucide-react';
 import { InboxSidebar, type InboxFolder } from './InboxSidebar';
 import { ConversationList, type ConversationItem } from './ConversationList';
@@ -30,7 +30,7 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
   const [sendingMessage, setSendingMessage] = useState(false);
 
   // Fetch unread count & broadcasts
-  const fetchOverview = async () => {
+  const fetchOverview = useCallback(async () => {
     try {
       const [countRes, bcRes] = await Promise.all([
         fetch('/api/messages/unread-count', {
@@ -44,37 +44,10 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
       setUnreadCount(countRes.unreadCount || 0);
       setBroadcasts(bcRes.items || []);
     } catch {}
-  };
-
-  // Fetch conversation list based on active folder
-  const fetchConversations = async () => {
-    if (activeFolder === 'broadcasts') return;
-    setLoadingList(true);
-    try {
-      let url = '/api/messages/conversations?';
-      if (activeFolder === 'direct') url += 'type=DIRECT&';
-      if (activeFolder === 'editorial') url += 'type=EDITORIAL_INQUIRY&';
-      if (activeFolder === 'archive') url += 'isArchived=true&';
-      else url += 'isArchived=false&';
-
-      const res = await fetch(url, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setConversations(data.items || []);
-        if (data.items?.length > 0 && !selectedConvId && !isComposing) {
-          setSelectedConvId(data.items[0].id);
-        }
-      }
-    } catch {
-    } finally {
-      setLoadingList(false);
-    }
-  };
+  }, []);
 
   // Fetch selected conversation detail
-  const fetchDetail = async (id: string) => {
+  const fetchDetail = useCallback(async (id: string) => {
     setLoadingDetail(true);
     try {
       const res = await fetch(`/api/messages/conversations/${id}`, {
@@ -90,20 +63,69 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
     } finally {
       setLoadingDetail(false);
     }
-  };
+  }, [fetchOverview]);
+
+  // Fetch conversation list based on target folder
+  const fetchConversations = useCallback(async (targetFolder: InboxFolder = activeFolder, preferredConvId?: string | null) => {
+    if (targetFolder === 'broadcasts') {
+      setConversations([]);
+      setSelectedConvId(null);
+      setActiveConversationDetail(null);
+      return;
+    }
+
+    setLoadingList(true);
+    try {
+      let url = '/api/messages/conversations?';
+      if (targetFolder === 'direct') url += 'type=DIRECT&';
+      if (targetFolder === 'editorial') url += 'type=EDITORIAL_INQUIRY&';
+      if (targetFolder === 'archive') url += 'isArchived=true&';
+      else url += 'isArchived=false&';
+
+      const res = await fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.items || [];
+        setConversations(items);
+
+        if (items.length > 0) {
+          const targetId = preferredConvId || (items.some((c: any) => c.id === selectedConvId) ? selectedConvId : items[0].id);
+          setSelectedConvId(targetId);
+          fetchDetail(targetId);
+        } else {
+          setSelectedConvId(null);
+          setActiveConversationDetail(null);
+        }
+      }
+    } catch {
+    } finally {
+      setLoadingList(false);
+    }
+  }, [activeFolder, selectedConvId, fetchDetail]);
 
   useEffect(() => {
     if (isOpen) {
       fetchOverview();
-      fetchConversations();
+      fetchConversations(activeFolder);
     }
-  }, [isOpen, activeFolder]);
+  }, [isOpen]);
 
-  useEffect(() => {
-    if (selectedConvId && !isComposing && activeFolder !== 'broadcasts') {
-      fetchDetail(selectedConvId);
-    }
-  }, [selectedConvId]);
+  const handleSelectFolder = (folder: InboxFolder) => {
+    setActiveFolder(folder);
+    setIsComposing(false);
+    setSelectedConvId(null);
+    setActiveConversationDetail(null);
+    fetchConversations(folder, null);
+  };
+
+  const handleSelectConversation = (id: string) => {
+    setSelectedConvId(id);
+    setIsComposing(false);
+    fetchDetail(id);
+  };
 
   if (!isOpen) return null;
 
@@ -121,7 +143,7 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
       });
       if (res.ok) {
         await fetchDetail(selectedConvId);
-        fetchConversations();
+        await fetchConversations(activeFolder, selectedConvId);
       }
     } catch {
     } finally {
@@ -143,8 +165,11 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
       if (res.ok) {
         const created = await res.json();
         setIsComposing(false);
-        await fetchConversations();
+        const nextFolder: InboxFolder = data.type === 'EDITORIAL_INQUIRY' ? 'editorial' : data.type === 'DIRECT' ? 'direct' : 'all';
+        setActiveFolder(nextFolder);
         setSelectedConvId(created.id);
+        await fetchConversations(nextFolder, created.id);
+        await fetchDetail(created.id);
       } else {
         const err = await res.json();
         throw new Error(err.message || 'Failed to dispatch');
@@ -166,9 +191,10 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
         },
         body: JSON.stringify({ isArchived }),
       });
-      fetchConversations();
       setSelectedConvId(null);
       setActiveConversationDetail(null);
+      await fetchConversations(activeFolder, null);
+      await fetchOverview();
     } catch {}
   };
 
@@ -203,16 +229,16 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
             <button
               onClick={() => {
                 fetchOverview();
-                fetchConversations();
+                fetchConversations(activeFolder, selectedConvId);
               }}
               title="Refresh Inboxes"
-              className="p-1 text-stone-400 hover:text-stone-200 rounded"
+              className="p-1 text-stone-400 hover:text-stone-200 rounded cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onClose}
-              className="p-1 text-stone-400 hover:text-stone-200 rounded"
+              className="p-1 text-stone-400 hover:text-stone-200 rounded cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -224,13 +250,13 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
           {/* 1. Folder Navigation Sidebar */}
           <InboxSidebar
             activeFolder={activeFolder}
-            onSelectFolder={(folder) => {
-              setActiveFolder(folder);
-              setIsComposing(false);
-            }}
+            onSelectFolder={handleSelectFolder}
             unreadCount={unreadCount}
             broadcastsCount={broadcasts.filter((b) => !b.isRead).length}
-            onNewMessage={() => setIsComposing(true)}
+            onNewMessage={() => {
+              setIsComposing(true);
+              setActiveConversationDetail(null);
+            }}
           />
 
           {/* 2. Main Desk Panel */}
@@ -242,7 +268,10 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
             />
           ) : isComposing ? (
             <MessageComposer
-              onCancel={() => setIsComposing(false)}
+              onCancel={() => {
+                setIsComposing(false);
+                if (selectedConvId) fetchDetail(selectedConvId);
+              }}
               onSubmit={handleCreateConversation}
               loading={sendingMessage}
             />
@@ -251,24 +280,31 @@ export const GazetteInbox: React.FC<GazetteInboxProps> = ({
               <ConversationList
                 conversations={conversations}
                 selectedId={selectedConvId}
-                onSelect={(id) => {
-                  setSelectedConvId(id);
-                  setIsComposing(false);
-                }}
+                onSelect={handleSelectConversation}
                 loading={loadingList}
               />
 
-              {activeConversationDetail ? (
+              {loadingDetail ? (
+                <div className="flex-1 flex items-center justify-center p-8 bg-stone-50/20 dark:bg-stone-900/30">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-700" />
+                </div>
+              ) : activeConversationDetail ? (
                 <ConversationView
                   conversation={activeConversationDetail}
                   currentUserId={currentUserId}
                   onSendMessage={handleSendMessage}
                   onToggleArchive={handleToggleArchive}
+                  isArchivedFolder={activeFolder === 'archive'}
                   sending={sendingMessage}
                 />
               ) : (
-                <div className="flex-1 flex items-center justify-center text-stone-400 font-serif italic text-sm">
-                  Select a correspondence file from the left to read or reply.
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-stone-50/20 dark:bg-stone-900/30 text-stone-400 font-serif">
+                  <div className="text-base text-stone-600 dark:text-stone-300 font-medium mb-1">
+                    Select a correspondence file from the list
+                  </div>
+                  <div className="text-xs text-stone-400 italic">
+                    Read threads, reply to dispatches, or compose a new message.
+                  </div>
                 </div>
               )}
             </div>

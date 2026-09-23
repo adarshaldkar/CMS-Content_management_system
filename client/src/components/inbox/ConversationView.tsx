@@ -1,14 +1,13 @@
 // client/src/components/inbox/ConversationView.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Clock,
   Send,
   Archive,
-  CheckCircle2,
+  ArchiveRestore,
   ExternalLink,
   Shield,
   User,
-  Paperclip,
   ArrowLeft,
 } from 'lucide-react';
 
@@ -46,6 +45,7 @@ interface ConversationViewProps {
   currentUserId: string;
   onSendMessage: (body: string, actionUrl?: string, actionLabel?: string) => Promise<void>;
   onToggleArchive: () => Promise<void>;
+  isArchivedFolder?: boolean;
   onBack?: () => void;
   sending: boolean;
 }
@@ -55,16 +55,34 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   currentUserId,
   onSendMessage,
   onToggleArchive,
+  isArchivedFolder = false,
   onBack,
   sending,
 }) => {
   const [replyText, setReplyText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversation.messages]);
+
+  const handleSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!replyText.trim() || sending) return;
-    await onSendMessage(replyText.trim());
+    const text = replyText.trim();
     setReplyText('');
+    await onSendMessage(text);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   /**
@@ -85,7 +103,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-stone-50/20 dark:bg-stone-900/30 overflow-hidden">
       {/* Editorial Header */}
-      <header className="p-4 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex items-center justify-between">
+      <header className="p-4 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
@@ -111,7 +129,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             </h2>
             <div className="text-xs text-stone-500 dark:text-stone-400 flex items-center gap-2 mt-0.5">
               <span>Participants:</span>
-              <div className="flex items-center gap-1 font-medium text-stone-700 dark:text-stone-300">
+              <div className="flex items-center gap-1 font-medium text-stone-700 dark:text-stone-300 flex-wrap">
                 {conversation.participants.map((p, i) => (
                   <span key={p.userId}>
                     {p.userName || 'Staff'} ({p.userRole || 'Member'}){i < conversation.participants.length - 1 ? ',' : ''}
@@ -125,11 +143,20 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleArchive}
-            title="Archive or Resolve"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-serif text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded transition-colors"
+            title={isArchivedFolder ? 'Restore conversation to active inbox' : 'Archive conversation'}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-serif text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded transition-colors cursor-pointer"
           >
-            <Archive className="w-3.5 h-3.5" />
-            <span>Archive</span>
+            {isArchivedFolder ? (
+              <>
+                <ArchiveRestore className="w-3.5 h-3.5 text-amber-600" />
+                <span>Restore to Active</span>
+              </>
+            ) : (
+              <>
+                <Archive className="w-3.5 h-3.5" />
+                <span>Archive</span>
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -150,7 +177,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
               <div className="flex items-center justify-between border-b border-stone-200/50 dark:border-stone-800/60 pb-2 mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-full bg-stone-200 dark:bg-stone-700 flex items-center justify-center text-xs font-serif font-bold text-stone-700 dark:text-stone-300">
-                    {m.senderName.charAt(0).toUpperCase()}
+                    {m.senderName ? m.senderName.charAt(0).toUpperCase() : 'S'}
                   </div>
                   <span className="font-serif font-semibold text-sm text-stone-900 dark:text-stone-100">
                     {m.senderName}
@@ -182,25 +209,33 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             </article>
           );
         })}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Reply Composer */}
-      <footer className="p-4 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800">
+      <footer className="p-4 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800 shrink-0">
         <form onSubmit={handleSend} className="flex gap-2">
           <textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Type your correspondence dispatch (Markdown supported)..."
+            onKeyDown={handleKeyDown}
+            placeholder="Type your correspondence dispatch (Markdown supported)... Press Ctrl+Enter to send"
             rows={2}
             className="flex-1 p-2.5 text-sm font-serif border border-stone-300 dark:border-stone-700 rounded bg-stone-50/50 dark:bg-stone-800 focus:outline-hidden focus:ring-1 focus:ring-amber-700 resize-none text-stone-900 dark:text-stone-100"
           />
           <button
             type="submit"
             disabled={!replyText.trim() || sending}
-            className="px-4 bg-amber-700 hover:bg-amber-800 text-white rounded font-serif text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+            className="px-4 bg-amber-700 hover:bg-amber-800 text-white rounded font-serif text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            <Send className="w-4 h-4" />
-            <span>Send</span>
+            {sending ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>Send</span>
+              </>
+            )}
           </button>
         </form>
       </footer>

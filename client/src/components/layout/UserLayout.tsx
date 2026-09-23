@@ -7,6 +7,7 @@ import {
   Flame,
   Globe,
   History,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -49,6 +50,7 @@ export const UserLayout: React.FC = () => {
     {
       title: 'READ & FOLLOW',
       items: [
+        { label: 'Gazette Inbox', to: '/inbox', icon: Inbox },
         { label: 'Saved Library', to: '/library', icon: Bookmark },
         { label: 'Reading History', to: '/history', icon: History },
         { label: 'For You Feed', to: '/feed', icon: Flame },

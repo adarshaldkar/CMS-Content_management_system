@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLogo } from '../common/BrandLogo';
-import reactLogo from '../../assets/react.svg';
-import viteLogo from '../../assets/vite.svg';
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com', symbol: 'github-icon' },
@@ -30,7 +28,7 @@ export const PublicFooter: React.FC = () => {
             <ul className="space-y-2 text-xs text-ink-secondary">
               <li>
                 <Link to="/category/technology" className="hover:text-ink-primary">
-                  Technology & Computing
+                  Technology &amp; Computing
                 </Link>
               </li>
               <li>
@@ -40,7 +38,7 @@ export const PublicFooter: React.FC = () => {
               </li>
               <li>
                 <Link to="/category/cybersecurity" className="hover:text-ink-primary">
-                  Cybersecurity & Privacy
+                  Cybersecurity &amp; Privacy
                 </Link>
               </li>
               <li>
@@ -107,20 +105,17 @@ export const PublicFooter: React.FC = () => {
             </div>
 
             <h4 className="text-xs font-mono uppercase tracking-wider text-ink-primary font-semibold mb-3">
-              Standards & Architecture
+              Legal &amp; Privacy
             </h4>
-            <p className="text-xs text-ink-secondary leading-relaxed">
-              Engineered with zero-buffer seamless database switching, strict CSRF validation, and Argon2id session security.
-            </p>
-            <div className="mt-4 flex items-center gap-2 text-[11px] font-mono text-ink-secondary">
-              Built with
-              <img src={reactLogo} alt="React" className="w-4 h-4" />
-              React
-              <span aria-hidden="true">+</span>
-              <img src={viteLogo} alt="Vite" className="w-4 h-4" />
-              Vite
-            </div>
-            <div className="mt-2 text-[11px] font-mono text-ink-secondary">
+            <ul className="space-y-2 text-xs text-ink-secondary">
+              <li><Link to="/legal/terms" className="hover:text-ink-primary transition-colors">Terms &amp; Conditions</Link></li>
+              <li><Link to="/legal/privacy" className="hover:text-ink-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/legal/cookies" className="hover:text-ink-primary transition-colors">Cookie Policy</Link></li>
+              <li><Link to="/legal/community" className="hover:text-ink-primary transition-colors">Community Guidelines</Link></li>
+              <li><Link to="/legal/copyright" className="hover:text-ink-primary transition-colors">Copyright &amp; DMCA</Link></li>
+              <li><Link to="/legal/acceptable-use" className="hover:text-ink-primary transition-colors">Acceptable Use</Link></li>
+            </ul>
+            <div className="mt-5 text-[11px] font-mono text-ink-secondary">
               © {new Date().getFullYear()} The Gazette Publishing Group.
             </div>
           </div>

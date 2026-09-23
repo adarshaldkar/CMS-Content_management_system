@@ -10,6 +10,7 @@ import { ScrollToTop } from './components/common/ScrollToTop';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { EditorialErrorBoundary } from './components/common/EditorialErrorBoundary';
 import { CommandPaletteModal } from './components/common/CommandPaletteModal';
+import { CookieConsentBanner } from './components/common/CookieConsentBanner';
 import { useAuthStore } from './stores/authStore';
 
 // ─── Route Code-Splitting with React.lazy (Optimized Performance) ──
@@ -51,6 +52,18 @@ const NewsletterManagerPage = lazy(() => import('./pages/admin/NewsletterManager
 const AdminPanelPage = lazy(() => import('./pages/AdminPanelPage').then((m) => ({ default: m.AdminPanelPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
+// Gazette Inbox
+const InboxPage = lazy(() => import('./pages/user/InboxPage').then((m) => ({ default: m.InboxPage })));
+
+// Legal Pages (lazy-loaded, all from one file)
+const TermsPageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.TermsPage })));
+const PrivacyPageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.PrivacyPage })));
+const CookiePolicyPageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.CookiePolicyPage })));
+const CommunityGuidelinesPageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.CommunityGuidelinesPage })));
+const ContentPolicyPageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.ContentPolicyPage })));
+const CopyrightPageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.CopyrightPage })));
+const AcceptableUsePageLazy = lazy(() => import('./pages/legal/LegalPagesWrapper').then((m) => ({ default: m.AcceptableUsePage })));
+
 const PageLoaderFallback = () => (
   <div className="min-h-[60vh] flex items-center justify-center p-8">
     <LoadingSpinner label="Loading dispatch..." />
@@ -86,6 +99,14 @@ export default function App() {
               <Route path="/feed" element={<ForYouFeedPage />} />
               <Route path="/newsletter/verify/:token" element={<NewsletterVerifyPage />} />
               <Route path="/newsletter/preferences/:token" element={<NewsletterPreferencesPage />} />
+              {/* Legal / Policy Pages — public, no auth required */}
+              <Route path="/legal/terms" element={<TermsPageLazy />} />
+              <Route path="/legal/privacy" element={<PrivacyPageLazy />} />
+              <Route path="/legal/cookies" element={<CookiePolicyPageLazy />} />
+              <Route path="/legal/community" element={<CommunityGuidelinesPageLazy />} />
+              <Route path="/legal/content" element={<ContentPolicyPageLazy />} />
+              <Route path="/legal/copyright" element={<CopyrightPageLazy />} />
+              <Route path="/legal/acceptable-use" element={<AcceptableUsePageLazy />} />
             </Route>
 
             {/* 2. Public-Only Auth Routes */}
@@ -122,6 +143,8 @@ export default function App() {
                 <Route path="/settings" element={<UserSettingsPage />} />
                 <Route path="/user" element={<UserDashboardPage />} />
                 <Route path="/user/*" element={<UserDashboardPage />} />
+                {/* Gazette Inbox — full-page inbox experience */}
+                <Route path="/inbox" element={<InboxPage />} />
               </Route>
             </Route>
 
@@ -152,6 +175,8 @@ export default function App() {
           </Routes>
         </EditorialErrorBoundary>
       </Suspense>
+      {/* Global Cookie Consent Banner (shown once until user decides) */}
+      <CookieConsentBanner />
     </BrowserRouter>
   );
 }

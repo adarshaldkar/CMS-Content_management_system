@@ -164,6 +164,7 @@ export class AuthService {
     const tokenHash = this.hashToken(refreshToken);
 
     await this.sessionRepo.create({
+      id: sessionId,
       userId: user.id,
       tokenHash,
       familyId,
