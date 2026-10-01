@@ -16,7 +16,8 @@ import { LegalService } from './legal.service';
 import type { PolicyDocument } from './legal.service';
 import { Public, CurrentUser } from '../../common/decorators/security.decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import type { AuthUser, ConsentRecord, ConsentChoice, ConsentType, JwtAccessPayload } from '../../domain/models';
+import type { AuthUser, ConsentRecord, JwtAccessPayload } from '../../domain/models';
+import { RecordConsentDtoClass, FileCopyrightClaimDtoClass } from './dto/legal.dto';
 
 @ApiTags('legal')
 @Controller('legal')
@@ -60,7 +61,7 @@ export class LegalController {
   @Post('consent')
   @ApiOperation({ summary: 'Record user or visitor cookie/privacy consent decision' })
   async recordConsent(
-    @Body() body: { consentType: ConsentType; choice: ConsentChoice; version?: string },
+    @Body() body: RecordConsentDtoClass,
     @Req() req: Request,
     @CurrentUser() user?: AuthUser,
   ): Promise<ConsentRecord> {
@@ -90,16 +91,10 @@ export class LegalController {
   @Post('copyright-claim')
   @ApiOperation({ summary: 'Submit a Copyright/DMCA infringement claim' })
   async fileCopyrightClaim(
-    @Body()
-    body: {
-      articleUrl: string;
-      claimantName: string;
-      claimantEmail: string;
-      description: string;
-      declaration: boolean;
-    },
+    @Body() body: FileCopyrightClaimDtoClass,
     @CurrentUser() user?: AuthUser,
   ) {
     return this.legalService.fileCopyrightClaim(body, user);
   }
 }
+

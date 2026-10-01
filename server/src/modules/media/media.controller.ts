@@ -3,6 +3,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UploadedFile,
@@ -74,7 +75,7 @@ export class MediaController {
   @Get('stream/:mediaId')
   @ApiOperation({ summary: 'Stream video asset using HTTP 206 Byte-Ranges' })
   async streamVideo(
-    @Param('mediaId') mediaId: string,
+    @Param('mediaId', new ParseUUIDPipe({ version: '4' })) mediaId: string,
     @Headers('range') rangeHeader: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
@@ -109,7 +110,9 @@ export class MediaController {
   @Get(':id')
   @UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard)
   @ApiOperation({ summary: 'Get details and processing status of a single media asset' })
-  async getOne(@Param('id') id: string): Promise<Media> {
+  async getOne(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<Media> {
     return this.mediaService.getMedia(id);
   }
 
@@ -135,9 +138,10 @@ export class MediaController {
   @ApiOperation({ summary: 'Delete a media asset' })
   @RequirePermissions(Permission.MEDIA_DELETE_OWN)
   async delete(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ): Promise<{ success: boolean }> {
     return this.mediaService.deleteMedia(id, user);
   }
 }
+

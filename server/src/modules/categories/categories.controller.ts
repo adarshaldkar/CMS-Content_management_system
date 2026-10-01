@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
+import { ListCategoriesQueryDto } from './dto/list-categories-query.dto';
 import { Public, RequirePermissions } from '../../common/decorators/security.decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -34,17 +36,12 @@ export class CategoriesController {
   @Cacheable(600)
   @Get()
   @ApiOperation({ summary: 'List all categories with pagination & search' })
-  async findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-    @Query('status') status?: 'active' | 'inactive',
-  ): Promise<PaginatedResult<Category>> {
+  async findAll(@Query() query: ListCategoriesQueryDto): Promise<PaginatedResult<Category>> {
     return this.categoriesService.findAll({
-      page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 50,
-      search,
-      status,
+      page: query.page ?? 1,
+      limit: query.limit ?? 50,
+      search: query.search,
+      status: query.status,
     });
   }
 
@@ -60,7 +57,9 @@ export class CategoriesController {
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Get category by ID' })
-  async findById(@Param('id') id: string): Promise<Category> {
+  async findById(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<Category> {
     return this.categoriesService.findById(id);
   }
 

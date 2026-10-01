@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FollowsService } from './follows.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,14 +18,20 @@ export class FollowsController {
   @Post('users/:userId/follow')
   @ApiOperation({ summary: 'Follow a user' })
   @RequirePermissions(Permission.FOLLOW_CREATE)
-  async followUser(@Param('userId') userId: string, @CurrentUser() user: AuthUser) {
+  async followUser(
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
     return this.followsService.followUser(userId, user);
   }
 
   @Delete('users/:userId/follow')
   @ApiOperation({ summary: 'Unfollow a user' })
   @RequirePermissions(Permission.FOLLOW_DELETE)
-  async unfollowUser(@Param('userId') userId: string, @CurrentUser() user: AuthUser) {
+  async unfollowUser(
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
     return this.followsService.unfollowUser(userId, user);
   }
 
@@ -33,7 +39,7 @@ export class FollowsController {
   @ApiOperation({ summary: 'Get whether the current user follows a target user' })
   @RequirePermissions(Permission.FOLLOW_READ)
   async getFollowStatus(
-    @Param('userId') userId: string,
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
     @CurrentUser() user: AuthUser,
   ) {
     const following = await this.followsService.isFollowing(
@@ -48,7 +54,7 @@ export class FollowsController {
   @Get('users/:userId/followers')
   @ApiOperation({ summary: 'Get followers of a user' })
   async getUserFollowers(
-    @Param('userId') userId: string,
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -58,7 +64,7 @@ export class FollowsController {
   @Get('users/:userId/following')
   @ApiOperation({ summary: 'Get users a user is following' })
   async getUserFollowing(
-    @Param('userId') userId: string,
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -95,7 +101,9 @@ export class FollowsController {
   @Public()
   @Get('users/:userId/stats')
   @ApiOperation({ summary: 'Get follower/following counts for a user profile' })
-  async getUserFollowStats(@Param('userId') userId: string) {
+  async getUserFollowStats(
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
+  ) {
     const [followersCount, followingCount] = await Promise.all([
       this.followsService.getFollowerCount(FollowTargetType.USER, userId),
       this.followsService.getFollowingCount(userId, FollowTargetType.USER),
@@ -103,3 +111,4 @@ export class FollowsController {
     return { userId, followersCount, followingCount };
   }
 }
+

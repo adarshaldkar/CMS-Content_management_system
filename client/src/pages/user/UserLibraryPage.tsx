@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bookmark, History, Trash2, X, ArrowRight, Clock } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
@@ -48,9 +48,20 @@ const TABS = [
 ];
 
 export const UserLibraryPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'bookmarks' | 'history'>('bookmarks');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'bookmarks' | 'history'>(() =>
+    location.pathname === '/history' ? 'history' : 'bookmarks'
+  );
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (location.pathname === '/history') {
+      setActiveTab('history');
+    } else if (location.pathname === '/library') {
+      setActiveTab('bookmarks');
+    }
+  }, [location.pathname]);
 
   // Dynamic Reading History State
   const [readingHistory, setReadingHistory] = useState<ReadingHistoryItem[]>(() => {

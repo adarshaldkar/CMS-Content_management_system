@@ -45,6 +45,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { EditorialAvatar } from '../../components/common/EditorialAvatar';
 import { authApi } from '../../api/auth.api';
 import { uploadMediaAsset } from '../../api/media.api';
 import { apiClient, fetchHealth } from '../../api/client';
@@ -475,23 +476,17 @@ export const UserProfilePage: React.FC = () => {
                   onClick={() => fileInputRef.current?.click()}
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded bg-ink-primary text-white flex items-center justify-center font-editorial font-bold text-3xl uppercase overflow-hidden border-2 border-border-subtle shadow-inner relative group cursor-pointer"
                   title="Click to select image from your computer"
-                  style={{ borderRadius: 2 }}
+                  style={{ borderRadius: 3 }}
                 >
-                  {user?.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name}
-                      className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <span>{user?.name.charAt(0) || 'A'}</span>
-                  )}
+                  <EditorialAvatar
+                    name={user?.name || 'A'}
+                    avatarUrl={user?.avatarUrl}
+                    size="2xl"
+                    className="w-full h-full border-none shadow-none"
+                  />
 
                   {/* Camera Hover Overlay */}
-                  <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white">
+                  <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white z-10">
                     <Camera size={20} />
                     <span className="text-[9px] font-mono uppercase tracking-wider font-semibold text-center px-1">
                       {isUploadingPhoto ? 'Uploading...' : user?.avatarUrl ? 'Change Photo' : 'Choose File'}
@@ -507,7 +502,7 @@ export const UserProfilePage: React.FC = () => {
                       handleRemovePhoto();
                     }}
                     disabled={isUploadingPhoto}
-                    className="text-[10px] font-mono text-rose-600 hover:text-rose-800 flex items-center gap-1 transition-colors underline cursor-pointer"
+                    className="text-[10px] font-mono text-rose-600 hover:text-rose-800 flex items-center gap-1 transition-colors underline cursor-pointer mt-1"
                     title="Remove custom profile picture"
                   >
                     <Trash2 size={10} />

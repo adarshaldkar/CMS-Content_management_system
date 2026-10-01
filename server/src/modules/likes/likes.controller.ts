@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { LikesService } from './likes.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,7 +17,7 @@ export class LikesController {
   @ApiOperation({ summary: 'Toggle like on an article (like if not liked, unlike if liked)' })
   @RequirePermissions(Permission.LIKE_TOGGLE)
   async toggleLike(
-    @Param('articleId') articleId: string,
+    @Param('articleId', new ParseUUIDPipe({ version: '4' })) articleId: string,
     @CurrentUser() user: AuthUser,
   ) {
     return this.likesService.toggleLike(articleId, user);
@@ -26,7 +26,9 @@ export class LikesController {
   @Public()
   @Get(':articleId/likes/count')
   @ApiOperation({ summary: 'Get public like count for an article' })
-  async getLikeCount(@Param('articleId') articleId: string) {
+  async getLikeCount(
+    @Param('articleId', new ParseUUIDPipe({ version: '4' })) articleId: string,
+  ) {
     const count = await this.likesService.getLikeCount(articleId);
     return { articleId, likesCount: count };
   }
@@ -34,10 +36,11 @@ export class LikesController {
   @Get(':articleId/like/status')
   @ApiOperation({ summary: 'Get whether the current user has liked an article' })
   async getLikeStatus(
-    @Param('articleId') articleId: string,
+    @Param('articleId', new ParseUUIDPipe({ version: '4' })) articleId: string,
     @CurrentUser() user: AuthUser,
   ) {
     const liked = await this.likesService.isLiked(user.id, articleId);
     return { liked };
   }
 }
+

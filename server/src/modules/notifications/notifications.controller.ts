@@ -5,6 +5,7 @@ import {
   Get,
   Logger,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -67,7 +68,7 @@ export class NotificationsController {
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark a single notification as read' })
   async markAsRead(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ): Promise<NotificationItem | null> {
     return this.notificationsService.markAsRead(id, user.id);

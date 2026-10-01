@@ -3,21 +3,23 @@ import React, { useState, useEffect } from 'react';
 interface EditorialAvatarProps {
   name?: string;
   avatarUrl?: string | null;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
 }
 
-const sizeClasses = {
+const sizeClasses: Record<string, string> = {
   xs: 'w-6 h-6 text-[10px]',
   sm: 'w-7 h-7 text-xs',
   md: 'w-8 h-8 text-xs',
   lg: 'w-10 h-10 text-sm',
+  xl: 'w-14 h-14 text-xl',
+  '2xl': 'w-20 h-20 sm:w-24 sm:h-24 text-3xl font-editorial',
 };
 
 /**
  * EditorialAvatar
- * URL-keyed avatar component with automatic error recovery:
- * Resets error state whenever avatarUrl changes, preventing permanent fallback states.
+ * High-legibility avatar component with robust error fallback:
+ * Always gracefully displays the user's initial monogram if image fails or is absent.
  */
 export const EditorialAvatar: React.FC<EditorialAvatarProps> = ({
   name = 'User',
@@ -32,12 +34,12 @@ export const EditorialAvatar: React.FC<EditorialAvatarProps> = ({
     setHasError(false);
   }, [avatarUrl]);
 
-  const initial = (name?.trim().charAt(0) || 'U').toUpperCase();
+  const initial = (name?.trim().charAt(0) || 'A').toUpperCase();
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded bg-ink-primary text-white flex items-center justify-center font-mono font-bold shrink-0 overflow-hidden select-none ${className}`}
-      style={{ borderRadius: 2 }}
+      className={`${sizeClasses[size] || sizeClasses.md} rounded bg-ink-primary text-white flex items-center justify-center font-mono font-bold shrink-0 overflow-hidden select-none border border-border-subtle shadow-inner ${className}`}
+      style={{ borderRadius: size === '2xl' ? 4 : 3 }}
       aria-label={`Avatar for ${name}`}
     >
       {avatarUrl && !hasError ? (
@@ -50,7 +52,9 @@ export const EditorialAvatar: React.FC<EditorialAvatarProps> = ({
           onError={() => setHasError(true)}
         />
       ) : (
-        <span aria-hidden="true">{initial}</span>
+        <span aria-hidden="true" className="tracking-tight text-white/95">
+          {initial}
+        </span>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   AlertCircle,
   CheckCircle2,
+  Cookie,
   Eye,
   EyeOff,
   KeyRound,
@@ -12,6 +13,7 @@ import {
   LogOut,
   Shield,
   Smartphone,
+  Sliders,
 } from 'lucide-react';
 import { authApi } from '../../api/auth.api';
 import { useAuthStore } from '../../stores/authStore';
@@ -42,6 +44,56 @@ export const UserSettingsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // ─── Cookie Preferences ───────────────────────────────────────────
+  const [cookiePrefs, setCookiePrefs] = useState({
+    analytics: true,
+    functional: true,
+    marketing: false,
+  });
+  const [cookieSaveStatus, setCookieSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('gazette_cookie_consent_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.categories) {
+          setCookiePrefs({
+            analytics: parsed.categories.analytics ?? true,
+            functional: parsed.categories.functional ?? true,
+            marketing: parsed.categories.marketing ?? false,
+          });
+        }
+      }
+    } catch {
+      // Ignore malformed storage
+    }
+  }, []);
+
+  const handleSaveCookiePrefs = async () => {
+    setCookieSaveStatus('saving');
+    const categories = { strictlyNecessary: true, ...cookiePrefs };
+
+    localStorage.setItem(
+      'gazette_cookie_consent_v1',
+      JSON.stringify({ choice: 'customized', categories, timestamp: new Date().toISOString() }),
+    );
+
+    try {
+      await fetch('/api/legal/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consentType: 'cookie_policy', version: 'v1.0', choice: 'customized', categories }),
+      });
+      setCookieSaveStatus('saved');
+    } catch {
+      setCookieSaveStatus('error');
+    } finally {
+      setTimeout(() => setCookieSaveStatus('idle'), 3000);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────
 
   const { clearAuth } = useAuthStore();
   const navigate = useNavigate();
@@ -242,6 +294,110 @@ export const UserSettingsPage: React.FC = () => {
               <span>{isLoggingOutAll ? 'Revoking sessions...' : 'Sign Out of All Devices'}</span>
             </button>
           </div>
+        </div>
+      </div>
+      {/* Cookie Preferences Card */}
+      <div className="bg-white border border-border-subtle rounded-xl p-6 shadow-sm">
+        <div className="flex items-center gap-2.5 pb-4 border-b border-border-subtle mb-6">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+            <Cookie size={16} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-ink-primary">Cookie Preferences</h2>
+            <p className="text-[11px] text-ink-secondary">
+              Control optional analytics, personalisation, and marketing cookies
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* Strictly Necessary — always on */}
+          <div className="p-3 rounded-lg border border-border-subtle bg-slate-50 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-ink-primary flex items-center gap-1.5">
+                Strictly Necessary
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
+                  Always Active
+                </span>
+              </p>
+              <p className="text-[11px] text-ink-secondary mt-0.5">
+                Required for secure authentication, CSRF defense, and session persistence.
+              </p>
+            </div>
+            <input type="checkbox" checked disabled className="h-4 w-4 rounded accent-amber-500 cursor-not-allowed opacity-50" />
+          </div>
+
+          {/* Analytics */}
+          <label className="p-3 rounded-lg border border-border-subtle bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors">
+            <div className="pr-4">
+              <p className="text-xs font-semibold text-ink-primary">Analytics &amp; Performance</p>
+              <p className="text-[11px] text-ink-secondary mt-0.5">
+                Measures reader traffic, scroll depth, and page performance.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={cookiePrefs.analytics}
+              onChange={(e) => setCookiePrefs({ ...cookiePrefs, analytics: e.target.checked })}
+              className="h-4 w-4 rounded accent-amber-500 cursor-pointer"
+            />
+          </label>
+
+          {/* Functional */}
+          <label className="p-3 rounded-lg border border-border-subtle bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors">
+            <div className="pr-4">
+              <p className="text-xs font-semibold text-ink-primary">Functional &amp; Preferences</p>
+              <p className="text-[11px] text-ink-secondary mt-0.5">
+                Remembers reading layout, font sizing, and dark/light mode across sessions.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={cookiePrefs.functional}
+              onChange={(e) => setCookiePrefs({ ...cookiePrefs, functional: e.target.checked })}
+              className="h-4 w-4 rounded accent-amber-500 cursor-pointer"
+            />
+          </label>
+
+          {/* Marketing */}
+          <label className="p-3 rounded-lg border border-border-subtle bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors">
+            <div className="pr-4">
+              <p className="text-xs font-semibold text-ink-primary">Personalised Recommendations</p>
+              <p className="text-[11px] text-ink-secondary mt-0.5">
+                Topic curation based on your reading history and newsletter subscriptions.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={cookiePrefs.marketing}
+              onChange={(e) => setCookiePrefs({ ...cookiePrefs, marketing: e.target.checked })}
+              className="h-4 w-4 rounded accent-amber-500 cursor-pointer"
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSaveCookiePrefs}
+            disabled={cookieSaveStatus === 'saving'}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-sm disabled:opacity-50"
+          >
+            <Sliders size={14} />
+            <span>{cookieSaveStatus === 'saving' ? 'Saving...' : 'Save Preferences'}</span>
+          </button>
+          {cookieSaveStatus === 'saved' && (
+            <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+              <CheckCircle2 size={14} />
+              Preferences saved
+            </span>
+          )}
+          {cookieSaveStatus === 'error' && (
+            <span className="flex items-center gap-1.5 text-xs text-rose-600 font-medium">
+              <AlertCircle size={14} />
+              Could not sync — preferences saved locally
+            </span>
+          )}
         </div>
       </div>
     </div>

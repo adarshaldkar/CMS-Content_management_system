@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Query,
   UseGuards,
@@ -52,7 +53,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Update user role with strict hierarchy checks' })
   @RequirePermissions(Permission.USER_UPDATE_ROLE)
   async updateRole(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() body: { role: UserRole },
     @CurrentUser() actor: AuthUser,
   ): Promise<User> {
@@ -63,10 +64,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Activate or deactivate a user account' })
   @RequirePermissions(Permission.USER_UPDATE_ROLE)
   async updateStatus(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() body: { isActive: boolean },
     @CurrentUser() actor: AuthUser,
   ): Promise<User> {
     return this.usersService.updateStatus(id, body.isActive, actor);
   }
 }
+

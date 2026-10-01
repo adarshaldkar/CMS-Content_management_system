@@ -4,12 +4,15 @@ import type { AuthSession, User } from '../types';
 export interface LoginDto {
   email: string;
   password: string;
+  cfTurnstileToken?: string;
 }
 
 export interface RegisterDto {
   name: string;
   email: string;
   password: string;
+  cfTurnstileToken?: string;
+  acceptedTermsVersion?: string;
 }
 
 export interface UpdateProfileDto {
@@ -64,8 +67,11 @@ export const authApi = {
     return data;
   },
 
-  async forgotPassword(email: string): Promise<{ message: string }> {
-    const { data } = await apiClient.post<{ message: string }>('/auth/forgot-password', { email });
+  async forgotPassword(email: string, cfTurnstileToken?: string): Promise<{ message: string }> {
+    const { data } = await apiClient.post<{ message: string }>('/auth/forgot-password', {
+      email,
+      ...(cfTurnstileToken ? { cfTurnstileToken } : {}),
+    });
     return data;
   },
 

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -31,7 +32,7 @@ export class CommentsController {
   @Get('articles/:articleId/comments')
   @ApiOperation({ summary: 'Get paginated comments for an article' })
   async getComments(
-    @Param('articleId') articleId: string,
+    @Param('articleId', new ParseUUIDPipe({ version: '4' })) articleId: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -46,7 +47,7 @@ export class CommentsController {
   @Get('users/:userId/comments')
   @ApiOperation({ summary: 'Get recent comments made by a user' })
   async getUserComments(
-    @Param('userId') userId: string,
+    @Param('userId', new ParseUUIDPipe({ version: '4' })) userId: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {
@@ -75,7 +76,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Post a comment on an article' })
   @RequirePermissions(Permission.COMMENT_CREATE)
   async createComment(
-    @Param('articleId') articleId: string,
+    @Param('articleId', new ParseUUIDPipe({ version: '4' })) articleId: string,
     @Body() body: { body?: string; content?: string; parentId?: string },
     @CurrentUser() user: AuthUser,
   ) {
@@ -87,7 +88,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Edit own comment' })
   @RequirePermissions(Permission.COMMENT_UPDATE_OWN)
   async updateComment(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() body: { body?: string; content?: string },
     @CurrentUser() user: AuthUser,
   ) {
@@ -99,7 +100,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Delete own comment or moderate' })
   @RequirePermissions(Permission.COMMENT_DELETE_OWN)
   async deleteComment(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ) {
     return this.commentsService.deleteComment(id, user);
@@ -109,7 +110,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Hide a comment (moderator)' })
   @RequirePermissions(Permission.COMMENT_MODERATE)
   async hideComment(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() body: { moderationNote?: string },
     @CurrentUser() user: AuthUser,
   ) {
@@ -135,3 +136,4 @@ export class CommentsController {
     });
   }
 }
+

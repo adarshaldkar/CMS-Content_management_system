@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { BrandLogo } from '../../components/common/BrandLogo';
+import { CloudflareTurnstile } from '../../components/common/CloudflareTurnstile';
 import { authApi } from '../../api/auth.api';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -21,6 +22,11 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const { setAuthUser } = useAuthStore();
   const navigate = useNavigate();
@@ -69,6 +75,7 @@ export const LoginPage: React.FC = () => {
       const response = await authApi.login({
         email: data.email,
         password: data.password,
+        cfTurnstileToken: turnstileToken || undefined,
       });
 
       setAuthUser(response.user as any);
@@ -180,6 +187,13 @@ export const LoginPage: React.FC = () => {
                 Remember this device for 30 days
               </label>
             </div>
+
+            {/* Cloudflare Turnstile bot protection */}
+            <CloudflareTurnstile
+              onVerify={handleTurnstileVerify}
+              action="login"
+              className=""
+            />
 
             <button
               type="submit"

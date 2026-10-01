@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,8 +15,12 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { BrandLogo } from '../../components/common/BrandLogo';
+import { CloudflareTurnstile } from '../../components/common/CloudflareTurnstile';
 import { authApi } from '../../api/auth.api';
 import { useAuthStore } from '../../stores/authStore';
+
+const TERMS_VERSION = 'v1.0';
+const PRIVACY_VERSION = 'v1.0';
 
 const registerSchema = z
   .object({
@@ -31,7 +35,10 @@ const registerSchema = z
       .regex(/[^A-Za-z0-9]/, 'Must include at least one special symbol'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
     agreeTerms: z.boolean().refine((val) => val === true, {
-      message: 'You must agree to the editorial publishing terms',
+      message: 'You must agree to the Terms & Conditions to continue',
+    }),
+    agreePrivacy: z.boolean().refine((val) => val === true, {
+      message: 'You must acknowledge the Privacy Policy to continue',
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -39,12 +46,30 @@ const registerSchema = z
     path: ['confirmPassword'],
   });
 
+/** Fire-and-forget: record policy acceptance on backend. Non-blocking. */
+const recordPolicyConsent = async (consentType: string, version: string) => {
+  try {
+    await fetch('/api/legal/consent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ consentType, version, choice: 'accepted' }),
+    });
+  } catch {
+    // Non-blocking — do not interrupt registration
+  }
+};
+
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const { setAuthUser } = useAuthStore();
   const navigate = useNavigate();
@@ -65,6 +90,8 @@ export const RegisterPage: React.FC = () => {
       email: '',
       password: '',
       confirmPassword: '',
+      agreeTerms: false,
+      agreePrivacy: false,
     },
   });
 
@@ -103,9 +130,16 @@ export const RegisterPage: React.FC = () => {
         name: data.name,
         email: data.email,
         password: data.password,
+        cfTurnstileToken: turnstileToken || undefined,
+        acceptedTermsVersion: TERMS_VERSION,
       });
 
       setAuthUser(response.user as any);
+
+      // Record policy acceptances server-side (non-blocking)
+      void recordPolicyConsent('terms_of_service', TERMS_VERSION);
+      void recordPolicyConsent('privacy_policy', PRIVACY_VERSION);
+
       // Route new user to requested article or topic onboarding
       navigate(redirectParam || '/onboarding');
     } catch (err: any) {
@@ -240,6 +274,14 @@ export const RegisterPage: React.FC = () => {
               )}
             </div>
 
+            {/* Cloudflare Turnstile bot protection */}
+            <CloudflareTurnstile
+              onVerify={handleTurnstileVerify}
+              action="register"
+              className="mt-1"
+            />
+
+            {/* Terms & Conditions consent */}
             <div className="flex items-start">
               <input
                 id="agreeTerms"
@@ -248,11 +290,35 @@ export const RegisterPage: React.FC = () => {
                 className="mt-0.5 h-4 w-4 text-accent-crimson focus:ring-accent-crimson border-border-subtle rounded"
               />
               <label htmlFor="agreeTerms" className="ml-2 block text-xs text-ink-secondary leading-normal">
-                I agree to the editorial standards, code of conduct, and terms of service.
+                I agree to the{' '}
+                <Link to="/legal/terms" target="_blank" className="text-accent-crimson font-semibold hover:underline">
+                  Terms &amp; Conditions
+                </Link>
+                {' '}and editorial publishing standards.
               </label>
             </div>
             {errors.agreeTerms && (
               <p className="mt-0.5 text-xs text-rose-600 font-medium">{errors.agreeTerms.message}</p>
+            )}
+
+            {/* Privacy Policy acknowledgement */}
+            <div className="flex items-start">
+              <input
+                id="agreePrivacy"
+                type="checkbox"
+                {...register('agreePrivacy')}
+                className="mt-0.5 h-4 w-4 text-accent-crimson focus:ring-accent-crimson border-border-subtle rounded"
+              />
+              <label htmlFor="agreePrivacy" className="ml-2 block text-xs text-ink-secondary leading-normal">
+                I acknowledge the{' '}
+                <Link to="/legal/privacy" target="_blank" className="text-accent-crimson font-semibold hover:underline">
+                  Privacy Policy
+                </Link>
+                {' '}and consent to data processing as described.
+              </label>
+            </div>
+            {errors.agreePrivacy && (
+              <p className="mt-0.5 text-xs text-rose-600 font-medium">{errors.agreePrivacy.message}</p>
             )}
 
             <button

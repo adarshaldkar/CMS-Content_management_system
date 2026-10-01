@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { BrandLogo } from '../../components/common/BrandLogo';
+import { CloudflareTurnstile } from '../../components/common/CloudflareTurnstile';
 import { authApi } from '../../api/auth.api';
 
 const forgotSchema = z.object({
@@ -16,6 +17,11 @@ type ForgotFormData = z.infer<typeof forgotSchema>;
 export const ForgotPasswordPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const {
     register,
@@ -28,7 +34,7 @@ export const ForgotPasswordPage: React.FC = () => {
   const onSubmit = async (data: ForgotFormData) => {
     setIsSubmitting(true);
     try {
-      await authApi.forgotPassword(data.email);
+      await authApi.forgotPassword(data.email, turnstileToken || undefined);
     } catch {
       // Intentionally suppress error to maintain anti-enumeration standard
     } finally {
@@ -92,6 +98,12 @@ export const ForgotPasswordPage: React.FC = () => {
                   <p className="mt-1 text-xs text-rose-600 font-medium">{errors.email.message}</p>
                 )}
               </div>
+
+              <CloudflareTurnstile
+                onVerify={handleTurnstileVerify}
+                action="forgot-password"
+                className=""
+              />
 
               <button
                 type="submit"

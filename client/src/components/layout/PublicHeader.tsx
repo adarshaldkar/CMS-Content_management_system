@@ -8,6 +8,7 @@ import {
   Compass,
   Edit3,
   Flame,
+  History,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -146,88 +147,132 @@ export const PublicHeader: React.FC = () => {
 
                   {/* Dropdown Menu */}
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-border-subtle py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150 font-sans">
-                      <div className="px-4 py-2 border-b border-border-subtle">
-                        <p className="text-xs font-semibold text-ink-primary truncate">{user.name}</p>
-                        <p className="text-[11px] text-ink-secondary truncate">{user.email}</p>
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-border-subtle py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 font-sans">
+                      {/* User Header */}
+                      <div className="px-4 py-2.5 border-b border-border-subtle bg-slate-50/50">
+                        <div className="flex items-center gap-2.5">
+                          <EditorialAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold font-serif text-ink-primary truncate">{user.name}</p>
+                            <p className="text-[10px] font-mono text-ink-secondary truncate">{user.email}</p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="py-1">
+                      {/* YOUR DESK */}
+                      <div className="px-3 pt-2 pb-1">
+                        <div className="px-2 pb-1 text-[9px] font-mono font-bold uppercase tracking-wider text-ink-muted">
+                          YOUR DESK
+                        </div>
                         <Link
                           to="/dashboard"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <LayoutDashboard size={15} />
+                          <LayoutDashboard size={14} className="text-ink-secondary" />
                           <span>Author Dashboard</span>
                         </Link>
                         <Link
                           to="/stories"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <Edit3 size={15} />
-                          <span>My Stories & Drafts</span>
+                          <Edit3 size={14} className="text-ink-secondary" />
+                          <span>Manuscripts & Stories</span>
                         </Link>
+                      </div>
+
+                      {/* READ & FOLLOW */}
+                      <div className="px-3 py-1 border-t border-border-subtle/70">
+                        <div className="px-2 pt-1 pb-1 text-[9px] font-mono font-bold uppercase tracking-wider text-ink-muted">
+                          READ & FOLLOW
+                        </div>
                         <Link
                           to="/feed"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <Flame size={15} />
+                          <Flame size={14} className="text-amber-500" />
                           <span>For You Feed</span>
                         </Link>
                         <Link
                           to="/inbox"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <Inbox size={15} />
-                          <span>Gazette Inbox</span>
+                          <div className="flex items-center gap-2.5">
+                            <Inbox size={14} className="text-accent-crimson" />
+                            <span>Gazette Inbox</span>
+                          </div>
+                          {unreadCount > 0 && (
+                            <span className="px-1.5 py-0.2 bg-accent-crimson text-white text-[9px] font-mono font-bold rounded-full">
+                              {unreadCount}
+                            </span>
+                          )}
                         </Link>
                         <Link
                           to="/library"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <Bookmark size={15} />
+                          <Bookmark size={14} className="text-ink-secondary" />
                           <span>Saved Library</span>
                         </Link>
                         <Link
+                          to="/history"
+                          onClick={() => setDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
+                        >
+                          <History size={14} className="text-ink-secondary" />
+                          <span>Reading History</span>
+                        </Link>
+                      </div>
+
+                      {/* ACCOUNT */}
+                      <div className="px-3 py-1 border-t border-border-subtle/70">
+                        <div className="px-2 pt-1 pb-1 text-[9px] font-mono font-bold uppercase tracking-wider text-ink-muted">
+                          ACCOUNT & SECURITY
+                        </div>
+                        <Link
                           to="/profile"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <UserIcon size={15} />
-                          <span>Author Profile</span>
+                          <UserIcon size={14} className="text-ink-secondary" />
+                          <span>Profile Settings</span>
                         </Link>
                         <Link
                           to="/settings"
                           onClick={() => setDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2 text-xs text-ink-primary hover:bg-slate-50 transition-colors"
+                          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-primary hover:bg-slate-100 transition-colors"
                         >
-                          <Settings size={15} />
-                          <span>Security & Sessions</span>
+                          <Settings size={14} className="text-ink-secondary" />
+                          <span>Account Security</span>
                         </Link>
+                      </div>
 
-                        {hasRole(['super_admin', 'admin', 'editor']) && (
+                      {/* GOVERNANCE */}
+                      {hasRole(['super_admin', 'admin', 'editor']) && (
+                        <div className="px-3 py-1 border-t border-border-subtle/70">
                           <Link
                             to="/admin"
                             onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-2.5 px-4 py-2 text-xs text-purple-700 hover:bg-purple-50 transition-colors border-t border-border-subtle mt-1 pt-2 font-medium"
+                            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-purple-700 hover:bg-purple-50 transition-colors"
                           >
-                            <Shield size={15} />
+                            <Shield size={14} />
                             <span>Admin Governance</span>
                           </Link>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
-                      <div className="border-t border-border-subtle pt-1">
+                      {/* SIGN OUT */}
+                      <div className="border-t border-border-subtle mt-1 pt-1 px-3">
                         <button
+                          type="button"
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-rose-600 hover:bg-rose-50 transition-colors text-left"
+                          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
                         >
-                          <LogOut size={15} />
+                          <LogOut size={14} />
                           <span>Sign Out</span>
                         </button>
                       </div>

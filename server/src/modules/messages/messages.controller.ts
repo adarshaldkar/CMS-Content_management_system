@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -81,7 +82,7 @@ export class MessagesController {
   @Get('conversations/:id')
   @ApiOperation({ summary: 'Get conversation details and full message history (BOLA protected)' })
   async getConversationDetail(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ) {
     return this.messagesService.getConversationDetail(id, user);
@@ -91,7 +92,7 @@ export class MessagesController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Send a reply message to an active conversation' })
   async addMessage(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: SendMessageDtoClass,
   ) {
@@ -101,7 +102,7 @@ export class MessagesController {
   @Patch('conversations/:id/read')
   @ApiOperation({ summary: 'Update conversation read state' })
   async markRead(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ) {
     return this.messagesService.updateReadState(id, user);
@@ -110,7 +111,7 @@ export class MessagesController {
   @Patch('conversations/:id/archive')
   @ApiOperation({ summary: 'Archive or unarchive a conversation' })
   async setArchived(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: ArchiveConversationDtoClass,
   ) {
@@ -145,7 +146,7 @@ export class MessagesController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Acknowledge/mark a broadcast announcement as read' })
   async markBroadcastRead(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ) {
     return this.messagesService.markBroadcastRead(id, user);

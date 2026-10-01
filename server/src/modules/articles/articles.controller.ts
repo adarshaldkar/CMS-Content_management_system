@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -14,6 +15,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ArticleService } from './article.service';
 import { WorkflowService } from './workflow.service';
+import { ListArticlesQueryDto } from './dto/list-articles-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CsrfGuard } from '../../common/guards/csrf.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -52,43 +54,37 @@ export class ArticlesController {
   @Cacheable(60, undefined, 300)
   @Get()
   @ApiOperation({ summary: 'List public published articles or filter by query' })
-  async list(
-    @Query('page') page = '1',
-    @Query('limit') limit = '20',
-    @Query('status') status?: ContentStatus,
-    @Query('search') search?: string,
-    @Query('authorId') authorId?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('categorySlug') categorySlug?: string,
-    @Query('categorySlugs') categorySlugs?: string | string[],
-    @Query('tagSlugs') tagSlugs?: string | string[],
-    @Query('contentType') contentType?: 'article' | 'video' | 'gallery' | 'series' | 'all',
-    @Query('category') category?: string,
-    @Query('sort') sort?: 'trending' | 'latest' | 'popular',
-    @Query('sortBy') sortBy?: 'latest' | 'trending' | 'most_read' | 'most_discussed' | 'most_liked',
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-  ): Promise<PaginatedResult<Article>> {
-    const resolvedSlug = categorySlug || category;
-    const resolvedCategorySlugs = categorySlugs || (resolvedSlug ? [resolvedSlug] : undefined);
-    const resolvedStatus = status ? status : authorId ? undefined : ContentStatus.PUBLISHED;
+  async list(@Query() query: ListArticlesQueryDto): Promise<PaginatedResult<Article>> {
+    const resolvedSlug = query.categorySlug || query.category;
+    const resolvedCategorySlugs =
+      query.categorySlugs || (resolvedSlug ? [resolvedSlug] : undefined);
+    const resolvedStatus = query.status
+      ? query.status
+      : query.authorId
+        ? undefined
+        : ContentStatus.PUBLISHED;
 
     return this.articleService.findMany({
-      page: Math.max(1, parseInt(page, 10) || 1),
-      limit: Math.min(50, Math.max(1, parseInt(limit, 10) || 20)),
+      page: Math.max(1, query.page ?? 1),
+      limit: Math.min(50, Math.max(1, query.limit ?? 20)),
       status: resolvedStatus,
-      search,
-      authorId,
-      categoryId,
+      search: query.search,
+      authorId: query.authorId,
+      categoryId: query.categoryId,
       categorySlug: resolvedSlug,
       categorySlugs: resolvedCategorySlugs,
-      tagSlugs,
-      contentType,
-      sortBy: sortBy || (sort === 'popular' ? 'most_liked' : sort === 'trending' ? 'trending' : 'latest'),
-      sortOrder,
-      fromDate,
-      toDate,
+      tagSlugs: query.tagSlugs,
+      contentType: query.contentType,
+      sortBy:
+        query.sortBy ||
+        (query.sort === 'popular'
+          ? 'most_liked'
+          : query.sort === 'trending'
+            ? 'trending'
+            : 'latest'),
+      sortOrder: query.sortOrder,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
     });
   }
 
@@ -107,7 +103,9 @@ export class ArticlesController {
 
   @Get('id/:id')
   @ApiOperation({ summary: 'Get article details by ID for editorial workspace' })
-  async getById(@Param('id') id: string): Promise<Article | null> {
+  async getById(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<Article | null> {
     return this.articleService.findById(id);
   }
 
@@ -127,7 +125,7 @@ export class ArticlesController {
   @ApiOperation({ summary: 'Update an article with optimistic concurrency control' })
   @RequirePermissions(Permission.ARTICLE_UPDATE_OWN)
   async update(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateArticleDto,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
@@ -139,7 +137,7 @@ export class ArticlesController {
   @Post(':id/transition')
   @ApiOperation({ summary: 'Execute an editorial workflow state transition' })
   async transition(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: WorkflowTransitionDto,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
@@ -151,7 +149,7 @@ export class ArticlesController {
   @Get(':id/revisions')
   @ApiOperation({ summary: 'Get immutable revision history for an article' })
   async getRevisions(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: AuthUser,
   ): Promise<ArticleRevision[]> {
     return this.workflowService.getRevisions(id, user);
@@ -161,8 +159,8 @@ export class ArticlesController {
   @ApiOperation({ summary: 'Restore an article to a previous revision snapshot' })
   @RequirePermissions(Permission.ARTICLE_UPDATE_OWN)
   async restoreRevision(
-    @Param('id') id: string,
-    @Param('revisionId') revisionId: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('revisionId', new ParseUUIDPipe({ version: '4' })) revisionId: string,
     @CurrentUser() user: AuthUser,
   ): Promise<Article> {
     const article = await this.workflowService.restoreRevision(id, revisionId, user);
