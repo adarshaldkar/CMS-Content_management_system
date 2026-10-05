@@ -82,9 +82,20 @@ async function bootstrap() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-          imgSrc: ["'self'", 'data:', 'blob:', 'https:', 'http:'],
+          imgSrc: [
+            "'self'",
+            'data:',
+            'blob:',
+            'https://images.unsplash.com',
+            'https://res.cloudinary.com',
+            'https://fonts.gstatic.com',
+          ],
           scriptSrc: ["'self'", ...(nodeEnv !== 'production' ? ["'unsafe-eval'"] : [])],
           connectSrc: ["'self'", clientUrl, 'ws://localhost:5173', 'http://localhost:5173'],
           frameSrc: [
@@ -97,9 +108,7 @@ async function bootstrap() {
             'https://platform.twitter.com',
             'https://syndication.twitter.com',
           ],
-          mediaSrc: ["'self'", 'data:', 'blob:', 'https:', 'http:'],
-          frameAncestors: ["'none'"],
-          objectSrc: ["'none'"],
+          mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
         },
       },
       crossOriginEmbedderPolicy: false,
