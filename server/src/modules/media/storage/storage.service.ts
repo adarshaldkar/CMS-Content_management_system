@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary';
@@ -35,6 +35,34 @@ export class StorageService {
     }
   }
 
+  /**
+   * Sanitizes a filename to prevent Path Traversal attacks (CWE-22)
+   */
+  private sanitizeFilename(filename: string): string {
+    const safeBaseName = path.basename(filename).replace(/[\u0000\\/]/g, '').trim();
+    if (!safeBaseName || safeBaseName === '.' || safeBaseName === '..') {
+      throw new BadRequestException('Invalid filename provided.');
+    }
+    return safeBaseName;
+  }
+
+  /**
+   * Resolves and verifies that the target path is strictly within the designated uploads folder
+   */
+  private getSafeFilePath(filename: string): { safeName: string; resolvedPath: string } {
+    const safeName = this.sanitizeFilename(filename);
+    const resolvedPath = path.resolve(this.uploadDir, safeName);
+
+    // Canonical path confinement check
+    const normalizedUploadDir = path.normalize(this.uploadDir);
+    if (!resolvedPath.startsWith(normalizedUploadDir + path.sep) && resolvedPath !== normalizedUploadDir) {
+      this.logger.error(`[Security Alert] Blocked Path Traversal attempt for input: ${filename}`);
+      throw new BadRequestException('Path traversal detected: invalid file location.');
+    }
+
+    return { safeName, resolvedPath };
+  }
+
   async saveFile(
     filename: string,
     buffer: Buffer,
@@ -42,34 +70,34 @@ export class StorageService {
     folder: string = 'gazette-cms/media',
   ): Promise<StoredAsset> {
     await fs.mkdir(this.uploadDir, { recursive: true });
-    const localFilePath = path.join(this.uploadDir, filename);
+    const { safeName, resolvedPath } = this.getSafeFilePath(filename);
 
-    // 1. Always save local disk copy
-    await fs.writeFile(localFilePath, buffer);
+    // 1. Always save local disk copy at the canonical safe path
+    await fs.writeFile(resolvedPath, buffer);
 
-    let finalUrl = `/uploads/${filename}`;
-    let storageKey = filename;
+    let finalUrl = `/uploads/${safeName}`;
+    let storageKey = safeName;
 
     // 2. Upload to Cloudinary CDN if available
     if (this.isCloudinaryConfigured) {
       try {
-        const publicId = path.parse(filename).name;
+        const publicId = path.parse(safeName).name;
         const uploadResult = await this.uploadToCloudinary(buffer, folder, publicId);
         finalUrl = uploadResult.secure_url;
         storageKey = uploadResult.public_id;
-        this.logger.log(`Uploaded ${filename} to Cloudinary CDN: ${finalUrl}`);
+        this.logger.log(`Uploaded ${safeName} to Cloudinary CDN: ${finalUrl}`);
       } catch (err: any) {
         this.logger.warn(
-          `Cloudinary upload failed for ${filename} (${err.message}). Falling back to local file URL.`,
+          `Cloudinary upload failed for ${safeName} (${err.message}). Falling back to local file URL.`,
         );
       }
     }
 
     return {
       url: finalUrl,
-      filename,
+      filename: safeName,
       storageKey,
-      localPath: localFilePath,
+      localPath: resolvedPath,
     };
   }
 
@@ -100,8 +128,8 @@ export class StorageService {
 
   async deleteLocalFile(filename: string): Promise<void> {
     try {
-      const localFilePath = path.join(this.uploadDir, filename);
-      await fs.unlink(localFilePath);
+      const { resolvedPath } = this.getSafeFilePath(filename);
+      await fs.unlink(resolvedPath);
     } catch {
       // Best-effort removal
     }
