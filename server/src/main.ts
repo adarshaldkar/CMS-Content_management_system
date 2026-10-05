@@ -32,10 +32,9 @@ async function bootstrap() {
   // Serve static uploaded assets
   // Trust proxy headers only in production (so rate limiting, CSRF origin checks
   // and audit IP logging see real client addresses behind a reverse proxy)
-  (app.getHttpAdapter().getInstance() as express.Express).set(
-    'trust proxy',
-    true,
-  );
+  const expressApp = app.getHttpAdapter().getInstance() as express.Express;
+  expressApp.set('trust proxy', true);
+  expressApp.disable('x-powered-by');
 
   // Security heads-up: flag connection strings that embed plain-text credentials.
   // Production should inject secrets via environment variables / a vault.
@@ -62,7 +61,20 @@ async function bootstrap() {
   const uploadDir = fs.existsSync(path.resolve(process.cwd(), 'uploads'))
     ? path.resolve(process.cwd(), 'uploads')
     : path.resolve(process.cwd(), 'server', 'uploads');
-  app.use('/uploads', express.static(uploadDir));
+
+  app.use(
+    '/uploads',
+    express.static(uploadDir, {
+      dotfiles: 'ignore',
+      index: false,
+      fallthrough: false,
+      maxAge: '1d',
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'");
+      },
+    }),
+  );
 
   // 1. Security Headers with tailored Content Security Policy
   app.use(
@@ -134,6 +146,7 @@ async function bootstrap() {
       .setDescription('Hardened Editorial Content Platform API (OWASP Top 10:2025 Compliant)')
       .setVersion('0.2.0')
       .addCookieAuth('access_token')
+      .addServer(`http://localhost:${port}`)
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api/docs', app, document);

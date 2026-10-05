@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -48,8 +49,12 @@ export class RecordConsentDtoClass {
   @IsOptional()
   @IsString()
   @MaxLength(50)
+  @Matches(/^[^\u0000]*$/, {
+    message: 'version contains invalid characters',
+  })
   version?: string;
 }
+
 
 export class FileCopyrightClaimDtoClass {
   @ApiProperty({ example: 'https://gazette.io/articles/sample-article' })

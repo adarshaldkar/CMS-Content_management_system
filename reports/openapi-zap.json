@@ -1,0 +1,3438 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/database/status": {
+      "get": {
+        "operationId": "DatabaseSwitcherController_getStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get real-time database connection status and health across all 6 engines",
+        "tags": [
+          "database"
+        ]
+      }
+    },
+    "/api/database/switch": {
+      "post": {
+        "operationId": "DatabaseSwitcherController_switchDb",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Atomically switch active database with mutex",
+        "tags": [
+          "database"
+        ]
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Query immutable security audit logs",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Application health check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/redis": {
+      "get": {
+        "operationId": "HealthController_getRedisStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Redis L2 cache & cluster telemetry",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/redis/purge": {
+      "post": {
+        "operationId": "HealthController_purgeRedisCache",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Purge all L2 cached keys",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Register a new user account",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Log in with email and password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/google": {
+      "post": {
+        "operationId": "AuthController_googleLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleAuthDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Log in with Google OAuth credentials",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Rotate refresh token and issue new session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Log out current session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout-all": {
+      "post": {
+        "operationId": "AuthController_logoutAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Log out all active sessions for current user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "operationId": "AuthController_getSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get list of all active device sessions for current user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "AuthController_revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke a specific active device session remotely",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/reauthenticate": {
+      "post": {
+        "operationId": "AuthController_reauthenticate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReauthenticateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "High-assurance password re-authentication for sensitive actions",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/resend-verification": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResendVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Resend email verification link",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/verify-email": {
+      "post": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Verify email address with verification token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get profile and permissions of authenticated user",
+        "tags": [
+          "auth"
+        ]
+      },
+      "patch": {
+        "operationId": "AuthController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update profile info of authenticated user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/change-password": {
+      "patch": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Change password for authenticated user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Request a password reset link (anti-enumeration: always returns 200)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Reset password using a valid reset token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/articles": {
+      "get": {
+        "operationId": "ArticlesController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "pending_review",
+                "approved",
+                "scheduled",
+                "published",
+                "rejected",
+                "archived"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "quantum computing",
+              "type": "string"
+            }
+          },
+          {
+            "name": "authorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "c1000000-0000-0000-0000-000000000001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "c2000000-0000-0000-0000-000000000002",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categorySlug",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "technology",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categorySlugs",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "technology,ai",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "tagSlugs",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "typescript,nestjs",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "contentType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "article",
+                "video",
+                "gallery",
+                "series",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "technology",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "trending",
+                "latest",
+                "popular"
+              ]
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "trending",
+                "most_read",
+                "most_discussed",
+                "most_liked"
+              ]
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2024-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2024-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List public published articles or filter by query",
+        "tags": [
+          "articles"
+        ]
+      },
+      "post": {
+        "operationId": "ArticlesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a new draft article",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/articles/slug/{slug}": {
+      "get": {
+        "operationId": "ArticlesController_getBySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a published article by slug",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/articles/id/{id}": {
+      "get": {
+        "operationId": "ArticlesController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get article details by ID for editorial workspace",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/articles/{id}": {
+      "patch": {
+        "operationId": "ArticlesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update an article with optimistic concurrency control",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/articles/{id}/transition": {
+      "post": {
+        "operationId": "ArticlesController_transition",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Execute an editorial workflow state transition",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/articles/{id}/revisions": {
+      "get": {
+        "operationId": "ArticlesController_getRevisions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get immutable revision history for an article",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/articles/{id}/revisions/{revisionId}/restore": {
+      "post": {
+        "operationId": "ArticlesController_restoreRevision",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revisionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Restore an article to a previous revision snapshot",
+        "tags": [
+          "articles"
+        ]
+      }
+    },
+    "/api/slots/my-clearance": {
+      "get": {
+        "operationId": "PublishingSlotsController_getMyClearance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get active publishing slot and auto-dispatch clearance for logged-in author",
+        "tags": [
+          "publishing-slots"
+        ]
+      }
+    },
+    "/api/admin/slots": {
+      "get": {
+        "operationId": "PublishingSlotsController_listSlots",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all editorial publishing slots with queue analytics",
+        "tags": [
+          "publishing-slots"
+        ]
+      },
+      "post": {
+        "operationId": "PublishingSlotsController_createSlot",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a new automated publishing slot",
+        "tags": [
+          "publishing-slots"
+        ]
+      }
+    },
+    "/api/admin/slots/queue": {
+      "get": {
+        "operationId": "PublishingSlotsController_getQueue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Inspect upcoming scheduled auto-publishing pipeline",
+        "tags": [
+          "publishing-slots"
+        ]
+      }
+    },
+    "/api/admin/slots/{id}": {
+      "patch": {
+        "operationId": "PublishingSlotsController_updateSlot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update an existing publishing slot configuration",
+        "tags": [
+          "publishing-slots"
+        ]
+      },
+      "delete": {
+        "operationId": "PublishingSlotsController_deleteSlot",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a publishing slot",
+        "tags": [
+          "publishing-slots"
+        ]
+      }
+    },
+    "/api/admin/slots/assignments": {
+      "get": {
+        "operationId": "PublishingSlotsController_listAssignments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all authors assigned to automated publishing slots",
+        "tags": [
+          "publishing-slots"
+        ]
+      },
+      "post": {
+        "operationId": "PublishingSlotsController_assignAuthor",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Assign an author to a publishing slot with auto-publish privileges",
+        "tags": [
+          "publishing-slots"
+        ]
+      }
+    },
+    "/api/admin/slots/assignments/{authorId}": {
+      "delete": {
+        "operationId": "PublishingSlotsController_revokeAuthor",
+        "parameters": [
+          {
+            "name": "authorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke automated publishing slot privileges from an author",
+        "tags": [
+          "publishing-slots"
+        ]
+      }
+    },
+    "/api/users": {
+      "get": {
+        "operationId": "UsersController_list",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all users with pagination and search",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{id}/role": {
+      "patch": {
+        "operationId": "UsersController_updateRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update user role with strict hierarchy checks",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{id}/status": {
+      "patch": {
+        "operationId": "UsersController_updateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Activate or deactivate a user account",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "operationId": "CategoriesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "technology",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all categories with pagination & search",
+        "tags": [
+          "categories"
+        ]
+      },
+      "post": {
+        "operationId": "CategoriesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a new category",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/api/categories/slug/{slug}": {
+      "get": {
+        "operationId": "CategoriesController_findBySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get category by slug",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/api/categories/{id}": {
+      "get": {
+        "operationId": "CategoriesController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get category by ID",
+        "tags": [
+          "categories"
+        ]
+      },
+      "patch": {
+        "operationId": "CategoriesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update a category",
+        "tags": [
+          "categories"
+        ]
+      },
+      "delete": {
+        "operationId": "CategoriesController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Soft delete a category",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/api/media/upload": {
+      "post": {
+        "operationId": "MediaController_upload",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload and auto-optimize an image asset (PNG, JPEG, WebP, AVIF, GIF up to 100MB)",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/video/upload": {
+      "post": {
+        "operationId": "MediaController_uploadVideo",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload a video asset (MP4, WebM, MOV up to 100 MB)",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/stream/{mediaId}": {
+      "get": {
+        "operationId": "MediaController_streamVideo",
+        "parameters": [
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stream video asset using HTTP 206 Byte-Ranges",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media/{id}": {
+      "get": {
+        "operationId": "MediaController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get details and processing status of a single media asset",
+        "tags": [
+          "media"
+        ]
+      },
+      "delete": {
+        "operationId": "MediaController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a media asset",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/media": {
+      "get": {
+        "operationId": "MediaController_list",
+        "parameters": [
+          {
+            "name": "scope",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List uploaded media assets",
+        "tags": [
+          "media"
+        ]
+      }
+    },
+    "/api/articles/{articleId}/comments": {
+      "get": {
+        "operationId": "CommentsController_getComments",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get paginated comments for an article",
+        "tags": [
+          "comments"
+        ]
+      },
+      "post": {
+        "operationId": "CommentsController_createComment",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Post a comment on an article",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/users/{userId}/comments": {
+      "get": {
+        "operationId": "CommentsController_getUserComments",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get recent comments made by a user",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/me/comments": {
+      "get": {
+        "operationId": "CommentsController_getMyComments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get comments made by the current logged-in user",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/comments/{id}": {
+      "patch": {
+        "operationId": "CommentsController_updateComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Edit own comment",
+        "tags": [
+          "comments"
+        ]
+      },
+      "delete": {
+        "operationId": "CommentsController_deleteComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete own comment or moderate",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/comments/{id}/hide": {
+      "post": {
+        "operationId": "CommentsController_hideComment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Hide a comment (moderator)",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/comments": {
+      "get": {
+        "operationId": "CommentsController_listAllComments",
+        "parameters": [
+          {
+            "name": "flagged",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hidden",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Admin: list all comments with optional filters",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/api/me/bookmarks": {
+      "get": {
+        "operationId": "BookmarksController_getMyBookmarks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get current user saved bookmarks with pagination",
+        "tags": [
+          "bookmarks"
+        ]
+      }
+    },
+    "/api/articles/{articleId}/bookmark/status": {
+      "get": {
+        "operationId": "BookmarksController_getBookmarkStatus",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get whether the current user has bookmarked an article",
+        "tags": [
+          "bookmarks"
+        ]
+      }
+    },
+    "/api/articles/{articleId}/bookmark": {
+      "post": {
+        "operationId": "BookmarksController_toggleBookmark",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Toggle bookmark on an article (add if absent, remove if present)",
+        "tags": [
+          "bookmarks"
+        ]
+      },
+      "delete": {
+        "operationId": "BookmarksController_removeBookmark",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Remove bookmark from an article",
+        "tags": [
+          "bookmarks"
+        ]
+      }
+    },
+    "/api/articles/{articleId}/like": {
+      "post": {
+        "operationId": "LikesController_toggleLike",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Toggle like on an article (like if not liked, unlike if liked)",
+        "tags": [
+          "likes"
+        ]
+      }
+    },
+    "/api/articles/{articleId}/likes/count": {
+      "get": {
+        "operationId": "LikesController_getLikeCount",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get public like count for an article",
+        "tags": [
+          "likes"
+        ]
+      }
+    },
+    "/api/articles/{articleId}/like/status": {
+      "get": {
+        "operationId": "LikesController_getLikeStatus",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get whether the current user has liked an article",
+        "tags": [
+          "likes"
+        ]
+      }
+    },
+    "/api/users/{userId}/follow": {
+      "post": {
+        "operationId": "FollowsController_followUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Follow a user",
+        "tags": [
+          "follows"
+        ]
+      },
+      "delete": {
+        "operationId": "FollowsController_unfollowUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Unfollow a user",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/users/{userId}/follow/status": {
+      "get": {
+        "operationId": "FollowsController_getFollowStatus",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get whether the current user follows a target user",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/users/{userId}/followers": {
+      "get": {
+        "operationId": "FollowsController_getUserFollowers",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get followers of a user",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/users/{userId}/following": {
+      "get": {
+        "operationId": "FollowsController_getUserFollowing",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get users a user is following",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/categories/{slug}/follow": {
+      "post": {
+        "operationId": "FollowsController_followCategory",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Follow a topic/category",
+        "tags": [
+          "follows"
+        ]
+      },
+      "delete": {
+        "operationId": "FollowsController_unfollowCategory",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Unfollow a topic/category",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/me/following/topics": {
+      "get": {
+        "operationId": "FollowsController_getMyFollowedTopics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get topics the current user follows (used for feed personalization)",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/users/{userId}/stats": {
+      "get": {
+        "operationId": "FollowsController_getUserFollowStats",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get follower/following counts for a user profile",
+        "tags": [
+          "follows"
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "NotificationsController_getInbox",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unreadOnly",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List user notifications with cursor-based pagination",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_getUnreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Fast Redis unread notification count for header badge",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "patch": {
+        "operationId": "NotificationsController_markAsRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Mark a single notification as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/mark-all-read": {
+      "post": {
+        "operationId": "NotificationsController_markAllAsRead",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Mark all unread notifications as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/preferences": {
+      "get": {
+        "operationId": "NotificationsController_getPreferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get user notification delivery preferences",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "patch": {
+        "operationId": "NotificationsController_updatePreferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update user notification delivery preferences",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/push-subscription": {
+      "post": {
+        "operationId": "NotificationsController_savePushSubscription",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Register browser Web Push subscription",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "delete": {
+        "operationId": "NotificationsController_removePushSubscription",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Unregister browser Web Push subscription",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/notifications/stream": {
+      "get": {
+        "operationId": "NotificationsController_streamNotifications",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Server-Sent Events stream for instant in-app alerts",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/admin/queues": {
+      "get": {
+        "operationId": "JobsAdminController_getQueues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get real-time operational summaries and metrics for all queues",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/jobs": {
+      "get": {
+        "operationId": "JobsAdminController_getJobs",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get paginated jobs in a queue filtered by state",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/jobs/{jobId}": {
+      "get": {
+        "operationId": "JobsAdminController_getJobDetail",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Inspect sanitized diagnostic details of a single job",
+        "tags": [
+          "admin-queues"
+        ]
+      },
+      "delete": {
+        "operationId": "JobsAdminController_removeJob",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Permanently remove a job from queue",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/jobs/{jobId}/retry": {
+      "post": {
+        "operationId": "JobsAdminController_retryJob",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Re-enqueue a single failed DLQ job",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/retry-all-failed": {
+      "post": {
+        "operationId": "JobsAdminController_retryAllFailed",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Bulk retry all failed DLQ jobs in a queue",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/pause": {
+      "post": {
+        "operationId": "JobsAdminController_pauseQueue",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Pause queue processing",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/resume": {
+      "post": {
+        "operationId": "JobsAdminController_resumeQueue",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Resume queue processing",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/clean": {
+      "post": {
+        "operationId": "JobsAdminController_cleanQueue",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Clean completed or failed jobs older than grace period",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/admin/queues/{queueName}/dispatch-test": {
+      "post": {
+        "operationId": "JobsAdminController_dispatchTest",
+        "parameters": [
+          {
+            "name": "queueName",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Dispatch test delayed or simulated DLQ job for operational drills",
+        "tags": [
+          "admin-queues"
+        ]
+      }
+    },
+    "/api/newsletter/subscribe": {
+      "post": {
+        "operationId": "NewsletterController_subscribe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscribeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/newsletter/verify/{token}": {
+      "get": {
+        "operationId": "NewsletterController_verify",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/newsletter/preferences/{token}": {
+      "get": {
+        "operationId": "NewsletterController_getPreferences",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      },
+      "patch": {
+        "operationId": "NewsletterController_updatePreferences",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubscriberPreferencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/newsletter/webhook/events": {
+      "post": {
+        "operationId": "NewsletterController_handleWebhook",
+        "parameters": [
+          {
+            "name": "x-webhook-signature",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/admin/newsletter/stats": {
+      "get": {
+        "operationId": "NewsletterController_getStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/admin/newsletter/subscribers": {
+      "get": {
+        "operationId": "NewsletterController_getSubscribers",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "topic",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/admin/newsletter/campaigns": {
+      "get": {
+        "operationId": "NewsletterController_getCampaigns",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      },
+      "post": {
+        "operationId": "NewsletterController_createCampaign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCampaignDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/admin/newsletter/campaigns/{id}/send": {
+      "post": {
+        "operationId": "NewsletterController_sendCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Newsletter"
+        ]
+      }
+    },
+    "/api/embeds/scrape": {
+      "post": {
+        "operationId": "EmbedsController_scrape",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScrapeEmbedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Embeds"
+        ]
+      }
+    },
+    "/api/embeds/transcript": {
+      "post": {
+        "operationId": "EmbedsController_transcript",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScrapeEmbedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Embeds"
+        ]
+      }
+    },
+    "/api/documents/import": {
+      "post": {
+        "operationId": "DocumentImportController_importDocument",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Import document (.docx, .md, .txt, .pdf) into manuscript",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/jobs/{id}": {
+      "get": {
+        "operationId": "DocumentImportController_getJobStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get current status and telemetry of an ingestion job",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/gutenberg/parse": {
+      "post": {
+        "operationId": "DocumentImportController_parseGutenberg",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Parse WordPress Gutenberg block HTML comments into Gazette Semantic HTML",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/documents/gutenberg/serialize": {
+      "post": {
+        "operationId": "DocumentImportController_serializeGutenberg",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Serialize Gazette Semantic HTML into standard WordPress Gutenberg block comments",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/api/legal/policies/{type}": {
+      "get": {
+        "operationId": "LegalController_getPolicy",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get policy document (terms, privacy, cookie, accessibility, community-guidelines, subprocessors)",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/api/legal/consent": {
+      "post": {
+        "operationId": "LegalController_recordConsent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordConsentDtoClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Record user or visitor cookie/privacy consent decision",
+        "tags": [
+          "legal"
+        ]
+      },
+      "get": {
+        "operationId": "LegalController_getUserConsent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get consent history for authenticated user",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/api/legal/copyright-claim": {
+      "post": {
+        "operationId": "LegalController_fileCopyrightClaim",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileCopyrightClaimDtoClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Submit a Copyright/DMCA infringement claim",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/api/privacy/export": {
+      "post": {
+        "operationId": "PrivacyController_exportData",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "GDPR Data Export — Download personal data bundle in JSON format",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/privacy/deactivate": {
+      "post": {
+        "operationId": "PrivacyController_deactivateAccount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Deactivate user account and revoke all sessions",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/privacy/delete-account": {
+      "post": {
+        "operationId": "PrivacyController_deleteAccount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Permanent Account Erasure & Anonymization (Right to be Forgotten)",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/messages/unread-count": {
+      "get": {
+        "operationId": "MessagesController_getUnreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get total unread messages and broadcast announcements count",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/recipients": {
+      "get": {
+        "operationId": "MessagesController_getRecipients",
+        "parameters": [
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Search and list potential message recipients (staff, authors, editors)",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/conversations": {
+      "get": {
+        "operationId": "MessagesController_getUserConversations",
+        "parameters": [
+          {
+            "name": "isArchived",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List user conversations with unread indicators and filtering",
+        "tags": [
+          "messages"
+        ]
+      },
+      "post": {
+        "operationId": "MessagesController_createConversation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversationDtoClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Start a new direct thread, editorial inquiry, or support ticket",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/conversations/{id}": {
+      "get": {
+        "operationId": "MessagesController_getConversationDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get conversation details and full message history (BOLA protected)",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/conversations/{id}/messages": {
+      "post": {
+        "operationId": "MessagesController_addMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDtoClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Send a reply message to an active conversation",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/conversations/{id}/read": {
+      "patch": {
+        "operationId": "MessagesController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update conversation read state",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/conversations/{id}/archive": {
+      "patch": {
+        "operationId": "MessagesController_setArchived",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveConversationDtoClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Archive or unarchive a conversation",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/broadcasts": {
+      "post": {
+        "operationId": "MessagesController_createBroadcast",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBroadcastDtoClass"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create and queue an administrative announcement broadcast (Admin only)",
+        "tags": [
+          "messages"
+        ]
+      },
+      "get": {
+        "operationId": "MessagesController_getUserBroadcasts",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get active broadcast announcements targeted to the current user",
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/api/messages/broadcasts/{id}/read": {
+      "post": {
+        "operationId": "MessagesController_markBroadcastRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Acknowledge/mark a broadcast announcement as read",
+        "tags": [
+          "messages"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "CMS Platform API",
+    "description": "Hardened Editorial Content Platform API (OWASP Top 10:2025 Compliant)",
+    "version": "0.2.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [
+    {
+      "url": "http://localhost:3001"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "access_token"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "GoogleAuthDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ReauthenticateDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ResendVerificationDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "VerifyEmailDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "SubscribeDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateSubscriberPreferencesDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "NewsletterWebhookDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateCampaignDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ScrapeEmbedDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RecordConsentDtoClass": {
+        "type": "object",
+        "properties": {
+          "consentType": {
+            "type": "string",
+            "enum": [
+              "COOKIE_ESSENTIAL",
+              "COOKIE_ANALYTICS",
+              "COOKIE_FUNCTIONAL",
+              "COOKIE_MARKETING",
+              "TERMS_ACCEPTANCE",
+              "PRIVACY_POLICY",
+              "NEWSLETTER_SUBSCRIPTION"
+            ],
+            "example": "COOKIE_ANALYTICS"
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "DECLINED",
+              "WITHDRAWN"
+            ],
+            "example": "ACCEPTED"
+          },
+          "version": {
+            "type": "string",
+            "example": "v1.0"
+          }
+        },
+        "required": [
+          "consentType",
+          "choice"
+        ]
+      },
+      "FileCopyrightClaimDtoClass": {
+        "type": "object",
+        "properties": {
+          "articleUrl": {
+            "type": "string",
+            "example": "https://gazette.io/articles/sample-article"
+          },
+          "claimantName": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "claimantEmail": {
+            "type": "string",
+            "example": "legal@rightsholder.org"
+          },
+          "description": {
+            "type": "string",
+            "example": "The article copies full paragraphs from copyrighted work without license."
+          },
+          "declaration": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "articleUrl",
+          "claimantName",
+          "claimantEmail",
+          "description",
+          "declaration"
+        ]
+      },
+      "CreateConversationDtoClass": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "example": "DIRECT",
+            "enum": [
+              "DIRECT",
+              "EDITORIAL_INQUIRY",
+              "SUPPORT_TICKET",
+              "SECURITY_BULLETIN",
+              "DMCA_DISPUTE"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "example": "Manuscript Review: Quantum Computing Breakthrough"
+          },
+          "recipientIds": {
+            "example": [
+              "c1000000-0000-0000-0000-000000000001"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "initialMessage": {
+            "type": "string",
+            "example": "Hello, please review the revised paragraphs in chapter 2."
+          },
+          "priority": {
+            "type": "string",
+            "example": "NORMAL",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "URGENT"
+            ]
+          },
+          "actionUrl": {
+            "type": "string",
+            "example": "https://gazette.io/articles/quantum-computing"
+          },
+          "actionLabel": {
+            "type": "string",
+            "example": "View Manuscript"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "type",
+          "subject",
+          "recipientIds",
+          "initialMessage"
+        ]
+      },
+      "SendMessageDtoClass": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "example": "The suggested changes have been applied to section 3."
+          },
+          "parentMessageId": {
+            "type": "string"
+          },
+          "actionUrl": {
+            "type": "string"
+          },
+          "actionLabel": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "ArchiveConversationDtoClass": {
+        "type": "object",
+        "properties": {
+          "isArchived": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "isArchived"
+        ]
+      },
+      "CreateBroadcastDtoClass": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Platform Scheduled Maintenance & Upgrade"
+          },
+          "body": {
+            "type": "string",
+            "example": "The Gazette will undergo database upgrades tonight at 02:00 UTC."
+          },
+          "targetRole": {
+            "type": "string",
+            "example": "ALL",
+            "enum": [
+              "ALL",
+              "SUPER_ADMIN",
+              "ADMIN",
+              "EDITOR",
+              "AUTHOR",
+              "SUBSCRIBER",
+              "USER"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "example": "NORMAL",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH",
+              "URGENT"
+            ]
+          },
+          "actionUrl": {
+            "type": "string"
+          },
+          "actionLabel": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ]
+      }
+    }
+  }
+}

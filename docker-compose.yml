@@ -11,6 +11,11 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U cms -d cms_platform']
       interval: 10s
@@ -21,6 +26,7 @@ services:
     image: mongo:7
     container_name: cms-mongodb
     restart: unless-stopped
+    command: mongod --wiredTigerCacheSizeGB 0.25
     environment:
       MONGO_INITDB_ROOT_USERNAME: cms
       MONGO_INITDB_ROOT_PASSWORD: cms_dev_password
@@ -29,6 +35,11 @@ services:
       - '27017:27017'
     volumes:
       - mongo_data:/data/db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
     healthcheck:
       test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
       interval: 10s
@@ -39,6 +50,7 @@ services:
     image: mariadb:11
     container_name: cms-mariadb
     restart: unless-stopped
+    command: --innodb-buffer-pool-size=64M
     environment:
       MARIADB_USER: cms
       MARIADB_PASSWORD: cms_dev_password
@@ -48,6 +60,11 @@ services:
       - '3307:3306'
     volumes:
       - mariadb_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
     healthcheck:
       test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
       interval: 10s
@@ -58,6 +75,7 @@ services:
     image: mysql:8.4
     container_name: cms-mysql
     restart: unless-stopped
+    command: --innodb-buffer-pool-size=64M
     environment:
       MYSQL_USER: cms
       MYSQL_PASSWORD: cms_dev_password
@@ -67,6 +85,11 @@ services:
       - '3308:3306'
     volumes:
       - mysql_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'cms', '-pcms_dev_password']
       interval: 10s
@@ -74,15 +97,20 @@ services:
       retries: 5
 
   cockroachdb:
-    image: cockroachdb/cockroach:v23.2.14
+    image: cockroachdb/cockroach:latest
     container_name: cms-cockroachdb
     restart: unless-stopped
-    command: start-single-node --insecure
+    command: start-single-node --insecure --max-sql-memory=128MB --cache=128MB
     ports:
       - '26257:26257'
       - '8080:8080'
     volumes:
       - cockroach_data:/cockroach/cockroach-data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/health?ready=1']
       interval: 10s
@@ -90,7 +118,7 @@ services:
       retries: 5
 
   clickhouse:
-    image: clickhouse/clickhouse-server:24.3-alpine
+    image: clickhouse/clickhouse-server:latest
     container_name: cms-clickhouse
     restart: unless-stopped
     environment:
@@ -103,6 +131,11 @@ services:
       - '9000:9000'
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1G
     healthcheck:
       test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:8123/ping']
       interval: 10s
@@ -113,16 +146,44 @@ services:
     image: redis:7-alpine
     container_name: cms-redis
     restart: unless-stopped
-    command: redis-server --requirepass cms_dev_password --maxmemory 512mb --maxmemory-policy volatile-lru --appendonly yes
+    command: redis-server --requirepass cms_dev_password --maxmemory 256mb --maxmemory-policy noeviction --appendonly yes
     ports:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     healthcheck:
       test: ['CMD', 'redis-cli', '-a', 'cms_dev_password', 'ping']
       interval: 5s
       timeout: 3s
       retries: 5
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: gazette-zap-web
+    restart: "no"
+    profiles:
+      - security
+    command: zap-webswing.sh
+    ports:
+      - '8081:8080'
+      - '8091:8090'
+    volumes:
+      - ./reports:/zap/wrk:rw
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
 
 volumes:
   postgres_data:
