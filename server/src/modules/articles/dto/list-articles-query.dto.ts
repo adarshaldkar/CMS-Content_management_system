@@ -59,6 +59,9 @@ export class ListArticlesQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(200, { message: 'search must not exceed 200 characters.' })
+  @Matches(/^[^\u0000]*$/, {
+    message: 'search contains invalid characters',
+  })
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   search?: string;
 
