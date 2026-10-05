@@ -28,6 +28,7 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
       'Cross-Origin-Resource-Policy': 'same-site',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
       'Content-Security-Policy':
         "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://images.unsplash.com https://res.cloudinary.com https://fonts.gstatic.com; connect-src 'self' http://localhost:3001 ws://localhost:5173 http://localhost:5173 http://127.0.0.1:3001 http://host.docker.internal:3001; frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com https://www.loom.com https://open.spotify.com https://platform.twitter.com https://syndication.twitter.com; media-src 'self' data: blob: https:;",
     },
