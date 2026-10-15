@@ -53,11 +53,13 @@ export const authApi = {
   },
 
   async logout(): Promise<{ message: string }> {
+    localStorage.removeItem('cms_access_token');
     const { data } = await apiClient.post<{ message: string }>('/auth/logout');
     return data;
   },
 
   async logoutAll(): Promise<{ message: string }> {
+    localStorage.removeItem('cms_access_token');
     const { data } = await apiClient.post<{ message: string }>('/auth/logout-all');
     return data;
   },

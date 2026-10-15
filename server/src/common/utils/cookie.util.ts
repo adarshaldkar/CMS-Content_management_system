@@ -20,7 +20,7 @@ export function getCookieConfig(
   const baseOptions: CookieOptions = {
     httpOnly: true,
     secure: cookieSecure,
-    sameSite: 'strict',
+    sameSite: cookieSecure ? 'none' : 'lax',
     path: '/',
   };
 

@@ -37,6 +37,19 @@ async function bootstrap() {
   expressApp.set('trust proxy', true);
   expressApp.disable('x-powered-by');
 
+  // Root health check & API discovery endpoint (for Render health checks & root pings)
+  expressApp.get('/', (_req, res) => {
+    res.status(200).json({
+      status: 'online',
+      service: 'CMS Content Management System API',
+      health: '/api/health',
+      timestamp: new Date().toISOString(),
+    });
+  });
+  expressApp.head('/', (_req, res) => {
+    res.status(200).end();
+  });
+
   // Security heads-up: flag connection strings that embed plain-text credentials.
   // Production should inject secrets via environment variables / a vault.
   const embeddedCredentialCheck = (url?: string): boolean =>

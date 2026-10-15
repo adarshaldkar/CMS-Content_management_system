@@ -18,8 +18,15 @@ const processQueue = (error: Error | null) => {
   failedQueue = [];
 };
 
+const getBaseUrl = (): string => {
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim();
+  if (!envUrl) return '/api';
+  const clean = envUrl.replace(/\/+$/, '');
+  return clean.endsWith('/api') ? clean : `${clean}/api`;
+};
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -27,9 +34,26 @@ export const apiClient = axios.create({
   },
 });
 
+// Attach Authorization header if access token exists in localStorage (cross-origin cookie fallback)
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('cms_access_token');
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Response interceptor for automatic 401 token refresh retry
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data && typeof response.data === 'object' && 'accessToken' in response.data) {
+      const token = (response.data as { accessToken?: string }).accessToken;
+      if (token && typeof token === 'string') {
+        localStorage.setItem('cms_access_token', token);
+      }
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -57,6 +81,7 @@ apiClient.interceptors.response.use(
         processQueue(null);
         return apiClient(originalRequest);
       } catch (refreshError: any) {
+        localStorage.removeItem('cms_access_token');
         processQueue(refreshError);
         return Promise.reject(refreshError);
       } finally {

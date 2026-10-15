@@ -72,7 +72,9 @@ export class CsrfGuard implements CanActivate {
         normalizedOrigin.startsWith('http://localhost') ||
         normalizedOrigin.startsWith('http://127.0.0.1'));
 
-    if (!allowedOrigins.includes(normalizedOrigin) && !isLocalDevOrigin) {
+    const isVercelOrigin = normalizedOrigin.endsWith('.vercel.app');
+
+    if (!allowedOrigins.includes(normalizedOrigin) && !isLocalDevOrigin && !isVercelOrigin) {
       throw new ForbiddenException('CSRF Protection: Untrusted request origin.');
     }
 
