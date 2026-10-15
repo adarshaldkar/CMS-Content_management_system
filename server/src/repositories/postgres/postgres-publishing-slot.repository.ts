@@ -50,9 +50,10 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
   constructor(private readonly postgres: PostgresService) {}
 
   private async ensureSchema(): Promise<void> {
-    this.ready ??= this.postgres.pool
-      .query(
-        `
+    if (!this.ready) {
+      this.ready = this.postgres.pool
+        .query(
+          `
         CREATE TABLE IF NOT EXISTS cms_publishing_slots (
           id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           name text NOT NULL,
@@ -90,14 +91,15 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
           ('Nightly Deep-Dive Edition', 'nightly-deep-dive', '20:30:00', 'UTC', 'ALL', 5, 5)
         ON CONFLICT (slug) DO NOTHING;
       `,
-      )
-      .then(() => undefined)
-      .catch((err) => {
-        this.logger.error('Failed to initialize publishing slot schema', err.stack);
-        throw err;
-      });
+        )
+        .then(() => undefined)
+        .catch((err) => {
+          this.logger.error('Failed to initialize publishing slot schema', err.stack);
+          throw err;
+        });
+    }
 
-    return this.ready;
+    await this.ready;
   }
 
   private mapSlot(row: SlotRow): PublishingSlot {
@@ -146,7 +148,7 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
       ORDER BY s.dispatch_time ASC
     `;
     const res = await this.postgres.pool.query<SlotRow>(query);
-    return res.rows.map((r) => this.mapSlot(r));
+    return res.rows.map((r: SlotRow) => this.mapSlot(r));
   }
 
   async findSlotById(id: string): Promise<PublishingSlot | null> {
@@ -250,7 +252,7 @@ export class PostgresPublishingSlotRepository implements IPublishingSlotReposito
       ORDER BY m.created_at DESC
     `;
     const res = await this.postgres.pool.query<AssignmentRow>(query);
-    return res.rows.map((r) => this.mapAssignment(r));
+    return res.rows.map((r: AssignmentRow) => this.mapAssignment(r));
   }
 
   async findAssignmentByAuthorId(authorId: string): Promise<AuthorSlotAssignment | null> {
