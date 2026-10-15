@@ -12,6 +12,8 @@
     "dev:client": "npm run dev -w client",
     "dev:server": "npm run start:dev -w server",
     "build": "npm run build -w client && npm run build -w server",
+    "build:server": "npm run build -w server",
+    "start:server": "node server/dist/main.js",
     "lint": "npm run lint -w client && npm run lint -w server",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
