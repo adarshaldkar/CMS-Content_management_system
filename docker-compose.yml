@@ -14,8 +14,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 512M
+          cpus: '0.5'
+          memory: 256M
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U cms -d cms_platform']
       interval: 10s
@@ -38,8 +38,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
-          memory: 512M
+          cpus: '0.5'
+          memory: 384M
     healthcheck:
       test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
       interval: 10s
@@ -50,7 +50,9 @@ services:
     image: mariadb:11
     container_name: cms-mariadb
     restart: unless-stopped
-    command: --innodb-buffer-pool-size=64M
+    profiles:
+      - mesh
+    command: --innodb-buffer-pool-size=48M
     environment:
       MARIADB_USER: cms
       MARIADB_PASSWORD: cms_dev_password
@@ -63,8 +65,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 384M
+          cpus: '0.25'
+          memory: 256M
     healthcheck:
       test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
       interval: 10s
@@ -75,7 +77,9 @@ services:
     image: mysql:8.4
     container_name: cms-mysql
     restart: unless-stopped
-    command: --innodb-buffer-pool-size=64M
+    profiles:
+      - mesh
+    command: --innodb-buffer-pool-size=48M
     environment:
       MYSQL_USER: cms
       MYSQL_PASSWORD: cms_dev_password
@@ -88,8 +92,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 384M
+          cpus: '0.25'
+          memory: 256M
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'cms', '-pcms_dev_password']
       interval: 10s
@@ -100,7 +104,9 @@ services:
     image: cockroachdb/cockroach:latest
     container_name: cms-cockroachdb
     restart: unless-stopped
-    command: start-single-node --insecure --max-sql-memory=128MB --cache=128MB
+    profiles:
+      - mesh
+    command: start-single-node --insecure --max-sql-memory=96MB --cache=96MB
     ports:
       - '26257:26257'
       - '8080:8080'
@@ -109,8 +115,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
-          memory: 512M
+          cpus: '0.5'
+          memory: 256M
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/health?ready=1']
       interval: 10s
@@ -121,6 +127,8 @@ services:
     image: clickhouse/clickhouse-server:latest
     container_name: cms-clickhouse
     restart: unless-stopped
+    profiles:
+      - mesh
     environment:
       CLICKHOUSE_DB: cms_platform
       CLICKHOUSE_USER: default
@@ -134,8 +142,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.75'
-          memory: 1G
+          cpus: '0.5'
+          memory: 512M
     healthcheck:
       test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:8123/ping']
       interval: 10s
@@ -146,7 +154,7 @@ services:
     image: redis:7-alpine
     container_name: cms-redis
     restart: unless-stopped
-    command: redis-server --requirepass cms_dev_password --maxmemory 256mb --maxmemory-policy noeviction --appendonly yes
+    command: redis-server --requirepass cms_dev_password --maxmemory 128mb --maxmemory-policy noeviction --appendonly yes
     ports:
       - '6379:6379'
     volumes:
@@ -154,8 +162,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '0.25'
+          memory: 128M
     healthcheck:
       test: ['CMD', 'redis-cli', '-a', 'cms_dev_password', 'ping']
       interval: 5s
@@ -177,8 +185,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
+          cpus: '1.0'
+          memory: 1G
     logging:
       driver: 'json-file'
       options:

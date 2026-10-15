@@ -125,13 +125,18 @@ export class MariaDbUserRepository implements IUserRepository {
 
   async create(data: CreateUserDto): Promise<User> {
     await this.mariadb.ensureSchema();
-    const id = randomUUID();
+    const id = data.id || randomUUID();
     const userRole = data.role || UserRole.AUTHOR;
     const isActive = data.isActive !== undefined ? data.isActive : true;
 
     await this.mariadb.pool.query(
       `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         password_hash = VALUES(password_hash),
+         name = VALUES(name),
+         role = VALUES(role),
+         is_active = VALUES(is_active);`,
       [
         id,
         data.email,
@@ -145,7 +150,7 @@ export class MariaDbUserRepository implements IUserRepository {
       ],
     );
 
-    return (await this.findById(id))!;
+    return (await this.findByEmail(data.email))!;
   }
 
   async update(id: string, data: UpdateUserDto): Promise<User> {

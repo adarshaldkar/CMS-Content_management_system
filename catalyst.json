@@ -1,0 +1,11 @@
+{
+  "client": {
+    "source": "client/dist"
+  },
+  "appsail": [
+    {
+      "name": "cms-backend",
+      "source": "server"
+    }
+  ]
+}

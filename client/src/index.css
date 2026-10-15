@@ -4,6 +4,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import '@xyflow/react/dist/style.css';
 
 /* Utility to completely hide scrollbars across all browsers and operating systems */
 .no-scrollbar::-webkit-scrollbar {

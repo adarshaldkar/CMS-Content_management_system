@@ -96,7 +96,7 @@ export class MongoUserRepository implements IUserRepository {
   }
 
   async create(data: CreateUserDto): Promise<User> {
-    const doc = await this.userModel.create({
+    const payload: any = {
       ...data,
       email: data.email.toLowerCase(),
       preferredTopics: data.preferredTopics ?? [],
@@ -106,8 +106,33 @@ export class MongoUserRepository implements IUserRepository {
       acceptedTermsVersion: data.acceptedTermsVersion ?? null,
       acceptedTermsAt: data.acceptedTermsAt ?? null,
       notificationPreferences: data.notificationPreferences ?? null,
-    });
-    return this.toDomain(doc);
+    };
+    if (data.id) {
+      payload._id = data.id;
+    }
+
+    try {
+      const doc = await this.userModel.create(payload);
+      return this.toDomain(doc);
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        // Duplicate key, update existing record with new password hash & role
+        const existing = await this.userModel.findOneAndUpdate(
+          { email: data.email.toLowerCase() },
+          {
+            $set: {
+              passwordHash: data.passwordHash,
+              role: data.role ?? UserRole.USER,
+              isActive: data.isActive ?? true,
+              isEmailVerified: data.isEmailVerified ?? false,
+            },
+          },
+          { new: true },
+        ).exec();
+        if (existing) return this.toDomain(existing);
+      }
+      throw err;
+    }
   }
 
   async update(id: string, data: UpdateUserDto): Promise<User> {

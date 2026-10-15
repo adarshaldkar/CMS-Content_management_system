@@ -49,6 +49,7 @@ export class MultiDatabaseMeshService implements OnApplicationBootstrap {
   private async initializeSecondarySchemasInBackground(): Promise<void> {
     const startTime = Date.now();
     const results = await Promise.allSettled([
+      this.postgres.ensureSchema(),
       this.mariadb.ensureSchema(),
       this.mysql.ensureSchema(),
       this.cockroach.ensureSchema(),

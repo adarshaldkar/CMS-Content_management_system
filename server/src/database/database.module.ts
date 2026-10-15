@@ -13,6 +13,8 @@ import { DatabaseSwitcherController } from './database-switcher.controller';
 import { AuditModule } from '../modules/audit/audit.module';
 import { RepositoryRegistryService } from '../repositories/repository-registry.service';
 
+import { AutoFailoverService } from './auto-failover.service';
+
 @Global()
 @Module({
   imports: [
@@ -24,10 +26,10 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
 
         return {
           uri,
-          serverSelectionTimeoutMS: 3000,
-          connectTimeoutMS: 3000,
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 5000,
           lazyConnection: true,
-          bufferCommands: false,
+          bufferCommands: true,
 
           autoIndex: false,
           connectionFactory: (connection: any) => {
@@ -50,6 +52,7 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
     ClickHouseService,
     MultiDatabaseMeshService,
     DatabaseSwitcherService,
+    AutoFailoverService,
     RepositoryRegistryService,
   ],
   exports: [
@@ -60,6 +63,7 @@ import { RepositoryRegistryService } from '../repositories/repository-registry.s
     ClickHouseService,
     MultiDatabaseMeshService,
     DatabaseSwitcherService,
+    AutoFailoverService,
     MongooseModule,
     RepositoryRegistryService,
   ],

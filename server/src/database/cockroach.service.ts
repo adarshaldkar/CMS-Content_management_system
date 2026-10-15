@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import type { EnvConfig } from '../config/env.schema';
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 @Injectable()
 export class CockroachDbService implements OnModuleDestroy {
   private readonly logger = new Logger(CockroachDbService.name);
@@ -11,10 +14,19 @@ export class CockroachDbService implements OnModuleDestroy {
 
   constructor(private readonly config: ConfigService<EnvConfig, true>) {
     const url = this.config.get('COCKROACH_URL', { infer: true }) || 'postgresql://root@localhost:26257/cms_platform?sslmode=disable';
+    
+    let sslConfig: any = undefined;
+    if (url.includes('sslmode=verify-full') || url.includes('cockroachlabs.cloud') || url.includes('sslmode=require')) {
+      const certPath = path.join(process.env.APPDATA || '', 'postgresql', 'root.crt');
+      const ca = fs.existsSync(certPath) ? fs.readFileSync(certPath).toString() : undefined;
+      sslConfig = ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false };
+    }
+
     this.pool = new Pool({
       connectionString: url,
       max: 10,
       connectionTimeoutMillis: 5000,
+      ssl: sslConfig,
     });
 
     this.pool.on('error', (err) => {

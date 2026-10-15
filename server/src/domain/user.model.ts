@@ -44,6 +44,7 @@ export interface User {
 }
 
 export interface CreateUserDto {
+  id?: string;
   email: string;
   name: string;
   passwordHash: string;

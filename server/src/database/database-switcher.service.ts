@@ -15,7 +15,7 @@ import { MultiDatabaseMeshService, type DatabaseEngine, type DatabaseHealthInfo 
 import { AuditService } from '../modules/audit/audit.service';
 import { RepositoryRegistryService } from '../repositories/repository-registry.service';
 import { ALL_DATABASE_REPOSITORIES } from '../repositories/repository.providers';
-import { AuditEventType, type AuthUser } from '../domain/models';
+import { AuditEventType, type AuthUser, UserRole } from '../domain/models';
 
 import { RedisService } from '../redis/redis.service';
 
@@ -138,13 +138,22 @@ export class DatabaseSwitcherService {
 
   async switchDatabase(
     targetDb: DatabaseEngine,
-    actor: AuthUser,
+    actor?: AuthUser,
   ): Promise<{
     success: boolean;
     previousDatabase: string;
     activeDatabase: string;
     state: SwitchState;
   }> {
+    const effectiveActor: AuthUser = actor ?? {
+      id: 'system-auto-failover-daemon',
+      email: 'system-failover@gazette.internal',
+      name: 'System Auto-Failover Monitor',
+      role: UserRole.SUPER_ADMIN,
+      isActive: true,
+      permissions: [],
+    };
+
     if (this.switchLock) {
       throw new BadRequestException(
         'A database switch operation is currently in progress. Please wait.',
@@ -214,14 +223,14 @@ export class DatabaseSwitcherService {
       await this.redisService.publish('cms:channel:mesh_switch', {
         targetDb,
         switchVersion: this.switchVersion,
-        switchedBy: actor.id,
+        switchedBy: effectiveActor.id,
         fencingToken: lockResult?.fencingToken,
         timestamp: new Date().toISOString(),
       });
 
       // Step 4: Audit trail
       await this.auditService.log({
-        actorId: actor.id,
+        actorId: effectiveActor.id,
         action: AuditEventType.DB_SWITCH_SUCCESS,
         resource: `Database:${targetDb}`,
         result: 'SUCCESS',

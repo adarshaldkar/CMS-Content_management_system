@@ -33,11 +33,14 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     const password = this.configService.get<string>('REDIS_PASSWORD', '');
     const db = this.configService.get<number>('REDIS_DB', 0);
 
+    const isTls = host.includes('upstash.io') || this.configService.get<string>('REDIS_TLS') === 'true';
+
     const redisOptions: RedisOptions = {
       host,
       port,
       password: password || undefined,
       db,
+      tls: isTls ? {} : undefined,
       lazyConnect: true,
       maxRetriesPerRequest: 2,
       retryStrategy: (times) => {

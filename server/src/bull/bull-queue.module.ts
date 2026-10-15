@@ -16,6 +16,7 @@ import { QUEUE_NAMES } from './bull-queue.constants';
         const password = configService.get('REDIS_PASSWORD', { infer: true });
         const db = configService.get('REDIS_DB', { infer: true });
 
+        const isTls = host?.includes('upstash.io') || (configService.get as any)('REDIS_TLS') === 'true';
         return {
           prefix: 'bull:cms',
           connection: {
@@ -23,6 +24,7 @@ import { QUEUE_NAMES } from './bull-queue.constants';
             port,
             password: password || undefined,
             db,
+            tls: isTls ? {} : undefined,
             maxRetriesPerRequest: null,
             enableReadyCheck: false,
           },

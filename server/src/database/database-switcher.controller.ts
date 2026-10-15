@@ -10,17 +10,26 @@ import { HighAssuranceAdminGuard } from '../common/guards/admin-security.guard';
 import { CurrentUser, RequirePermissions } from '../common/decorators/security.decorators';
 import { Permission, type AuthUser } from '../domain/models';
 
+import { AutoFailoverService } from './auto-failover.service';
+
 @ApiTags('database')
 @Controller('database')
 @UseGuards(JwtAuthGuard, CsrfGuard, PermissionsGuard, HighAssuranceAdminGuard)
 export class DatabaseSwitcherController {
-  constructor(private readonly switcherService: DatabaseSwitcherService) {}
+  constructor(
+    private readonly switcherService: DatabaseSwitcherService,
+    private readonly autoFailoverService: AutoFailoverService,
+  ) {}
 
   @Get('status')
   @ApiOperation({ summary: 'Get real-time database connection status and health across all 6 engines' })
   @RequirePermissions(Permission.AUDIT_READ)
-  async getStatus(): Promise<DatabaseHealthStatus> {
-    return this.switcherService.getStatus();
+  async getStatus(): Promise<DatabaseHealthStatus & { autoFailover: any }> {
+    const status = await this.switcherService.getStatus();
+    return {
+      ...status,
+      autoFailover: this.autoFailoverService.getStatus(),
+    };
   }
 
   @Post('switch')
@@ -32,6 +41,17 @@ export class DatabaseSwitcherController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.switcherService.switchDatabase(body.targetDatabase, user);
+  }
+
+  @Post('auto-failover/reset')
+  @ApiOperation({ summary: 'Clear manual database override and restore PostgreSQL primary priority' })
+  @RequirePermissions(Permission.DATABASE_SWITCH)
+  async resetAutoFailover() {
+    this.autoFailoverService.resetManualOverride();
+    return {
+      success: true,
+      message: 'Manual override cleared. Automatic failover and primary restoration sentinel active.',
+    };
   }
 }
 

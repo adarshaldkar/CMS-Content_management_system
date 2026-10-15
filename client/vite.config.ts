@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   resolve: {
     alias: {
@@ -21,7 +22,7 @@ export default defineConfig({
       ],
       deny: ['**/.env*', '**/.git*', '../server/**', '../.agents/**'],
     },
-    allowedHosts: ['host.docker.internal', 'localhost', '127.0.0.1'],
+    allowedHosts: true,
     headers: {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',

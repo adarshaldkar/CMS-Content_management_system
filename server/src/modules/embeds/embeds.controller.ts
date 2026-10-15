@@ -6,11 +6,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { EmbedsService } from './embeds.service';
 import { ScrapeEmbedDto, EmbedMetadataResponseDto } from './dto/embeds.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
+@SkipThrottle({ 'auth-sensitive': true })
 @Controller('embeds')
 export class EmbedsController {
   constructor(private readonly embedsService: EmbedsService) {}

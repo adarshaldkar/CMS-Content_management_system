@@ -122,13 +122,18 @@ export class MySqlUserRepository implements IUserRepository {
 
   async create(data: CreateUserDto): Promise<User> {
     await this.mysql.ensureSchema();
-    const id = randomUUID();
+    const id = data.id || randomUUID();
     const userRole = data.role || UserRole.AUTHOR;
     const isActive = data.isActive !== undefined ? data.isActive : true;
 
     await this.mysql.pool.query(
       `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics, is_email_verified, email_verification_token, email_verification_expires_at, accepted_terms_version, accepted_terms_at, notification_preferences)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         password_hash = VALUES(password_hash),
+         name = VALUES(name),
+         role = VALUES(role),
+         is_active = VALUES(is_active);`,
       [
         id,
         data.email,
@@ -148,7 +153,7 @@ export class MySqlUserRepository implements IUserRepository {
       ],
     );
 
-    return (await this.findById(id))!;
+    return (await this.findByEmail(data.email))!;
   }
 
   async update(id: string, data: UpdateUserDto): Promise<User> {

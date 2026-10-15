@@ -52,6 +52,7 @@ export class CsrfGuard implements CanActivate {
     }
 
     const clientUrl = this.config.get('CLIENT_URL', { infer: true }) || 'http://localhost:5173';
+    const nodeEnv = this.config.get('NODE_ENV', { infer: true });
 
     const allowedOrigins = [
       clientUrl,
@@ -63,7 +64,15 @@ export class CsrfGuard implements CanActivate {
 
     const normalizedOrigin = originSource.toLowerCase().replace(/\/+$/, '');
 
-    if (!allowedOrigins.includes(normalizedOrigin)) {
+    const isLocalDevOrigin =
+      nodeEnv !== 'production' &&
+      (/^http:\/\/(192\.168\.\d+\.\d+|10\.0\.\d+\.\d+|172\.\d+\.\d+\.\d+)(:\d+)?$/.test(
+        normalizedOrigin,
+      ) ||
+        normalizedOrigin.startsWith('http://localhost') ||
+        normalizedOrigin.startsWith('http://127.0.0.1'));
+
+    if (!allowedOrigins.includes(normalizedOrigin) && !isLocalDevOrigin) {
       throw new ForbiddenException('CSRF Protection: Untrusted request origin.');
     }
 

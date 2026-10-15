@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, Route, Routes } from 'react-router-dom';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { UserLayout } from './components/layout/UserLayout';
 import { AdminLayout } from './components/layout/AdminLayout';
@@ -37,6 +37,7 @@ const UserProfilePage = lazy(() => import('./pages/user/UserProfilePage').then((
 const UserSettingsPage = lazy(() => import('./pages/user/UserSettingsPage').then((m) => ({ default: m.UserSettingsPage })));
 const UserLibraryPage = lazy(() => import('./pages/user/UserLibraryPage').then((m) => ({ default: m.UserLibraryPage })));
 const ArticleEditorPage = lazy(() => import('./pages/ArticleEditorPage').then((m) => ({ default: m.ArticleEditorPage })));
+const ArchitectureStudioPage = lazy(() => import('./pages/ArchitectureStudioPage').then((m) => ({ default: m.ArchitectureStudioPage })));
 
 // Admin Governance Pages
 const EditorialReviewPage = lazy(() => import('./pages/admin/EditorialReviewPage').then((m) => ({ default: m.EditorialReviewPage })));
@@ -78,7 +79,7 @@ export default function App() {
   }, [checkAuth]);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <ScrollToTop />
       <CommandPaletteModal />
       <Suspense fallback={<PageLoaderFallback />}>
@@ -108,6 +109,10 @@ export default function App() {
               <Route path="/legal/copyright" element={<CopyrightPageLazy />} />
               <Route path="/legal/acceptable-use" element={<AcceptableUsePageLazy />} />
             </Route>
+
+            {/* Interactive Architecture & Diagram Studio (React Flow) */}
+            <Route path="/architecture" element={<ArchitectureStudioPage />} />
+            <Route path="/diagrams" element={<ArchitectureStudioPage />} />
 
             {/* 2. Public-Only Auth Routes */}
             <Route element={<PublicOnlyRoute />}>
@@ -177,6 +182,6 @@ export default function App() {
       </Suspense>
       {/* Global Cookie Consent Banner (shown once until user decides) */}
       <CookieConsentBanner />
-    </BrowserRouter>
+    </HashRouter>
   );
 }

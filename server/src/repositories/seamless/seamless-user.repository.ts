@@ -80,6 +80,18 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
     return targets;
   }
 
+  private get allPeerStores(): IUserRepository[] {
+    const active = this.activeRepo;
+    const list: (IUserRepository | undefined)[] = [
+      this.postgresStore,
+      this.mongoStore,
+      this.mariadbRepo,
+      this.mysqlRepo,
+      this.cockroachRepo,
+    ];
+    return list.filter((r): r is IUserRepository => Boolean(r && r !== active));
+  }
+
   private get jitReadPeer(): IUserRepository {
     return activeEngine() === 'mongodb' ? this.postgresStore : this.mongoStore;
   }
@@ -91,6 +103,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
     for (const store of this.peerStores) {
       tasks.push(
         store.create({
+          id: user.id,
           email: user.email,
           name: user.name,
           passwordHash: user.passwordHash || '',
@@ -99,6 +112,7 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
           preferredTopics: user.preferredTopics || [],
           role: user.role,
           isActive: user.isActive,
+          isEmailVerified: user.isEmailVerified,
         }).catch((e) => this.logger.debug(`Peer user sync note: ${e.message}`)),
       );
     }
@@ -134,7 +148,13 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
         this.mariadb.pool.query(
           `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE name=VALUES(name), bio=VALUES(bio), avatar_url=VALUES(avatar_url), role=VALUES(role), preferred_topics=VALUES(preferred_topics);`,
+           ON DUPLICATE KEY UPDATE
+             password_hash=VALUES(password_hash),
+             name=VALUES(name),
+             bio=VALUES(bio),
+             avatar_url=VALUES(avatar_url),
+             role=VALUES(role),
+             preferred_topics=VALUES(preferred_topics);`,
           [
             user.id,
             user.email,
@@ -156,7 +176,13 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
         this.mysql.pool.query(
           `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE name=VALUES(name), bio=VALUES(bio), avatar_url=VALUES(avatar_url), role=VALUES(role), preferred_topics=VALUES(preferred_topics);`,
+           ON DUPLICATE KEY UPDATE
+             password_hash=VALUES(password_hash),
+             name=VALUES(name),
+             bio=VALUES(bio),
+             avatar_url=VALUES(avatar_url),
+             role=VALUES(role),
+             preferred_topics=VALUES(preferred_topics);`,
           [
             user.id,
             user.email,
@@ -178,7 +204,15 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
         this.cockroach.pool.query(
           `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, bio=EXCLUDED.bio, avatar_url=EXCLUDED.avatar_url, role=EXCLUDED.role, preferred_topics=EXCLUDED.preferred_topics, updated_at=now();`,
+           ON CONFLICT (email) DO UPDATE SET
+             id=EXCLUDED.id,
+             password_hash=EXCLUDED.password_hash,
+             name=EXCLUDED.name,
+             bio=EXCLUDED.bio,
+             avatar_url=EXCLUDED.avatar_url,
+             role=EXCLUDED.role,
+             preferred_topics=EXCLUDED.preferred_topics,
+             updated_at=now();`,
           [
             user.id,
             user.email,
@@ -220,56 +254,80 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
   }
 
   async findById(id: string): Promise<User | null> {
-    const user = await this.activeRepo.findById(id);
-    if (user) return user;
-
     try {
-      const peerUser = await this.jitReadPeer.findById(id);
-      if (peerUser) {
-        this.logger.log(`[Seamless Sync] JIT replicating user ${peerUser.email} by ID`);
-        const replicated = await this.activeRepo.create({
-          email: peerUser.email,
-          name: peerUser.name,
-          passwordHash: peerUser.passwordHash || '',
-          bio: peerUser.bio,
-          avatarUrl: peerUser.avatarUrl,
-          preferredTopics: peerUser.preferredTopics || [],
-          role: peerUser.role,
-          isActive: peerUser.isActive,
-        });
-        this.replicateToAll(replicated).catch(() => {});
-        return replicated;
-      }
+      const user = await this.activeRepo.findById(id);
+      if (user) return user;
     } catch (err: any) {
-      this.logger.warn(`[Seamless Sync] Peer DB lookup by ID failed: ${err.message}`);
+      this.logger.debug(`Active store findById failed: ${err.message}`);
+    }
+
+    for (const peer of this.allPeerStores) {
+      try {
+        const peerUser = await peer.findById(id);
+        if (peerUser) {
+          this.logger.log(`[Seamless Sync] JIT replicating user ${peerUser.email} by ID`);
+          try {
+            const replicated = await this.activeRepo.create({
+              id: peerUser.id,
+              email: peerUser.email,
+              name: peerUser.name,
+              passwordHash: peerUser.passwordHash || '',
+              bio: peerUser.bio,
+              avatarUrl: peerUser.avatarUrl,
+              preferredTopics: peerUser.preferredTopics || [],
+              role: peerUser.role,
+              isActive: peerUser.isActive,
+              isEmailVerified: peerUser.isEmailVerified,
+            });
+            this.replicateToAll(replicated).catch(() => {});
+            return replicated;
+          } catch {
+            return peerUser;
+          }
+        }
+      } catch (err: any) {
+        this.logger.debug(`Peer DB lookup by ID failed: ${err.message}`);
+      }
     }
 
     return null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const user = await this.activeRepo.findByEmail(email);
-    if (user) return user;
-
     try {
-      const peerUser = await this.jitReadPeer.findByEmail(email);
-      if (peerUser) {
-        this.logger.log(`[Seamless Sync] JIT replicating user ${peerUser.email} on login`);
-        const replicated = await this.activeRepo.create({
-          email: peerUser.email,
-          name: peerUser.name,
-          passwordHash: peerUser.passwordHash || '',
-          bio: peerUser.bio,
-          avatarUrl: peerUser.avatarUrl,
-          preferredTopics: peerUser.preferredTopics || [],
-          role: peerUser.role,
-          isActive: peerUser.isActive,
-        });
-        this.replicateToAll(replicated).catch(() => {});
-        return replicated;
-      }
+      const user = await this.activeRepo.findByEmail(email);
+      if (user) return user;
     } catch (err: any) {
-      this.logger.warn(`[Seamless Sync] Peer DB lookup by Email failed: ${err.message}`);
+      this.logger.debug(`Active store findByEmail failed: ${err.message}`);
+    }
+
+    for (const peer of this.allPeerStores) {
+      try {
+        const peerUser = await peer.findByEmail(email);
+        if (peerUser) {
+          this.logger.log(`[Seamless Sync] JIT replicating user ${peerUser.email} on login`);
+          try {
+            const replicated = await this.activeRepo.create({
+              id: peerUser.id,
+              email: peerUser.email,
+              name: peerUser.name,
+              passwordHash: peerUser.passwordHash || '',
+              bio: peerUser.bio,
+              avatarUrl: peerUser.avatarUrl,
+              preferredTopics: peerUser.preferredTopics || [],
+              role: peerUser.role,
+              isActive: peerUser.isActive,
+              isEmailVerified: peerUser.isEmailVerified,
+            });
+            this.replicateToAll(replicated).catch(() => {});
+            return replicated;
+          } catch {
+            return peerUser;
+          }
+        }
+      } catch (err: any) {
+        this.logger.debug(`Peer DB lookup by Email failed: ${err.message}`);
+      }
     }
 
     return null;
@@ -315,6 +373,29 @@ export class SeamlessUserRepository implements IUserRepository, IRuntimeSwitchab
   }
 
   async updatePassword(userId: string, newPasswordHash: string): Promise<void> {
-    return this.activeRepo.updatePassword(userId, newPasswordHash);
+    await this.activeRepo.updatePassword(userId, newPasswordHash);
+
+    // Replicate new password to all other engines so failover never breaks auth
+    for (const peer of this.allPeerStores) {
+      peer.updatePassword(userId, newPasswordHash).catch((e) =>
+        this.logger.debug(`Peer password sync deferred: ${e.message}`),
+      );
+    }
+
+    if (this.mariadb) {
+      this.mariadb.pool
+        .query('UPDATE cms_users SET password_hash = ? WHERE id = ?', [newPasswordHash, userId])
+        .catch(() => {});
+    }
+    if (this.mysql) {
+      this.mysql.pool
+        .query('UPDATE cms_users SET password_hash = ? WHERE id = ?', [newPasswordHash, userId])
+        .catch(() => {});
+    }
+    if (this.cockroach) {
+      this.cockroach.pool
+        .query('UPDATE cms_users SET password_hash = $1 WHERE id = $2', [newPasswordHash, userId])
+        .catch(() => {});
+    }
   }
 }

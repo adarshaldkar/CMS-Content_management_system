@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { QueryResultRow } from 'pg';
 import type {
   CreateUserDto,
@@ -173,15 +174,23 @@ export class PostgresUserRepository implements IUserRepository {
 
   async create(data: CreateUserDto): Promise<User> {
     await this.ensureSchema();
+    const id = data.id || randomUUID();
     const result = await this.postgres.pool.query<UserRow>(
       `INSERT INTO cms_users (
-         email, name, password_hash, bio, avatar_url, preferred_topics, role, is_active,
+         id, email, name, password_hash, bio, avatar_url, preferred_topics, role, is_active,
          is_email_verified, email_verification_token, email_verification_expires_at,
          accepted_terms_version, accepted_terms_at, notification_preferences
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (email) DO UPDATE SET
+         password_hash = EXCLUDED.password_hash,
+         name = EXCLUDED.name,
+         role = EXCLUDED.role,
+         is_active = true,
+         updated_at = now()
        RETURNING *`,
       [
+        id,
         data.email.toLowerCase(),
         data.name,
         data.passwordHash,

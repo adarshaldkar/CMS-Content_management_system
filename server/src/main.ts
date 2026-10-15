@@ -25,7 +25,8 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const config = app.get<ConfigService<EnvConfig, true>>(ConfigService);
-  const port = config.get('PORT', { infer: true });
+  const catalystPort = process.env.X_ZOHO_CATALYST_LISTEN_PORT ? parseInt(process.env.X_ZOHO_CATALYST_LISTEN_PORT, 10) : undefined;
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : (catalystPort || config.get('PORT', { infer: true }) || 3001);
   const clientUrl = config.get('CLIENT_URL', { infer: true });
   const nodeEnv = config.get('NODE_ENV', { infer: true });
 
@@ -135,7 +136,16 @@ async function bootstrap() {
 
   // 4. Strict CORS
   app.enableCors({
-    origin: [clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin || nodeEnv !== 'production') return callback(null, true);
+      if ([clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'].includes(origin) || origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -163,7 +173,7 @@ async function bootstrap() {
   }
 
   const listenStart = performance.now();
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   const totalBootTime = (performance.now() - bootStart).toFixed(1);
   console.log(`[BOOT] Server listening: ${(performance.now() - listenStart).toFixed(1)}ms`);
   console.log(`[BOOT] Total Backend Startup Time: ${totalBootTime}ms (~${(Number(totalBootTime) / 1000).toFixed(2)}s)`);

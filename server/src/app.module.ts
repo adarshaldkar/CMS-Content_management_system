@@ -58,6 +58,11 @@ import { MessagesModule } from './modules/messages/messages.module';
         ttl: 60000,
         limit: process.env.THROTTLE_LIMIT ? parseInt(process.env.THROTTLE_LIMIT, 10) : 50000,
       },
+      {
+        name: 'auth-sensitive',
+        ttl: 60000,
+        limit: 50000,
+      },
     ]),
   ],
   providers: [

@@ -1,0 +1,7 @@
+{
+  "command": "node dist/main.js",
+  "buildPath": ".",
+  "stack": "node20",
+  "memory": 512,
+  "env_variables": {}
+}

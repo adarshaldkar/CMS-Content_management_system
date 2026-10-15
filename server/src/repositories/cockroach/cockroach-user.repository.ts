@@ -124,13 +124,19 @@ export class CockroachUserRepository implements IUserRepository {
 
   async create(data: CreateUserDto): Promise<User> {
     await this.cockroach.ensureSchema();
-    const id = randomUUID();
+    const id = data.id || randomUUID();
     const userRole = data.role || UserRole.AUTHOR;
     const isActive = data.isActive !== undefined ? data.isActive : true;
 
     await this.cockroach.pool.query(
       `INSERT INTO cms_users (id, email, name, password_hash, role, is_active, avatar_url, bio, preferred_topics, is_email_verified, email_verification_token, email_verification_expires_at, accepted_terms_version, accepted_terms_at, notification_preferences)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (email) DO UPDATE SET
+         password_hash = EXCLUDED.password_hash,
+         name = EXCLUDED.name,
+         role = EXCLUDED.role,
+         is_active = EXCLUDED.is_active,
+         updated_at = now();`,
       [
         id,
         data.email,
@@ -150,7 +156,7 @@ export class CockroachUserRepository implements IUserRepository {
       ],
     );
 
-    return (await this.findById(id))!;
+    return (await this.findByEmail(data.email))!;
   }
 
   async update(id: string, data: UpdateUserDto): Promise<User> {

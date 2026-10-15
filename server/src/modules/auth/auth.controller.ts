@@ -95,7 +95,10 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ 'auth-sensitive': { limit: 5, ttl: 60000 } })
+  @Throttle({
+    default: { limit: process.env.NODE_ENV === 'production' ? 5 : 100, ttl: 60000 },
+    'auth-sensitive': { limit: process.env.NODE_ENV === 'production' ? 5 : 100, ttl: 60000 },
+  })
   @ApiOperation({ summary: 'Log in with email and password' })
   async login(
     @Body() dto: LoginDto,
